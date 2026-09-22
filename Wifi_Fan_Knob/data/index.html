@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WiFi Fan Knob - Control Panel</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid rgba(255, 215, 0, 0.3);
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            color: #ffd700;
+            margin-bottom: 10px;
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+
+        .status-line {
+            font-size: 0.9rem;
+            color: #a0a0a0;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            border-bottom: 2px solid rgba(255, 215, 0, 0.2);
+        }
+
+        .tab-btn {
+            padding: 12px 24px;
+            border: none;
+            background: transparent;
+            color: #a0a0a0;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            position: relative;
+            border-bottom: 3px solid transparent;
+        }
+
+        .tab-btn:hover {
+            color: #ffd700;
+        }
+
+        .tab-btn.active {
+            color: #ffd700;
+            border-bottom-color: #ffd700;
+        }
+
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* FORM STYLES */
+        .form-grid {
+            display: grid;
+            gap: 20px;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        label {
+            font-weight: 600;
+            color: #ffd700;
+            font-size: 0.95rem;
+        }
+
+        input[type="text"],
+        input[type="password"],
+        input[type="number"],
+        input[type="email"],
+        select {
+            padding: 12px 15px;
+            border: 2px solid rgba(255, 215, 0, 0.2);
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.05);
+            color: #e0e0e0;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        input[type="text"]:focus,
+        input[type="password"]:focus,
+        input[type="number"]:focus,
+        input[type="email"]:focus,
+        select:focus {
+            outline: none;
+            border-color: #ffd700;
+            background: rgba(255, 215, 0, 0.1);
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: rgba(255, 215, 0, 0.2);
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #ffd700;
+            cursor: pointer;
+            box-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #ffd700;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
+        }
+
+        input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            accent-color: #ffd700;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 120px;
+        }
+
+        .btn-primary {
+            background: #ffd700;
+            color: #1a1a2e;
+        }
+
+        .btn-primary:hover {
+            background: #ffed4e;
+            box-shadow: 0 4px 12px rgba(255, 215, 0, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 215, 0, 0.1);
+            color: #ffd700;
+            border: 2px solid #ffd700;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 215, 0, 0.2);
+        }
+
+        .btn-danger {
+            background: rgba(255, 100, 100, 0.3);
+            color: #ff6464;
+            border: 2px solid #ff6464;
+        }
+
+        .btn-danger:hover {
+            background: rgba(255, 100, 100, 0.5);
+        }
+
+        /* STATUS CARDS */
+        .status-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(255, 215, 0, 0.2);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .status-card h3 {
+            color: #ffd700;
+            margin-bottom: 12px;
+            font-size: 1.1rem;
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 215, 0, 0.1);
+        }
+
+        .status-item:last-child {
+            border-bottom: none;
+        }
+
+        .status-label {
+            color: #a0a0a0;
+        }
+
+        .status-value {
+            color: #ffd700;
+            font-weight: 600;
+        }
+
+        /* HOME TAB SPECIFIC */
+        .rpm-display {
+            background: rgba(255, 215, 0, 0.1);
+            border: 3px solid #ffd700;
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .rpm-number {
+            font-size: 3.5rem;
+            color: #ffd700;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        .rpm-label {
+            color: #a0a0a0;
+            font-size: 1rem;
+            margin-top: 8px;
+        }
+
+        .presets-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .preset-btn {
+            padding: 15px 10px;
+            background: rgba(255, 215, 0, 0.1);
+            border: 2px solid rgba(255, 215, 0, 0.3);
+            border-radius: 6px;
+            color: #ffd700;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .preset-btn:hover {
+            background: rgba(255, 215, 0, 0.25);
+            border-color: #ffd700;
+        }
+
+        .speed-control {
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(255, 215, 0, 0.2);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .speed-control h3 {
+            color: #ffd700;
+            margin-bottom: 15px;
+        }
+
+        .speed-input-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .speed-input-group input[type="range"] {
+            flex: 1;
+        }
+
+        .speed-value {
+            color: #ffd700;
+            font-weight: 700;
+            min-width: 60px;
+            text-align: right;
+        }
+
+        /* OTA TAB */
+        .file-upload {
+            border: 2px dashed rgba(255, 215, 0, 0.3);
+            border-radius: 8px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .file-upload:hover {
+            border-color: #ffd700;
+            background: rgba(255, 215, 0, 0.05);
+        }
+
+        .file-upload input[type="file"] {
+            display: none;
+        }
+
+        .upload-text {
+            color: #a0a0a0;
+            margin-bottom: 10px;
+        }
+
+        .upload-hint {
+            color: #606060;
+            font-size: 0.85rem;
+        }
+
+        /* MESSAGES */
+        .alert {
+            padding: 15px 20px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            border-left: 4px solid;
+        }
+
+        .alert-success {
+            background: rgba(76, 175, 80, 0.1);
+            border-left-color: #4caf50;
+            color: #4caf50;
+        }
+
+        .alert-error {
+            background: rgba(244, 67, 54, 0.1);
+            border-left-color: #f44336;
+            color: #f44336;
+        }
+
+        .alert-info {
+            background: rgba(33, 150, 243, 0.1);
+            border-left-color: #2196f3;
+            color: #2196f3;
+        }
+
+        /* RESPONSIVE */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 1.8rem;
+            }
+
+            .tabs {
+                gap: 5px;
+            }
+
+            .tab-btn {
+                padding: 10px 16px;
+                font-size: 0.9rem;
+            }
+
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .rpm-number {
+                font-size: 2.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>⚡ WiFi Fan Knob</h1>
+            <div class="status-line">Control Panel • IP: <span id="device-ip">192.168.1.100</span> • Status: <span id="device-status">Online</span></div>
+        </header>
+
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('home')">Home</button>
+            <button class="tab-btn" onclick="switchTab('wifi')">WiFi</button>
+            <button class="tab-btn" onclick="switchTab('config')">Config</button>
+            <button class="tab-btn" onclick="switchTab('ota')">OTA Update</button>
+        </div>
+
+        <!-- HOME TAB -->
+        <div id="home" class="tab-content active">
+            <div class="rpm-display">
+                <div class="rpm-number" id="rpm-current">1500</div>
+                <div class="rpm-label">Current RPM</div>
+            </div>
+
+            <div class="status-card">
+                <h3>System Status</h3>
+                <div class="status-item">
+                    <span class="status-label">Fan Status:</span>
+                    <span class="status-value" id="fan-status">Running</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Power Mode:</span>
+                    <span class="status-value" id="power-mode">Active</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">WiFi Signal:</span>
+                    <span class="status-value" id="wifi-signal">-55 dBm</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">MQTT Connected:</span>
+                    <span class="status-value" id="mqtt-status">Yes</span>
+                </div>
+            </div>
+
+            <div class="status-card">
+                <h3>Quick Start Presets</h3>
+                <div class="presets-grid">
+                    <button class="preset-btn" onclick="setPreset(800)">Low (800)</button>
+                    <button class="preset-btn" onclick="setPreset(1200)">Med (1200)</button>
+                    <button class="preset-btn" onclick="setPreset(1600)">High (1600)</button>
+                    <button class="preset-btn" onclick="setPreset(2000)">Max (2000)</button>
+                </div>
+            </div>
+
+            <div class="speed-control">
+                <h3>Manual Speed Control</h3>
+                <div class="speed-input-group">
+                    <input type="range" id="speed-slider" min="0" max="2500" value="1500" oninput="updateSpeed(this.value)">
+                    <span class="speed-value" id="speed-display">1500</span>
+                </div>
+                <small style="color: #606060; display: block; margin-top: 10px;">Set fan speed manually (0-2500 RPM)</small>
+            </div>
+
+            <button class="btn-primary" onclick="applySpeed()">Apply Speed</button>
+            <button class="btn-secondary" style="margin-left: 10px;" onclick="standbyMode()">Standby</button>
+        </div>
+
+        <!-- WiFi TAB -->
+        <div id="wifi" class="tab-content">
+            <div class="status-card">
+                <h3>Network Information</h3>
+                <div class="status-item">
+                    <span class="status-label">Connected SSID:</span>
+                    <span class="status-value" id="current-ssid">Home WiFi</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">IP Address:</span>
+                    <span class="status-value" id="current-ip">192.168.1.100</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Signal Strength:</span>
+                    <span class="status-value" id="current-signal">-55 dBm</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">MAC Address:</span>
+                    <span class="status-value" style="font-family: monospace; font-size: 0.9rem;">AA:BB:CC:DD:EE:FF</span>
+                </div>
+            </div>
+
+            <form onsubmit="saveWiFi(event)">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="wifi-ssid">SSID</label>
+                        <input type="text" id="wifi-ssid" placeholder="Network name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="wifi-pass">Password</label>
+                        <input type="password" id="wifi-pass" placeholder="Network password">
+                    </div>
+                </div>
+                <button type="submit" class="btn-primary" style="margin-top: 15px;">Connect to WiFi</button>
+            </form>
+
+            <div style="margin-top: 20px;">
+                <button class="btn-secondary" onclick="scanWiFi()">Scan Available Networks</button>
+                <button class="btn-danger" onclick="forgetWiFi()">Forget Saved Network</button>
+            </div>
+        </div>
+
+        <!-- CONFIG TAB -->
+        <div id="config" class="tab-content">
+            <form onsubmit="saveConfig(event)">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="time-zone">Time Zone</label>
+                        <select id="time-zone" required>
+                            <option value="EST">Eastern (EST)</option>
+                            <option value="CST" selected>Central (CST)</option>
+                            <option value="MST">Mountain (MST)</option>
+                            <option value="PST">Pacific (PST)</option>
+                            <option value="UTC">UTC</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="time-format">Time Format</label>
+                        <select id="time-format" required>
+                            <option value="12h" selected>12-Hour</option>
+                            <option value="24h">24-Hour</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="status-card" style="margin-top: 20px;">
+                    <h3>Fan Calibration</h3>
+                    <p style="color: #a0a0a0; margin-bottom: 15px; font-size: 0.9rem;">Calibrate min/max PWM for your fan model</p>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="fan-min-pwm">Min PWM (start threshold)</label>
+                            <input type="number" id="fan-min-pwm" min="0" max="255" value="50" required>
+                            <small style="color: #606060;">0-255</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="fan-max-pwm">Max PWM (full speed)</label>
+                            <input type="number" id="fan-max-pwm" min="0" max="255" value="200" required>
+                            <small style="color: #606060;">0-255</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="status-card">
+                    <h3>MQTT Configuration</h3>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="mqtt-broker">MQTT Broker IP</label>
+                            <input type="text" id="mqtt-broker" placeholder="192.168.1.50" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="mqtt-port">Port</label>
+                            <input type="number" id="mqtt-port" value="1883" min="1" max="65535" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="mqtt-user">Username</label>
+                            <input type="text" id="mqtt-user" placeholder="(optional)">
+                        </div>
+                        <div class="form-group">
+                            <label for="mqtt-pass">Password</label>
+                            <input type="password" id="mqtt-pass" placeholder="(optional)">
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-top: 15px;">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="mqtt-discovery" checked>
+                            <label for="mqtt-discovery" style="margin: 0;">Enable Home Assistant Auto-Discovery</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="status-card">
+                    <h3>Display & Interface</h3>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="brightness">LCD Brightness</label>
+                            <input type="range" id="brightness" min="10" max="100" value="80" oninput="updateBrightnessLabel(this.value)">
+                            <small style="color: #606060;">Current: <span id="brightness-label">80</span>%</small>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-primary" style="margin-top: 15px;">Save Configuration</button>
+            </form>
+
+            <button class="btn-danger" style="margin-top: 10px;" onclick="resetConfig()">Reset to Defaults</button>
+        </div>
+
+        <!-- OTA TAB -->
+        <div id="ota" class="tab-content">
+            <div class="status-card">
+                <h3>Firmware Information</h3>
+                <div class="status-item">
+                    <span class="status-label">Current Version:</span>
+                    <span class="status-value">v1.0.0</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Build Date:</span>
+                    <span class="status-value">2026-09-22</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Chip ID:</span>
+                    <span class="status-value" style="font-family: monospace; font-size: 0.9rem;">A1B2C3D4E5F6</span>
+                </div>
+            </div>
+
+            <form onsubmit="uploadFirmware(event)">
+                <div class="file-upload" onclick="document.getElementById('firmware-file').click()">
+                    <input type="file" id="firmware-file" accept=".bin" onchange="selectFile(this)">
+                    <div class="upload-text">📁 Click to select firmware file or drag & drop</div>
+                    <div class="upload-hint">Supported: .bin (binary) files only</div>
+                    <div style="margin-top: 15px; color: #ffd700; font-weight: 600;" id="file-name"></div>
+                </div>
+
+                <div style="margin-top: 20px;">
+                    <button type="submit" class="btn-primary" id="upload-btn" disabled>Upload & Reboot</button>
+                </div>
+            </form>
+
+            <div style="margin-top: 30px; padding: 20px; background: rgba(255, 215, 0, 0.05); border-radius: 6px; border-left: 4px solid rgba(255, 215, 0, 0.3);">
+                <h4 style="color: #ffd700; margin-bottom: 10px;">⚠️ Important</h4>
+                <ul style="list-style: none; color: #a0a0a0; font-size: 0.9rem;">
+                    <li>✓ Do NOT power off during upload</li>
+                    <li>✓ Ensure stable WiFi connection</li>
+                    <li>✓ Upload may take 30-60 seconds</li>
+                    <li>✓ Device will reboot automatically after completion</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function switchTab(tabName) {
+            const contents = document.querySelectorAll('.tab-content');
+            const buttons = document.querySelectorAll('.tab-btn');
+
+            contents.forEach(tab => tab.classList.remove('active'));
+            buttons.forEach(btn => btn.classList.remove('active'));
+
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        function updateSpeed(value) {
+            document.getElementById('speed-display').textContent = value;
+        }
+
+        function applySpeed() {
+            const speed = document.getElementById('speed-slider').value;
+            console.log('Setting fan speed to:', speed, 'RPM');
+            alert('Fan speed set to ' + speed + ' RPM');
+        }
+
+        function setPreset(rpm) {
+            document.getElementById('speed-slider').value = rpm;
+            document.getElementById('speed-display').textContent = rpm;
+            applySpeed();
+        }
+
+        function standbyMode() {
+            console.log('Entering standby mode...');
+            alert('Entering standby mode. Touch display to wake.');
+        }
+
+        function updateBrightnessLabel(value) {
+            document.getElementById('brightness-label').textContent = value;
+        }
+
+        function saveWiFi(event) {
+            event.preventDefault();
+            const ssid = document.getElementById('wifi-ssid').value;
+            const pass = document.getElementById('wifi-pass').value;
+            console.log('Saving WiFi:', ssid);
+            alert('WiFi credentials saved. Reconnecting...');
+        }
+
+        function scanWiFi() {
+            alert('Scanning for available networks...\nFound: Home WiFi (-55 dBm), Guest WiFi (-70 dBm), Neighbor (-85 dBm)');
+        }
+
+        function forgetWiFi() {
+            if (confirm('Forget saved WiFi network?')) {
+                alert('Network forgotten. Device will enter AP mode on next reboot.');
+            }
+        }
+
+        function saveConfig(event) {
+            event.preventDefault();
+            console.log('Saving configuration...');
+            alert('Configuration saved successfully!');
+        }
+
+        function resetConfig() {
+            if (confirm('Reset all settings to factory defaults?')) {
+                alert('Configuration reset. Device will reboot.');
+            }
+        }
+
+        function selectFile(input) {
+            if (input.files && input.files[0]) {
+                document.getElementById('file-name').textContent = '✓ Selected: ' + input.files[0].name;
+                document.getElementById('upload-btn').disabled = false;
+            }
+        }
+
+        function uploadFirmware(event) {
+            event.preventDefault();
+            const file = document.getElementById('firmware-file').files[0];
+            if (file) {
+                console.log('Uploading:', file.name);
+                alert('Uploading firmware...\n\nThis will take 30-60 seconds.\nDo NOT power off the device!\n\nDevice will reboot automatically.');
+            }
+        }
+    </script>
+</body>
+</html>
