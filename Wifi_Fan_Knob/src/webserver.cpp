@@ -4,6 +4,9 @@
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
 #include <WiFi.h>
+#include <Update.h>
+#include <esp_ota_ops.h>
+#include <esp_app_desc.h>
 
 // Port comes from config, so the server is created after config loads
 static AsyncWebServer *server = nullptr;
@@ -11,6 +14,9 @@ static AsyncWebServer *server = nullptr;
 // web/index.html embedded by board_build.embed_txtfiles (NUL-terminated)
 extern const uint8_t index_html_start[] asm("_binary_web_index_html_start");
 extern const uint8_t index_html_end[] asm("_binary_web_index_html_end");
+
+// Error from the current/last OTA upload ("" = OK)
+static String ota_error;
 
 // Reboot once the response has been delivered to the browser
 static void restart_after_response(AsyncWebServerRequest *request) {
@@ -153,6 +159,12 @@ void init_webserver() {
     doc["fan_controller"] = fan_controller_present();
     doc["power_mode"] = "Active";   // Standby not implemented yet
     doc["mqtt_connected"] = false;  // MQTT not implemented yet
+    doc["fw_version"] = config.firmwareVersion;
+    char build_id[9];  // First 8 hex chars of firmware ELF SHA-256: unique per build
+    esp_app_get_elf_sha256(build_id, sizeof(build_id));
+    doc["fw_build"] = build_id;
+    doc["chip_id"] = config.chipId;
+    doc["app_slot"] = esp_ota_get_running_partition()->label;
     String body;
     serializeJson(doc, body);
     request->send(200, "application/json", body);
@@ -168,6 +180,45 @@ void init_webserver() {
     fan_set_target(rpm);
     request->send(200, "text/plain", "Target set to " + String(fan_get_target()) + " RPM");
   });
+
+  // OTA firmware upload: stream .bin into the spare app slot, validate, reboot.
+  // On any error the running firmware is untouched.
+  server->on("/api/ota", HTTP_POST,
+    [](AsyncWebServerRequest *request) {
+      if (ota_error.length() > 0 || !Update.isFinished()) {
+        String msg = ota_error.length() > 0 ? ota_error : String("Upload incomplete");
+        Serial.printf("[OTA] Failed: %s\n", msg.c_str());
+        request->send(500, "text/plain", "Update failed: " + msg);
+        return;
+      }
+      Serial.println("[OTA] Success, rebooting");
+      restart_after_response(request);
+      request->send(200, "text/plain", "Update OK. Rebooting...");
+    },
+    [](AsyncWebServerRequest *request, const String &filename, size_t index, uint8_t *data, size_t len, bool final) {
+      if (index == 0) {
+        Serial.printf("[OTA] Receiving %s\n", filename.c_str());
+        ota_error = "";
+        if (Update.isRunning()) Update.abort();  // Leftover from an interrupted upload
+        if (len == 0 || data[0] != 0xE9) {
+          // Update lib would report this as "Decryption error"
+          ota_error = "Not an ESP32 firmware image (expected firmware.bin)";
+        } else if (!Update.begin(UPDATE_SIZE_UNKNOWN, U_FLASH)) {
+          ota_error = Update.errorString();
+        }
+      }
+      if (ota_error.length() == 0 && Update.write(data, len) != len) {
+        ota_error = Update.errorString();
+        Update.abort();
+      }
+      if (final && ota_error.length() == 0) {
+        if (Update.end(true)) {  // Validates image before marking it bootable
+          Serial.printf("[OTA] Wrote %u bytes\n", index + len);
+        } else {
+          ota_error = Update.errorString();
+        }
+      }
+    });
 
   // Current settings for the Config tab (no passwords)
   server->on("/api/config", HTTP_GET, [](AsyncWebServerRequest *request) {

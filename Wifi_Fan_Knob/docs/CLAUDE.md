@@ -50,8 +50,8 @@ cd Wifi_Fan_Knob/Wifi_Fan_Knob     # PlatformIO project is nested
 | `src/main.cpp` | ✅ Working | Boot, display (LGFX + LVGL), encoder, WiFi, NTP, state machine skeleton |
 | `include/config.h` / `src/config.cpp` | ✅ Working | SPIFFS JSON config load/save/validate/defaults |
 | `include/lv_conf.h` | ✅ Minimal | LVGL 8 config (240×240, 16-bit) |
-| `include/webserver.h` / `src/webserver.cpp` | 🟡 Partial | `/` → embedded index.html; `GET /api/status` (network + target RPM/range, fan controller, power mode); `POST /api/fan` (target RPM); `/api/wifi` save/forget/scan (scan async: 202→200); `GET/POST /api/config`, `POST /api/config/reset` |
-| `web/index.html` | 🟡 Partial | 4-tab web UI; Home, WiFi + Config tabs wired; OTA still mock; Standby button says not implemented |
+| `include/webserver.h` / `src/webserver.cpp` | 🟡 Partial | `/` → embedded index.html; `GET /api/status` (network + target RPM/range, fan controller, power mode); `POST /api/fan` (target RPM); `POST /api/ota` (firmware upload); `/api/wifi` save/forget/scan (scan async: 202→200); `GET/POST /api/config`, `POST /api/config/reset` |
+| `web/index.html` | 🟡 Partial | 4-tab web UI; All 4 tabs wired (Home, WiFi, Config, OTA); Standby button says not implemented |
 | `include/mqtt.h` / `src/mqtt.cpp` | ⬜ Empty | MQTT + HA discovery (TODO; needs an MQTT library in `lib_deps`) |
 | `include/fan_control.h` / `src/fan_control.cpp` | 🟡 Partial | Target RPM (knob + web, clamped to config) and EMC2101 probe; PWM/tach TODO |
 | `lib/Adafruit_EMC2101/` | Vendored | Adafruit EMC2101 driver (local copy, not from registry) |
@@ -136,6 +136,12 @@ See `platformio.ini`. Libraries:
 ### ✅ Verified on hardware
 - Serial boot output over native USB CDC
 - 16 MB flash + 8 MB PSRAM detected
+- OTA (verified over home WiFi): OTA tab uploads `.pio/build/esp32-s3-devkitc-1/firmware.bin`
+  to the spare slot (app0/app1), validated by `Update.end(true)` before switching. Rejects
+  non-images (first byte != 0xE9) and truncated images; running firmware untouched on error.
+  OTA tab shows Build ID (ELF SHA-256 prefix, changes every build) and running slot.
+  CLI: `curl -F "firmware=@.pio/build/esp32-s3-devkitc-1/firmware.bin" http://<ip>:8080/api/ota`.
+  USB upload still works after OTA (it rewrites otadata, booting app0 again).
 - Home tab: target RPM shared with knob (page polls /api/status every 2 s; LCD redrawn only
   from loop() since LVGL isn't thread-safe). Presets hard-coded in page (match config defaults).
 - Touch: own minimal CST816D driver in `main.cpp` (init sequence from Elecrow; single-attempt
@@ -159,12 +165,15 @@ See `platformio.ini`. Libraries:
 - EMC2101 detection at 0x4C on I2C 38/39 — module not yet delivered; `EMC2101 not found!` expected.
 
 ### ⬜ Not started
-- Web UI handlers: OTA
 - `fan_control.cpp`, `mqtt.cpp`
 - LVGL menus, dragon-eye standby
 - Light-sleep standby
 
 ### Known quirks
+- **No web auth yet**: anyone on the LAN (or on the AP, default password `12345678`) can change
+  settings or flash firmware via OTA. `config.webserver.username/password` exist but aren't enforced.
+- **AP can stay up after STA connects**: if the 10 s boot connect times out, AP_STA fallback starts
+  the AP, but the STA keeps retrying and may join later — board is then on both networks.
 - **First boot `task_wdt: esp_task_wdt_reset(763): task not found` spam**: expected once.
   `SPIFFS.begin(true)` formats an empty partition, and `SPIFFS::format()` removes the
   core-0 idle task from the WDT during the format. Stops when format completes.

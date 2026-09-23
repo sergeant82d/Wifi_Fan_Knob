@@ -606,15 +606,19 @@
                 <h3>Firmware Information</h3>
                 <div class="status-item">
                     <span class="status-label">Current Version:</span>
-                    <span class="status-value">v1.0.0</span>
+                    <span class="status-value" id="fw-version">--</span>
                 </div>
                 <div class="status-item">
-                    <span class="status-label">Build Date:</span>
-                    <span class="status-value">2026-09-22</span>
+                    <span class="status-label">Build ID:</span>
+                    <span class="status-value" id="fw-build" style="font-family: monospace; font-size: 0.9rem;">--</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Running Slot:</span>
+                    <span class="status-value" id="app-slot">--</span>
                 </div>
                 <div class="status-item">
                     <span class="status-label">Chip ID:</span>
-                    <span class="status-value" style="font-family: monospace; font-size: 0.9rem;">A1B2C3D4E5F6</span>
+                    <span class="status-value" id="chip-id" style="font-family: monospace; font-size: 0.9rem;">--</span>
                 </div>
             </div>
 
@@ -807,6 +811,12 @@
                     slider.value = s.target_rpm;
                     set('speed-display', s.target_rpm);
                 }
+
+                // OTA tab
+                set('fw-version', s.fw_version);
+                set('fw-build', s.fw_build);
+                set('app-slot', s.app_slot);
+                set('chip-id', s.chip_id);
             } catch (e) {
                 set('device-status', 'Offline');
             }
@@ -852,13 +862,39 @@
             }
         }
 
+        // Upload .bin with progress (XHR: fetch has no upload progress)
         function uploadFirmware(event) {
             event.preventDefault();
             const file = document.getElementById('firmware-file').files[0];
-            if (file) {
-                console.log('Uploading:', file.name);
-                alert('Uploading firmware...\n\nThis will take 30-60 seconds.\nDo NOT power off the device!\n\nDevice will reboot automatically.');
-            }
+            if (!file) return;
+            if (!confirm('Upload ' + file.name + ' and reboot? Do NOT power off during the upload.')) return;
+
+            const status = document.getElementById('file-name');
+            const button = document.getElementById('upload-btn');
+            button.disabled = true;
+
+            const form = new FormData();
+            form.append('firmware', file, file.name);
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/ota');
+            xhr.upload.onprogress = e => {
+                if (e.lengthComputable) status.textContent = 'Uploading... ' + Math.round(e.loaded * 100 / e.total) + '%';
+            };
+            xhr.onload = () => {
+                if (xhr.status === 200) {
+                    status.textContent = '✓ ' + xhr.responseText + ' Reloading in 15 s...';
+                    setTimeout(() => location.reload(), 15000);
+                } else {
+                    status.textContent = '✗ ' + xhr.responseText;
+                    button.disabled = false;
+                }
+            };
+            xhr.onerror = () => {
+                status.textContent = '✗ Upload failed (connection lost)';
+                button.disabled = false;
+            };
+            status.textContent = 'Uploading... 0%';
+            xhr.send(form);
         }
     </script>
 </body>
