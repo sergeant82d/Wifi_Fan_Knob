@@ -733,15 +733,55 @@
             }
         }
 
-        function saveConfig(event) {
+        // Fill the Config tab from the device's current settings
+        async function loadConfig() {
+            try {
+                const c = await (await fetch('/api/config')).json();
+                document.getElementById('time-zone').value = c.display.timezone;
+                document.getElementById('time-format').value = c.display.timeFormat;
+                document.getElementById('fan-min-pwm').value = c.fan.calibration.minPwm;
+                document.getElementById('fan-max-pwm').value = c.fan.calibration.maxPwm;
+                document.getElementById('mqtt-broker').value = c.network.mqtt.broker;
+                document.getElementById('mqtt-port').value = c.network.mqtt.port;
+                document.getElementById('mqtt-user').value = c.network.mqtt.username;
+                document.getElementById('mqtt-pass').placeholder = '(unchanged if blank)';
+                document.getElementById('mqtt-discovery').checked = c.network.mqtt.discoveryEnabled;
+                document.getElementById('brightness').value = c.display.brightness;
+                updateBrightnessLabel(c.display.brightness);
+            } catch (e) {
+                console.log('Could not load config:', e);
+            }
+        }
+        document.addEventListener('DOMContentLoaded', loadConfig);
+
+        async function saveConfig(event) {
             event.preventDefault();
-            console.log('Saving configuration...');
-            alert('Configuration saved successfully!');
+            const v = id => document.getElementById(id).value;
+            try {
+                alert(await postForm('/api/config', {
+                    tz: v('time-zone'),
+                    time_format: v('time-format'),
+                    min_pwm: v('fan-min-pwm'),
+                    max_pwm: v('fan-max-pwm'),
+                    mqtt_broker: v('mqtt-broker'),
+                    mqtt_port: v('mqtt-port'),
+                    mqtt_user: v('mqtt-user'),
+                    mqtt_pass: v('mqtt-pass'),
+                    mqtt_discovery: document.getElementById('mqtt-discovery').checked ? '1' : '0',
+                    brightness: v('brightness')
+                }));
+                document.getElementById('mqtt-pass').value = '';
+            } catch (e) {
+                alert('Save failed: ' + e.message);
+            }
         }
 
-        function resetConfig() {
-            if (confirm('Reset all settings to factory defaults?')) {
-                alert('Configuration reset. Device will reboot.');
+        async function resetConfig() {
+            if (!confirm('Reset ALL settings to factory defaults, including saved WiFi? The device will reboot into AP mode.')) return;
+            try {
+                alert(await postForm('/api/config/reset', {}));
+            } catch (e) {
+                alert('Reset failed: ' + e.message);
             }
         }
 

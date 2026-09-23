@@ -363,6 +363,7 @@ String getConfigAsJson() {
   doc["network"]["webserver"]["port"] = config.webserver.port;
   doc["network"]["mqtt"]["broker"] = config.mqtt.broker;
   doc["network"]["mqtt"]["port"] = config.mqtt.port;
+  doc["network"]["mqtt"]["username"] = config.mqtt.username;  // password deliberately omitted
   doc["network"]["mqtt"]["discoveryEnabled"] = config.mqtt.discoveryEnabled;
 
   doc["display"]["timezone"] = config.display.timezone;

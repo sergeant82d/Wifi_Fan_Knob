@@ -49,8 +49,8 @@ cd Wifi_Fan_Knob/Wifi_Fan_Knob     # PlatformIO project is nested
 | `src/main.cpp` | ✅ Working | Boot, display (LGFX + LVGL), encoder, WiFi, NTP, state machine skeleton |
 | `include/config.h` / `src/config.cpp` | ✅ Working | SPIFFS JSON config load/save/validate/defaults |
 | `include/lv_conf.h` | ✅ Minimal | LVGL 8 config (240×240, 16-bit) |
-| `include/webserver.h` / `src/webserver.cpp` | 🟡 Partial | `/` → index.html; `/api/wifi` save, `/api/wifi/forget`, `/api/wifi/scan` (async, poll for 202→200) |
-| `data/index.html` | 🟡 Partial | 4-tab web UI; WiFi tab wired, other tabs still mock `alert()`s |
+| `include/webserver.h` / `src/webserver.cpp` | 🟡 Partial | `/` → index.html; `/api/wifi` save/forget/scan (scan async: 202→200); `GET/POST /api/config`, `POST /api/config/reset` |
+| `data/index.html` | 🟡 Partial | 4-tab web UI; WiFi + Config tabs wired; Home + OTA still mock `alert()`s |
 | `include/mqtt.h` / `src/mqtt.cpp` | ⬜ Empty | MQTT + HA discovery (TODO; needs an MQTT library in `lib_deps`) |
 | `include/fan_control.h` / `src/fan_control.cpp` | ⬜ Empty | EMC2101 PWM + tach (TODO) |
 | `lib/Adafruit_EMC2101/` | Vendored | Adafruit EMC2101 driver (local copy, not from registry) |
@@ -140,6 +140,8 @@ See `platformio.ini`. Libraries:
 - SPIFFS mount + config defaults written
 - WiFi AP mode (`WiFi-Fan-Knob-XXXXXX` / `12345678`)
 - Webserver serves `index.html` at `http://192.168.4.1:8080`
+- Config tab: loads current settings, validates, saves (MQTT password never sent to browser;
+  blank = keep). Brightness and timezone are saved but not yet applied to backlight/clock.
 
 ### 🔧 Implemented, not yet verified
 - Encoder: table-driven quadrature decoder (from Elecrow), 1 count per detent; button
@@ -149,7 +151,7 @@ See `platformio.ini`. Libraries:
 - EMC2101 detection at 0x4C on I2C 38/39 — module not yet delivered; `EMC2101 not found!` expected.
 
 ### ⬜ Not started
-- Web UI handlers: Home (needs fan_control), Config save, OTA
+- Web UI handlers: Home (needs fan_control), OTA
 - `fan_control.cpp`, `mqtt.cpp`
 - LVGL screens (main gauge, menus, dragon-eye standby)
 - Touch (CST816D) — Elecrow's `CST816D.cpp/.h` can be reused
@@ -159,7 +161,14 @@ See `platformio.ini`. Libraries:
 - **First boot `task_wdt: esp_task_wdt_reset(763): task not found` spam**: expected once.
   `SPIFFS.begin(true)` formats an empty partition, and `SPIFFS::format()` removes the
   core-0 idle task from the WDT during the format. Stops when format completes.
-- `config.advanced.deepSleepEnabled` name predates the light-sleep decision; not renamed
+- **Rare boot panic (~1 in 9 boots), accepted for now**: `Guru Meditation ... Unhandled debug
+  exception` during `attachInterrupt()`. Coredump showed the `ipc1` task (1024-byte stack, fixed
+  in precompiled SDK) overflowing when an interrupt frame lands while it installs the GPIO ISR
+  service; the end-of-stack watchpoint fires and the board reboots cleanly. Not caused by our
+  code. Revisit if frequency rises (newer core may have larger IPC stack).
+  Coredump is saved to the `coredump` partition (0xFF0000); decode with `esp-coredump
+  info_corefile` against `.pio/build/esp32-s3-devkitc-1/firmware.elf`.
+- `config.system.deepSleepEnabled` name predates the light-sleep decision; not renamed
   (would change the config JSON format).
 
 ---
