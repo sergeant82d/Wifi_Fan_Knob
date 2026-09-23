@@ -136,6 +136,8 @@ See `platformio.ini`. Libraries:
 ### ✅ Verified on hardware
 - Serial boot output over native USB CDC
 - 16 MB flash + 8 MB PSRAM detected
+- Encoder: table-driven quadrature decoder (from Elecrow), 1 count per detent; debounced
+  button. Serial prints `Encoder: n` / `Button pressed`.
 - Display: black screen with centered status box — `IP:port` + mode (WiFi / AP mode /
   WiFi lost), refreshed 1 s. Flashes red/white via `status_set_attention()` when a saved
   network is configured but not connected.
@@ -146,8 +148,6 @@ See `platformio.ini`. Libraries:
   blank = keep). Brightness and timezone are saved but not yet applied to backlight/clock.
 
 ### 🔧 Implemented, not yet verified
-- Encoder: table-driven quadrature decoder (from Elecrow), 1 count per detent; button
-  press latched on debounced falling edge. Serial prints `Encoder: n` / `Button pressed`.
 - NTP: background SNTP started when WiFi STA connects, re-syncs every 60 min. UTC only —
   timezone from config not applied yet.
 - EMC2101 detection at 0x4C on I2C 38/39 — module not yet delivered; `EMC2101 not found!` expected.
