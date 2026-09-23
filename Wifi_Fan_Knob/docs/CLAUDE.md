@@ -35,8 +35,7 @@ cd Wifi_Fan_Knob/Wifi_Fan_Knob     # PlatformIO project is nested
 - Build: PlatformIO **Build**. Flash: **Upload** only — the web UI (`web/index.html`) is
   compiled into the firmware via `board_build.embed_txtfiles`. SPIFFS holds only
   `/config.json`. Do not run `uploadfs`: it rewrites the whole SPIFFS partition, wiping
-  `/config.json` (defaults
-  are recreated on next boot.
+  `/config.json` (defaults are recreated on next boot).
 - CLI builds: use `~/.platformio/penv/Scripts/pio.exe`. An older PlatformIO in
   `C:\Python312\Scripts` (6.1.19) fails with `SCons.Tool.FortranCommon` errors.
 
