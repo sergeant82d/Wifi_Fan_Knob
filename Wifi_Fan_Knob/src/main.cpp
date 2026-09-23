@@ -8,6 +8,7 @@
 
 #include "config.h"  // Add near top with other includes
 #include "webserver.h"
+#include "ui.h"
 
 // ============================================================================
 // PIN DEFINITIONS (Elecrow 1.28" Rotary Display)
@@ -255,6 +256,7 @@ enum SystemState {
 };
 
 volatile SystemState current_state = STATE_ACTIVE;
+uint16_t fan_target_rpm = 0;  // Set by knob; starts at 0 (off)
 bool time_synced = false;
 const unsigned long NTP_SYNC_INTERVAL = 60 * 60 * 1000; // 60 minutes
 
@@ -363,85 +365,6 @@ void start_ntp() {
 }
 
 // ============================================================================
-// STATUS BOX (center of LCD: IP address, flashes when attention needed)
-// ============================================================================
-
-static lv_obj_t *status_box = nullptr;
-static lv_obj_t *status_label = nullptr;
-static lv_timer_t *status_flash_timer = nullptr;
-static bool status_flash_red = false;
-
-static void status_set_colors(lv_color_t bg, lv_color_t fg) {
-  lv_obj_set_style_bg_color(status_box, bg, 0);
-  lv_obj_set_style_text_color(status_label, fg, 0);
-}
-
-static void status_flash_cb(lv_timer_t *) {
-  status_flash_red = !status_flash_red;
-  if (status_flash_red) {
-    status_set_colors(lv_palette_main(LV_PALETTE_RED), lv_color_white());
-  } else {
-    status_set_colors(lv_color_white(), lv_color_black());
-  }
-}
-
-void create_status_box() {
-  lv_obj_set_style_bg_color(lv_scr_act(), lv_color_black(), 0);
-
-  status_box = lv_obj_create(lv_scr_act());
-  lv_obj_set_size(status_box, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-  lv_obj_center(status_box);
-  lv_obj_clear_flag(status_box, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_set_style_border_width(status_box, 0, 0);
-  lv_obj_set_style_radius(status_box, 8, 0);
-  lv_obj_set_style_pad_all(status_box, 10, 0);
-
-  status_label = lv_label_create(status_box);
-  lv_obj_set_style_text_font(status_label, &lv_font_montserrat_20, 0);
-  lv_obj_set_style_text_align(status_label, LV_TEXT_ALIGN_CENTER, 0);
-  lv_label_set_text(status_label, "Starting...");
-
-  status_set_colors(lv_color_white(), lv_color_black());
-  status_flash_timer = lv_timer_create(status_flash_cb, 500, nullptr);
-  lv_timer_pause(status_flash_timer);
-}
-
-// Steady white box normally; flashes red/white while attention is needed
-void status_set_attention(bool attention) {
-  bool flashing = !status_flash_timer->paused;
-  if (attention == flashing) return;
-  if (attention) {
-    lv_timer_resume(status_flash_timer);
-  } else {
-    lv_timer_pause(status_flash_timer);
-    status_flash_red = false;
-    status_set_colors(lv_color_white(), lv_color_black());
-  }
-}
-
-// Refresh IP/mode text and attention state from current WiFi status
-void update_status_box() {
-  String ip, mode;
-  if (WiFi.status() == WL_CONNECTED) {
-    ip = WiFi.localIP().toString();
-    mode = "WiFi";
-  } else if (WiFi.getMode() & WIFI_AP) {
-    ip = WiFi.softAPIP().toString();
-    mode = "AP mode";
-  } else {
-    ip = "--";
-    mode = "WiFi lost";
-  }
-  String text = ip + ":" + String(config.webserver.port) + "\n" + mode;
-  if (text != lv_label_get_text(status_label)) {
-    lv_label_set_text(status_label, text.c_str());
-  }
-
-  // Attention: saved network configured but not connected
-  status_set_attention(config.wifi.ssid[0] != '\0' && WiFi.status() != WL_CONNECTED);
-}
-
-// ============================================================================
 // SOFT POWER LATCH (KEEP_ALIVE)
 // ============================================================================
 
@@ -518,9 +441,6 @@ void setup() {
   indev_drv.read_cb = touchpad_read;
   lv_indev_drv_register(&indev_drv);
 
-  create_status_box();
-  lv_task_handler();  // Show "Starting..." while WiFi connects
-
   // I2C & EMC2101
   Serial.println("Initializing I2C and fan controller...");
   Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
@@ -544,6 +464,9 @@ Serial.println("Initializing configuration system...");
 initConfig();  // Load config from SPIFFS (or set defaults)
 applyDisplaySettings();
 
+ui_init();          // Needs config (RPM range, time format)
+lv_task_handler();  // Show screen while WiFi connects
+
 // Update device info with actual chip ID (optional, for logging)
 snprintf(config.chipId, sizeof(config.chipId), "%06X", (uint32_t)(ESP.getEfuseMac() >> 24));
 
@@ -556,7 +479,7 @@ if (config.advanced.debugMode) {
     start_ntp();
   }
   init_webserver();
-  update_status_box();
+  ui_update();
 
 
   // UI Setup
@@ -585,9 +508,11 @@ void loop() {
   encoder_count = 0;
   portEXIT_CRITICAL(&encoder_mux);
   if (delta != 0) {
-    // TODO: Update fan speed by delta * 100 RPM
-    Serial.print("Encoder: ");
-    Serial.println(delta);
+    // Knob sets target RPM; applied to the fan once fan_control exists
+    int32_t rpm = (int32_t)fan_target_rpm + delta * config.fan.rpmStep;
+    fan_target_rpm = constrain(rpm, config.fan.minRpm, config.fan.maxRpm);
+    ui_set_target_rpm(fan_target_rpm);
+    Serial.printf("Encoder: %ld -> target %u RPM\n", (long)delta, fan_target_rpm);
   }
 
   // Handle encoder button
@@ -596,11 +521,11 @@ void loop() {
     // TODO: Trigger standby/shutdown menu
     Serial.println("Button pressed");  }
 
-  // Refresh status box once a second
+  // Refresh clock + status box once a second
   static unsigned long last_status_update = 0;
   if (millis() - last_status_update >= 1000) {
     last_status_update = millis();
-    update_status_box();
+    ui_update();
   }
 
   // LVGL tick

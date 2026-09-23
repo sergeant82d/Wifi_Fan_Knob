@@ -55,8 +55,7 @@ cd Wifi_Fan_Knob/Wifi_Fan_Knob     # PlatformIO project is nested
 | `include/mqtt.h` / `src/mqtt.cpp` | ⬜ Empty | MQTT + HA discovery (TODO; needs an MQTT library in `lib_deps`) |
 | `include/fan_control.h` / `src/fan_control.cpp` | ⬜ Empty | EMC2101 PWM + tach (TODO) |
 | `lib/Adafruit_EMC2101/` | Vendored | Adafruit EMC2101 driver (local copy, not from registry) |
-
-No `ui.cpp` exists yet — LVGL screens are still TODO.
+| `include/ui.h` / `src/ui.cpp` | ✅ Working | LVGL main screen: RPM arc, target RPM, clock, status box |
 
 ### Documentation (`docs/`)
 
@@ -141,9 +140,10 @@ See `platformio.ini`. Libraries:
   reads — Elecrow's retries forever). Feeds LVGL pointer; logs `Touch: x,y` on press.
 - Encoder: table-driven quadrature decoder (from Elecrow), 1 count per detent; debounced
   button. Serial prints `Encoder: n` / `Button pressed`.
-- Display: black screen with centered status box — `IP:port` + mode (WiFi / AP mode /
-  WiFi lost), refreshed 1 s. Flashes red/white via `status_set_attention()` when a saved
-  network is configured but not connected.
+- Main screen (`ui.cpp`): 270° cyan arc + large target RPM (knob, `rpmStep` per detent,
+  clamped to min/max; not persisted, starts at 0), clock (12h/24h + TZ, `--:--` until
+  valid), one-line status box at bottom (`[AP ]IP:port` / `WiFi lost`). Status box flashes
+  red/white via `ui_set_attention()` when a saved network is configured but not connected.
 - SPIFFS mount + config defaults written
 - WiFi AP mode (`WiFi-Fan-Knob-XXXXXX` / `12345678`)
 - Webserver serves `index.html` at `http://192.168.4.1:8080`
@@ -159,7 +159,7 @@ See `platformio.ini`. Libraries:
 ### ⬜ Not started
 - Web UI handlers: Home (needs fan_control), OTA
 - `fan_control.cpp`, `mqtt.cpp`
-- LVGL screens (main gauge, menus, dragon-eye standby)
+- LVGL menus, dragon-eye standby
 - Light-sleep standby
 
 ### Known quirks
