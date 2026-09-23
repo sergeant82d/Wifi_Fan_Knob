@@ -50,10 +50,10 @@ cd Wifi_Fan_Knob/Wifi_Fan_Knob     # PlatformIO project is nested
 | `src/main.cpp` | ✅ Working | Boot, display (LGFX + LVGL), encoder, WiFi, NTP, state machine skeleton |
 | `include/config.h` / `src/config.cpp` | ✅ Working | SPIFFS JSON config load/save/validate/defaults |
 | `include/lv_conf.h` | ✅ Minimal | LVGL 8 config (240×240, 16-bit) |
-| `include/webserver.h` / `src/webserver.cpp` | 🟡 Partial | `/` → embedded index.html; `GET /api/status` (live IP/SSID/RSSI/MAC); `/api/wifi` save/forget/scan (scan async: 202→200); `GET/POST /api/config`, `POST /api/config/reset` |
-| `web/index.html` | 🟡 Partial | 4-tab web UI; WiFi + Config tabs wired; Home + OTA still mock `alert()`s |
+| `include/webserver.h` / `src/webserver.cpp` | 🟡 Partial | `/` → embedded index.html; `GET /api/status` (network + target RPM/range, fan controller, power mode); `POST /api/fan` (target RPM); `/api/wifi` save/forget/scan (scan async: 202→200); `GET/POST /api/config`, `POST /api/config/reset` |
+| `web/index.html` | 🟡 Partial | 4-tab web UI; Home, WiFi + Config tabs wired; OTA still mock; Standby button says not implemented |
 | `include/mqtt.h` / `src/mqtt.cpp` | ⬜ Empty | MQTT + HA discovery (TODO; needs an MQTT library in `lib_deps`) |
-| `include/fan_control.h` / `src/fan_control.cpp` | ⬜ Empty | EMC2101 PWM + tach (TODO) |
+| `include/fan_control.h` / `src/fan_control.cpp` | 🟡 Partial | Target RPM (knob + web, clamped to config) and EMC2101 probe; PWM/tach TODO |
 | `lib/Adafruit_EMC2101/` | Vendored | Adafruit EMC2101 driver (local copy, not from registry) |
 | `include/ui.h` / `src/ui.cpp` | ✅ Working | LVGL main screen: RPM arc, target RPM, clock, status box |
 
@@ -136,6 +136,8 @@ See `platformio.ini`. Libraries:
 ### ✅ Verified on hardware
 - Serial boot output over native USB CDC
 - 16 MB flash + 8 MB PSRAM detected
+- Home tab: target RPM shared with knob (page polls /api/status every 2 s; LCD redrawn only
+  from loop() since LVGL isn't thread-safe). Presets hard-coded in page (match config defaults).
 - Touch: own minimal CST816D driver in `main.cpp` (init sequence from Elecrow; single-attempt
   reads — Elecrow's retries forever). Feeds LVGL pointer; logs `Touch: x,y` on press.
 - Encoder: table-driven quadrature decoder (from Elecrow), 1 count per detent; debounced
@@ -157,7 +159,7 @@ See `platformio.ini`. Libraries:
 - EMC2101 detection at 0x4C on I2C 38/39 — module not yet delivered; `EMC2101 not found!` expected.
 
 ### ⬜ Not started
-- Web UI handlers: Home (needs fan_control), OTA
+- Web UI handlers: OTA
 - `fan_control.cpp`, `mqtt.cpp`
 - LVGL menus, dragon-eye standby
 - Light-sleep standby

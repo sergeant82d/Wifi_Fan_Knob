@@ -425,8 +425,8 @@
         <!-- HOME TAB -->
         <div id="home" class="tab-content active">
             <div class="rpm-display">
-                <div class="rpm-number" id="rpm-current">1500</div>
-                <div class="rpm-label">Current RPM</div>
+                <div class="rpm-number" id="rpm-current">--</div>
+                <div class="rpm-label">Target RPM</div>
             </div>
 
             <div class="status-card">
@@ -465,7 +465,7 @@
                     <input type="range" id="speed-slider" min="0" max="2500" value="1500" oninput="updateSpeed(this.value)">
                     <span class="speed-value" id="speed-display">1500</span>
                 </div>
-                <small style="color: #606060; display: block; margin-top: 10px;">Set fan speed manually (0-2500 RPM)</small>
+                <small style="color: #606060; display: block; margin-top: 10px;">Set fan speed manually (<span id="speed-range">0-2500</span> RPM)</small>
             </div>
 
             <button class="btn-primary" onclick="applySpeed()">Apply Speed</button>
@@ -655,14 +655,23 @@
             event.target.classList.add('active');
         }
 
+        // Slider follows the device's target until the user moves it; Apply sends it
+        let sliderDirty = false;
+
         function updateSpeed(value) {
+            sliderDirty = true;
             document.getElementById('speed-display').textContent = value;
         }
 
-        function applySpeed() {
-            const speed = document.getElementById('speed-slider').value;
-            console.log('Setting fan speed to:', speed, 'RPM');
-            alert('Fan speed set to ' + speed + ' RPM');
+        async function applySpeed() {
+            const rpm = document.getElementById('speed-slider').value;
+            try {
+                await postForm('/api/fan', { rpm });
+                sliderDirty = false;
+                loadStatus();
+            } catch (e) {
+                alert('Set speed failed: ' + e.message);
+            }
         }
 
         function setPreset(rpm) {
@@ -672,8 +681,7 @@
         }
 
         function standbyMode() {
-            console.log('Entering standby mode...');
-            alert('Entering standby mode. Touch display to wake.');
+            alert('Standby is not implemented yet.');
         }
 
         function updateBrightnessLabel(value) {
@@ -783,12 +791,28 @@
                 set('current-ip', s.ip);
                 set('current-signal', signal);
                 set('current-mac', s.mac);
+
+                // Home tab
+                set('rpm-current', s.target_rpm);
+                set('fan-status', !s.fan_controller ? 'No fan controller'
+                                  : (s.target_rpm > 0 ? 'Running' : 'Stopped'));
+                set('power-mode', s.power_mode);
+                set('mqtt-status', s.mqtt_connected ? 'Yes' : 'No');
+                set('speed-range', s.min_rpm + '-' + s.max_rpm);
+                const slider = document.getElementById('speed-slider');
+                slider.min = s.min_rpm;
+                slider.max = s.max_rpm;
+                slider.step = s.rpm_step;
+                if (!sliderDirty) {
+                    slider.value = s.target_rpm;
+                    set('speed-display', s.target_rpm);
+                }
             } catch (e) {
                 set('device-status', 'Offline');
             }
         }
         document.addEventListener('DOMContentLoaded', loadStatus);
-        setInterval(loadStatus, 5000);
+        setInterval(loadStatus, 2000);  // Knob changes show within ~2 s
 
         async function saveConfig(event) {
             event.preventDefault();

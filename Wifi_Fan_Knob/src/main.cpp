@@ -3,12 +3,12 @@
 #include <WiFi.h>
 #include <time.h>
 #include <esp_sntp.h>
-#include <Adafruit_EMC2101.h>
 #include "lv_conf.h"
 
 #include "config.h"  // Add near top with other includes
 #include "webserver.h"
 #include "ui.h"
+#include "fan_control.h"
 
 // ============================================================================
 // PIN DEFINITIONS (Elecrow 1.28" Rotary Display)
@@ -256,24 +256,8 @@ enum SystemState {
 };
 
 volatile SystemState current_state = STATE_ACTIVE;
-uint16_t fan_target_rpm = 0;  // Set by knob; starts at 0 (off)
 bool time_synced = false;
 const unsigned long NTP_SYNC_INTERVAL = 60 * 60 * 1000; // 60 minutes
-
-// ============================================================================
-// EMC2101 FAN CONTROLLER
-// ============================================================================
-
-Adafruit_EMC2101 emc2101;
-
-bool init_fan_controller() {
-  if (!emc2101.begin(0x4C, &Wire)) {
-    Serial.println("EMC2101 not found!");
-    return false;
-  }
-  Serial.println("EMC2101 initialized");
-  return true;
-}
 
 // ============================================================================
 // WIFI SETUP
@@ -444,7 +428,7 @@ void setup() {
   // I2C & EMC2101
   Serial.println("Initializing I2C and fan controller...");
   Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
-  if (!init_fan_controller()) {
+  if (!fan_init()) {
     Serial.println("WARNING: Fan controller not responding");
   }
 
@@ -508,18 +492,24 @@ void loop() {
   encoder_count = 0;
   portEXIT_CRITICAL(&encoder_mux);
   if (delta != 0) {
-    // Knob sets target RPM; applied to the fan once fan_control exists
-    int32_t rpm = (int32_t)fan_target_rpm + delta * config.fan.rpmStep;
-    fan_target_rpm = constrain(rpm, config.fan.minRpm, config.fan.maxRpm);
-    ui_set_target_rpm(fan_target_rpm);
-    Serial.printf("Encoder: %ld -> target %u RPM\n", (long)delta, fan_target_rpm);
+    // Knob sets target RPM (fan_control clamps to config range)
+    fan_set_target((int32_t)fan_get_target() + delta * config.fan.rpmStep);
+    Serial.printf("Encoder: %ld -> target %u RPM\n", (long)delta, fan_get_target());
+  }
+
+  // Redraw target RPM when changed by knob or web UI (LVGL only touched here)
+  static uint16_t shown_rpm = 0;
+  if (fan_get_target() != shown_rpm) {
+    shown_rpm = fan_get_target();
+    ui_set_target_rpm(shown_rpm);
   }
 
   // Handle encoder button
   if (encoder_button_pressed) {
     encoder_button_pressed = false;
     // TODO: Trigger standby/shutdown menu
-    Serial.println("Button pressed");  }
+    Serial.println("Button pressed");
+  }
 
   // Refresh clock + status box once a second
   static unsigned long last_status_update = 0;

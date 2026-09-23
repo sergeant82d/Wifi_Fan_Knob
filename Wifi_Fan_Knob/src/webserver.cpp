@@ -1,5 +1,6 @@
 #include "webserver.h"
 #include "config.h"
+#include "fan_control.h"
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
 #include <WiFi.h>
@@ -131,7 +132,7 @@ void init_webserver() {
 
   // Live network status for the page header and WiFi tab
   server->on("/api/status", HTTP_GET, [](AsyncWebServerRequest *request) {
-    StaticJsonDocument<256> doc;
+    StaticJsonDocument<512> doc;
     if (WiFi.status() == WL_CONNECTED) {
       doc["mode"] = "WiFi";
       doc["ip"] = WiFi.localIP().toString();
@@ -145,9 +146,27 @@ void init_webserver() {
       doc["rssi"] = nullptr;  // No station link in AP mode
       doc["mac"] = WiFi.softAPmacAddress();
     }
+    doc["target_rpm"] = fan_get_target();
+    doc["min_rpm"] = config.fan.minRpm;
+    doc["max_rpm"] = config.fan.maxRpm;
+    doc["rpm_step"] = config.fan.rpmStep;
+    doc["fan_controller"] = fan_controller_present();
+    doc["power_mode"] = "Active";   // Standby not implemented yet
+    doc["mqtt_connected"] = false;  // MQTT not implemented yet
     String body;
     serializeJson(doc, body);
     request->send(200, "application/json", body);
+  });
+
+  // Set target RPM from the Home tab (same target the knob adjusts)
+  server->on("/api/fan", HTTP_POST, [](AsyncWebServerRequest *request) {
+    long rpm;
+    if (!form_int(request, "rpm", config.fan.minRpm, config.fan.maxRpm, rpm)) {
+      request->send(400, "text/plain", "rpm must be " + String(config.fan.minRpm) + "-" + String(config.fan.maxRpm));
+      return;
+    }
+    fan_set_target(rpm);
+    request->send(200, "text/plain", "Target set to " + String(fan_get_target()) + " RPM");
   });
 
   // Current settings for the Config tab (no passwords)
