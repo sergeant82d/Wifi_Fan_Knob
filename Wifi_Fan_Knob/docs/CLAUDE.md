@@ -32,8 +32,10 @@ cd Wifi_Fan_Knob/Wifi_Fan_Knob     # PlatformIO project is nested
 - Serial is native USB (COM port VID 303A:1001); needs `-DARDUINO_USB_CDC_ON_BOOT=1`,
   otherwise `Serial` goes to unconnected UART0 and only IDF logs reach USB.
 - Platform is pioarduino `espressif32` 51.x → Arduino core 3.0.4 / ESP-IDF 5.1.
-- Build: PlatformIO **Build**. Flash: **Upload**, then **Upload Filesystem Image**
-  (`uploadfs`) whenever `data/` changes. `uploadfs` wipes `/config.json`; defaults
+- Build: PlatformIO **Build**. Flash: **Upload** only — the web UI (`web/index.html`) is
+  compiled into the firmware via `board_build.embed_txtfiles`. SPIFFS holds only
+  `/config.json`. Do not run `uploadfs`: it rewrites the whole SPIFFS partition, wiping
+  `/config.json` (defaults
   are recreated on next boot.
 - CLI builds: use `~/.platformio/penv/Scripts/pio.exe`. An older PlatformIO in
   `C:\Python312\Scripts` (6.1.19) fails with `SCons.Tool.FortranCommon` errors.
@@ -49,8 +51,8 @@ cd Wifi_Fan_Knob/Wifi_Fan_Knob     # PlatformIO project is nested
 | `src/main.cpp` | ✅ Working | Boot, display (LGFX + LVGL), encoder, WiFi, NTP, state machine skeleton |
 | `include/config.h` / `src/config.cpp` | ✅ Working | SPIFFS JSON config load/save/validate/defaults |
 | `include/lv_conf.h` | ✅ Minimal | LVGL 8 config (240×240, 16-bit) |
-| `include/webserver.h` / `src/webserver.cpp` | 🟡 Partial | `/` → index.html; `/api/wifi` save/forget/scan (scan async: 202→200); `GET/POST /api/config`, `POST /api/config/reset` |
-| `data/index.html` | 🟡 Partial | 4-tab web UI; WiFi + Config tabs wired; Home + OTA still mock `alert()`s |
+| `include/webserver.h` / `src/webserver.cpp` | 🟡 Partial | `/` → embedded index.html; `GET /api/status` (live IP/SSID/RSSI/MAC); `/api/wifi` save/forget/scan (scan async: 202→200); `GET/POST /api/config`, `POST /api/config/reset` |
+| `web/index.html` | 🟡 Partial | 4-tab web UI; WiFi + Config tabs wired; Home + OTA still mock `alert()`s |
 | `include/mqtt.h` / `src/mqtt.cpp` | ⬜ Empty | MQTT + HA discovery (TODO; needs an MQTT library in `lib_deps`) |
 | `include/fan_control.h` / `src/fan_control.cpp` | ⬜ Empty | EMC2101 PWM + tach (TODO) |
 | `lib/Adafruit_EMC2101/` | Vendored | Adafruit EMC2101 driver (local copy, not from registry) |

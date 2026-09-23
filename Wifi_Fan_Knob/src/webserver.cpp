@@ -2,11 +2,14 @@
 #include "config.h"
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
-#include <SPIFFS.h>
 #include <WiFi.h>
 
 // Port comes from config, so the server is created after config loads
 static AsyncWebServer *server = nullptr;
+
+// web/index.html embedded by board_build.embed_txtfiles (NUL-terminated)
+extern const uint8_t index_html_start[] asm("_binary_web_index_html_start");
+extern const uint8_t index_html_end[] asm("_binary_web_index_html_end");
 
 // Reboot once the response has been delivered to the browser
 static void restart_after_response(AsyncWebServerRequest *request) {
@@ -69,13 +72,9 @@ static String apply_config_form(AsyncWebServerRequest *request) {
 void init_webserver() {
   server = new AsyncWebServer(config.webserver.port);
 
-  // Serve only the UI page — /config.json in SPIFFS holds credentials
+  // UI page from flash (excluding the appended NUL)
   server->on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-    if (!SPIFFS.exists("/index.html")) {
-      request->send(500, "text/plain", "index.html missing from SPIFFS (run: pio run -t uploadfs)");
-      return;
-    }
-    request->send(SPIFFS, "/index.html", "text/html");
+    request->send(200, "text/html", index_html_start, index_html_end - index_html_start - 1);
   });
 
   // Save WiFi credentials, then reboot to connect
