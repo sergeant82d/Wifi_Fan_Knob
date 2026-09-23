@@ -130,6 +130,27 @@ void init_webserver() {
     request->send(200, "application/json", body);
   });
 
+  // Live network status for the page header and WiFi tab
+  server->on("/api/status", HTTP_GET, [](AsyncWebServerRequest *request) {
+    StaticJsonDocument<256> doc;
+    if (WiFi.status() == WL_CONNECTED) {
+      doc["mode"] = "WiFi";
+      doc["ip"] = WiFi.localIP().toString();
+      doc["ssid"] = WiFi.SSID();
+      doc["rssi"] = WiFi.RSSI();
+      doc["mac"] = WiFi.macAddress();
+    } else {
+      doc["mode"] = "AP mode";
+      doc["ip"] = WiFi.softAPIP().toString();
+      doc["ssid"] = WiFi.softAPSSID();
+      doc["rssi"] = nullptr;  // No station link in AP mode
+      doc["mac"] = WiFi.softAPmacAddress();
+    }
+    String body;
+    serializeJson(doc, body);
+    request->send(200, "application/json", body);
+  });
+
   // Current settings for the Config tab (no passwords)
   server->on("/api/config", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(200, "application/json", getConfigAsJson());

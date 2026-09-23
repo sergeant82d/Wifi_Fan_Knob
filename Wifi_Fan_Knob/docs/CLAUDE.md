@@ -148,7 +148,7 @@ See `platformio.ini`. Libraries:
 - Webserver serves `index.html` at `http://192.168.4.1:8080`
 - Config tab: loads current settings, validates, saves (MQTT password never sent to browser;
   blank = keep). Brightness (PWM backlight) and time zone (POSIX TZ, US zones with DST) apply
-  at boot and immediately on save via `applyDisplaySettings()`.
+  at boot and immediately on save via `applyDisplaySettings()` (verified on hardware).
 
 ### 🔧 Implemented, not yet verified
 - NTP: background SNTP started when WiFi STA connects, re-syncs every 60 min, local time

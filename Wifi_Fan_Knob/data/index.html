@@ -490,7 +490,7 @@
                 </div>
                 <div class="status-item">
                     <span class="status-label">MAC Address:</span>
-                    <span class="status-value" style="font-family: monospace; font-size: 0.9rem;">AA:BB:CC:DD:EE:FF</span>
+                    <span class="status-value" id="current-mac" style="font-family: monospace; font-size: 0.9rem;">AA:BB:CC:DD:EE:FF</span>
                 </div>
             </div>
 
@@ -498,8 +498,7 @@
                 <div class="form-grid">
                     <div class="form-group">
                         <label for="wifi-ssid">SSID</label>
-                        <input type="text" id="wifi-ssid" placeholder="Network name" list="wifi-networks" required>
-                        <datalist id="wifi-networks"></datalist>
+                        <input type="text" id="wifi-ssid" placeholder="Network name" required>
                     </div>
                     <div class="form-group">
                         <label for="wifi-pass">Password</label>
@@ -513,6 +512,7 @@
                 <button class="btn-secondary" onclick="scanWiFi()">Scan Available Networks</button>
                 <button class="btn-danger" onclick="forgetWiFi()">Forget Saved Network</button>
             </div>
+            <div id="wifi-networks" style="margin-top: 15px; display: grid; gap: 8px;"></div>
         </div>
 
         <!-- CONFIG TAB -->
@@ -701,6 +701,7 @@
 
         async function scanWiFi() {
             const list = document.getElementById('wifi-networks');
+            list.textContent = 'Scanning...';
             try {
                 let res;
                 // Poll until the non-blocking scan finishes (~2-5 s)
@@ -710,15 +711,30 @@
                     await new Promise(r => setTimeout(r, 500));
                 }
                 if (!res.ok) throw new Error('scan did not complete');
-                const networks = (await res.json()).sort((a, b) => b.rssi - a.rssi);
+                // Strongest first; hidden (empty) SSIDs and duplicates dropped
+                const seen = new Set();
+                const networks = (await res.json())
+                    .sort((a, b) => b.rssi - a.rssi)
+                    .filter(n => n.ssid && !seen.has(n.ssid) && seen.add(n.ssid));
                 list.innerHTML = '';
+                if (networks.length === 0) {
+                    list.textContent = 'No networks found.';
+                    return;
+                }
                 networks.forEach(n => {
-                    const opt = document.createElement('option');
-                    opt.value = n.ssid;
-                    opt.label = n.rssi + ' dBm';
-                    list.appendChild(opt);
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'preset-btn';
+                    btn.style.textAlign = 'left';
+                    btn.textContent = n.ssid + '  (' + n.rssi + ' dBm)';
+                    btn.onclick = () => {
+                        document.getElementById('wifi-ssid').value = n.ssid;
+                        const pass = document.getElementById('wifi-pass');
+                        pass.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        pass.focus();
+                    };
+                    list.appendChild(btn);
                 });
-                alert('Found ' + networks.length + ' networks. Click the SSID field to choose one.');
             } catch (e) {
                 alert('Scan failed: ' + e.message);
             }
@@ -753,6 +769,26 @@
             }
         }
         document.addEventListener('DOMContentLoaded', loadConfig);
+
+        // Live network info: header, Home tab signal, WiFi tab block
+        async function loadStatus() {
+            const set = (id, text) => { document.getElementById(id).textContent = text; };
+            try {
+                const s = await (await fetch('/api/status')).json();
+                const signal = s.rssi === null ? 'n/a (AP mode)' : s.rssi + ' dBm';
+                set('device-ip', s.ip);
+                set('device-status', s.mode);
+                set('wifi-signal', signal);
+                set('current-ssid', s.ssid);
+                set('current-ip', s.ip);
+                set('current-signal', signal);
+                set('current-mac', s.mac);
+            } catch (e) {
+                set('device-status', 'Offline');
+            }
+        }
+        document.addEventListener('DOMContentLoaded', loadStatus);
+        setInterval(loadStatus, 5000);
 
         async function saveConfig(event) {
             event.preventDefault();

@@ -348,7 +348,9 @@ static const char *posix_tz(const char *tz) {
 
 // Apply saved brightness and time zone (boot, and after Config tab save)
 void applyDisplaySettings() {
-  ledcWrite(SCREEN_BACKLIGHT_PIN, config.display.brightness * 255 / 100);
+  uint32_t duty = config.display.brightness * 255 / 100;
+  bool ok = ledcWrite(SCREEN_BACKLIGHT_PIN, duty);
+  Serial.printf("[DISPLAY] Brightness %u%% (duty %u/255) %s\n", config.display.brightness, duty, ok ? "OK" : "FAILED");
   setenv("TZ", posix_tz(config.display.timezone), 1);
   tzset();
 }
@@ -480,7 +482,10 @@ void setup() {
   pinMode(ENCODER_SW_PIN, INPUT_PULLUP);
   pinMode(POWER_LIGHT_PIN, OUTPUT);
   digitalWrite(POWER_LIGHT_PIN, HIGH);
-  ledcAttach(SCREEN_BACKLIGHT_PIN, 5000, 8);  // PWM backlight, full until config loads
+  // PWM backlight, full until config loads
+  if (!ledcAttach(SCREEN_BACKLIGHT_PIN, 5000, 8)) {
+    Serial.println("WARNING: Backlight PWM attach failed");
+  }
   ledcWrite(SCREEN_BACKLIGHT_PIN, 255);
 
   // Display & LVGL
