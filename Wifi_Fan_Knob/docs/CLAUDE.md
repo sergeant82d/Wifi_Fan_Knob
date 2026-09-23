@@ -27,7 +27,10 @@ cd Wifi_Fan_Knob/Wifi_Fan_Knob     # PlatformIO project is nested
 ```
 
 - Open `Wifi_Fan_Knob.code-workspace` (repo root) in VS Code with PlatformIO.
-- Board environment: `esp32-s3-devkitc-1` (Elecrow board runs as this variant).
+- Board environment: `esp32-s3-devkitc-1`, overridden in `platformio.ini` for this board:
+  16 MB QIO flash, OPI PSRAM (`qio_opi`), `default_16MB.csv` partitions (2 OTA slots).
+- Serial is native USB (COM port VID 303A:1001); needs `-DARDUINO_USB_CDC_ON_BOOT=1`,
+  otherwise `Serial` goes to unconnected UART0 and only IDF logs reach USB.
 - Platform is pioarduino `espressif32` 51.x → Arduino core 3.0.4 / ESP-IDF 5.1.
 - Build: PlatformIO **Build**. Flash: **Upload**, then **Upload Filesystem Image**
   (`uploadfs`) whenever `data/` changes. `uploadfs` wipes `/config.json`; defaults
@@ -72,7 +75,7 @@ Pin reference lives in this file and at the top of `src/main.cpp`; there is no s
 
 ### Board: Elecrow CrowPanel 1.28" Rotary Display (ESP32-S3)
 
-- **MCU**: ESP32-S3 (dual-core, 240 MHz, PSRAM)
+- **MCU**: ESP32-S3 (dual-core, 240 MHz), 16 MB flash, 8 MB OPI PSRAM (verified)
 - **Display**: 240×240 round IPS, GC9A01 over SPI
 - **Touch**: CST816D, own I2C bus (not yet implemented)
 - **Encoder**: rotary knob with push button
@@ -91,7 +94,7 @@ https://github.com/Elecrow-RD/CrowPanel-1.28inch-HMI-ESP32-Rotary-Display-240-24
 | Display DC / CS / RST | 3 / 9 / 14 | |
 | Display Backlight | 46 | HIGH = on; PWM-capable |
 | **Display rail** | **1** | Must be HIGH or the display is dark |
-| **Display rail ("KEEP_ALIVE")** | **2** | See note below |
+| **"KEEP_ALIVE"** | **2** | Role unknown — see note below |
 | Touch SDA / SCL | 6 / 7 | |
 | Touch INT / RST | 5 / 13 | |
 | Main I2C SDA / SCL | 38 / 39 | EMC2101 (0x4C) + optional OLED |
@@ -99,12 +102,14 @@ https://github.com/Elecrow-RD/CrowPanel-1.28inch-HMI-ESP32-Rotary-Display-240-24
 | Power Light | 40 | Elecrow drives it LOW |
 | RGB LED Data | 48 | |
 
-**GPIO 1 & 2 — unverified role.** Earlier design notes called GPIO 2 a soft power latch
-(P-MOSFET) for the whole board. Elecrow's example instead sets GPIO 1 and 2 HIGH with the
-comment "These two rails must remain enabled while the display is operating." Firmware now
-drives both HIGH first thing in `setup()`. Until tested (drive GPIO 2 LOW and see whether
-the board powers off or only the display goes dark), `shutdown_system()` should be assumed
-to blank the display rather than cut power.
+**GPIO 1 & 2.** Earlier design notes called GPIO 2 a soft power latch (P-MOSFET) for the
+whole board. Elecrow's example sets GPIO 1 and 2 HIGH with the comment "These two rails must
+remain enabled while the display is operating." Firmware drives both HIGH first in `setup()`.
+
+Test 2026-09-23 (USB-C powered): GPIO 2 LOW for 3 s → MCU kept running (serial heartbeat
+continued) and no visible display change. So on USB power GPIO 2 neither cuts MCU power nor
+blanks the display. Still possible it latches a battery/switch path that USB bypasses —
+untested. `shutdown_system()` must not be relied on to power off the board.
 
 **Round screen**: corners of the 240×240 buffer are not visible — keep content inside the
 circle (e.g. `gfx.println` at (10,10) is off-screen).
@@ -129,7 +134,8 @@ See `platformio.ini`. Libraries:
 ## Current Status
 
 ### ✅ Verified on hardware
-- Serial boot output (115200)
+- Serial boot output over native USB CDC
+- 16 MB flash + 8 MB PSRAM detected
 - Display powers up and LVGL renders (default light screen; no UI yet)
 - SPIFFS mount + config defaults written
 - WiFi AP mode (`WiFi-Fan-Knob-XXXXXX` / `12345678`)
@@ -140,7 +146,7 @@ See `platformio.ini`. Libraries:
   press latched on debounced falling edge. Serial prints `Encoder: n` / `Button pressed`.
 - NTP: background SNTP started when WiFi STA connects, re-syncs every 60 min. UTC only —
   timezone from config not applied yet.
-- EMC2101 detection at 0x4C on I2C 38/39.
+- EMC2101 detection at 0x4C on I2C 38/39 — module not yet delivered; `EMC2101 not found!` expected.
 
 ### ⬜ Not started
 - Web UI handlers: Home (needs fan_control), Config save, OTA
@@ -231,7 +237,7 @@ STANDBY (1)
 2. Audio format for warnings: WAV, MP3, or other?
 3. Dragon eye animation: pre-rendered frames or procedural LVGL drawing?
 4. Noctua fan min/max PWM: initial guess 50-200 (calibrate)
-5. GPIO 2: power latch or display rail?
+5. GPIO 2: no effect on USB power — does it matter on battery/other supply?
 
 ---
 

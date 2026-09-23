@@ -325,6 +325,7 @@ void setup() {
   Serial.begin(115200);
   delay(1000);
   Serial.println("\n\n=== PWM Fan Controller Startup ===\n");
+  Serial.printf("Flash: %u MB, PSRAM: %u bytes\n", ESP.getFlashChipSize() / (1024 * 1024), ESP.getPsramSize());
 
   // GPIO Setup
   pinMode(ENCODER_A_PIN, INPUT);
@@ -433,8 +434,7 @@ void loop() {
   if (encoder_button_pressed) {
     encoder_button_pressed = false;
     // TODO: Trigger standby/shutdown menu
-    Serial.println("Button pressed");
-  }
+    Serial.println("Button pressed");  }
 
   // LVGL tick
   lv_tick_inc(5);
