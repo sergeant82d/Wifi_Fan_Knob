@@ -146,6 +146,7 @@ void init_webserver() {
       request->send(500, "text/plain", "Failed to write config to SPIFFS");
       return;
     }
+    applyDisplaySettings();
     request->send(200, "text/plain", "Configuration saved.");
   });
 

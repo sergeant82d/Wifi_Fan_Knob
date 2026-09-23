@@ -145,11 +145,12 @@ See `platformio.ini`. Libraries:
 - WiFi AP mode (`WiFi-Fan-Knob-XXXXXX` / `12345678`)
 - Webserver serves `index.html` at `http://192.168.4.1:8080`
 - Config tab: loads current settings, validates, saves (MQTT password never sent to browser;
-  blank = keep). Brightness and timezone are saved but not yet applied to backlight/clock.
+  blank = keep). Brightness (PWM backlight) and time zone (POSIX TZ, US zones with DST) apply
+  at boot and immediately on save via `applyDisplaySettings()`.
 
 ### 🔧 Implemented, not yet verified
-- NTP: background SNTP started when WiFi STA connects, re-syncs every 60 min. UTC only —
-  timezone from config not applied yet.
+- NTP: background SNTP started when WiFi STA connects, re-syncs every 60 min, local time
+  per configured zone (`configTzTime`; plain `configTime` would reset TZ to UTC).
 - EMC2101 detection at 0x4C on I2C 38/39 — module not yet delivered; `EMC2101 not found!` expected.
 
 ### ⬜ Not started

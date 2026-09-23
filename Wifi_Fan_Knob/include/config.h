@@ -117,4 +117,7 @@ void setMqttBroker(const char* broker, uint16_t port);
 void setFanCalibration(uint8_t minPwm, uint8_t maxPwm);
 void setTimezone(const char* tz);
 
+// Apply brightness + time zone to hardware/clock (defined in main.cpp)
+void applyDisplaySettings();
+
 #endif

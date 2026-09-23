@@ -286,9 +286,26 @@ void init_wifi() {
 
 // Starts the background SNTP client; it re-syncs every NTP_SYNC_INTERVAL
 // on its own, so nothing here blocks.
+// POSIX TZ string for the web UI's time zone choices (US zones observe DST)
+static const char *posix_tz(const char *tz) {
+  if (!strcmp(tz, "EST")) return "EST5EDT,M3.2.0,M11.1.0";
+  if (!strcmp(tz, "CST")) return "CST6CDT,M3.2.0,M11.1.0";
+  if (!strcmp(tz, "MST")) return "MST7MDT,M3.2.0,M11.1.0";
+  if (!strcmp(tz, "PST")) return "PST8PDT,M3.2.0,M11.1.0";
+  return "UTC0";
+}
+
+// Apply saved brightness and time zone (boot, and after Config tab save)
+void applyDisplaySettings() {
+  ledcWrite(SCREEN_BACKLIGHT_PIN, config.display.brightness * 255 / 100);
+  setenv("TZ", posix_tz(config.display.timezone), 1);
+  tzset();
+}
+
 void start_ntp() {
   esp_sntp_set_sync_interval(NTP_SYNC_INTERVAL);
-  configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+  // configTzTime, not configTime: configTime would reset TZ to UTC
+  configTzTime(posix_tz(config.display.timezone), "pool.ntp.org", "time.nist.gov");
   Serial.println("NTP started");
 }
 
@@ -411,9 +428,9 @@ void setup() {
   pinMode(ENCODER_B_PIN, INPUT);
   pinMode(ENCODER_SW_PIN, INPUT_PULLUP);
   pinMode(POWER_LIGHT_PIN, OUTPUT);
-  pinMode(SCREEN_BACKLIGHT_PIN, OUTPUT);
   digitalWrite(POWER_LIGHT_PIN, HIGH);
-  digitalWrite(SCREEN_BACKLIGHT_PIN, HIGH);
+  ledcAttach(SCREEN_BACKLIGHT_PIN, 5000, 8);  // PWM backlight, full until config loads
+  ledcWrite(SCREEN_BACKLIGHT_PIN, 255);
 
   // Display & LVGL
   Serial.println("Initializing display...");
@@ -466,6 +483,7 @@ void setup() {
 
 Serial.println("Initializing configuration system...");
 initConfig();  // Load config from SPIFFS (or set defaults)
+applyDisplaySettings();
 
 // Update device info with actual chip ID (optional, for logging)
 snprintf(config.chipId, sizeof(config.chipId), "%06X", (uint32_t)(ESP.getEfuseMac() >> 24));
