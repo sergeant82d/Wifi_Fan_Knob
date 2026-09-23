@@ -77,7 +77,7 @@ Pin reference lives in this file and at the top of `src/main.cpp`; there is no s
 
 - **MCU**: ESP32-S3 (dual-core, 240 MHz), 16 MB flash, 8 MB OPI PSRAM (verified)
 - **Display**: 240×240 round IPS, GC9A01 over SPI
-- **Touch**: CST816D, own I2C bus (not yet implemented)
+- **Touch**: CST816D at 0x15 on Wire1 (6/7); raw coords map directly to screen (verified)
 - **Encoder**: rotary knob with push button
 - **RGB LED**: 5× WS2812
 - **Audio / BLE**: present, unused
@@ -136,6 +136,8 @@ See `platformio.ini`. Libraries:
 ### ✅ Verified on hardware
 - Serial boot output over native USB CDC
 - 16 MB flash + 8 MB PSRAM detected
+- Touch: own minimal CST816D driver in `main.cpp` (init sequence from Elecrow; single-attempt
+  reads — Elecrow's retries forever). Feeds LVGL pointer; logs `Touch: x,y` on press.
 - Encoder: table-driven quadrature decoder (from Elecrow), 1 count per detent; debounced
   button. Serial prints `Encoder: n` / `Button pressed`.
 - Display: black screen with centered status box — `IP:port` + mode (WiFi / AP mode /
@@ -157,7 +159,6 @@ See `platformio.ini`. Libraries:
 - Web UI handlers: Home (needs fan_control), OTA
 - `fan_control.cpp`, `mqtt.cpp`
 - LVGL screens (main gauge, menus, dragon-eye standby)
-- Touch (CST816D) — Elecrow's `CST816D.cpp/.h` can be reused
 - Light-sleep standby
 
 ### Known quirks

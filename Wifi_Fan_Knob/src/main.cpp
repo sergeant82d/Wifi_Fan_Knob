@@ -134,10 +134,61 @@ void display_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color
 // TOUCH INPUT CALLBACK
 // ============================================================================
 
+// CST816D on its own I2C bus (Wire1). Init sequence follows Elecrow's
+// driver; reads are single-attempt so a missing chip can't hang the loop.
+#define TOUCH_I2C_ADDR 0x15
+static bool touch_ok = false;
+
+bool init_touch() {
+  Wire1.begin(TOUCH_SDA_PIN, TOUCH_SCL_PIN);
+
+  // Wake pulse on INT, then hardware reset
+  pinMode(TOUCH_INT_PIN, OUTPUT);
+  digitalWrite(TOUCH_INT_PIN, HIGH);
+  delay(1);
+  digitalWrite(TOUCH_INT_PIN, LOW);
+  delay(1);
+  pinMode(TOUCH_INT_PIN, INPUT);
+  pinMode(TOUCH_RST_PIN, OUTPUT);
+  digitalWrite(TOUCH_RST_PIN, LOW);
+  delay(10);
+  digitalWrite(TOUCH_RST_PIN, HIGH);
+  delay(300);
+
+  // Register 0xFE = 0xFF disables auto-sleep (as in Elecrow's driver)
+  Wire1.beginTransmission(TOUCH_I2C_ADDR);
+  Wire1.write(0xFE);
+  Wire1.write(0xFF);
+  return Wire1.endTransmission() == 0;
+}
+
+// Reads finger count + coordinates (regs 0x02-0x06); false if no touch or I2C error
+static bool read_touch(uint16_t &x, uint16_t &y) {
+  Wire1.beginTransmission(TOUCH_I2C_ADDR);
+  Wire1.write(0x02);
+  if (Wire1.endTransmission(false) != 0) return false;
+  if (Wire1.requestFrom(TOUCH_I2C_ADDR, 5) != 5) return false;
+  uint8_t d[5];
+  for (uint8_t &b : d) b = Wire1.read();
+  if (d[0] == 0) return false;
+  x = ((d[1] & 0x0F) << 8) | d[2];
+  y = ((d[3] & 0x0F) << 8) | d[4];
+  return true;
+}
+
 void touchpad_read(lv_indev_drv_t *indev_drv, lv_indev_data_t *data) {
-  // TODO: Implement CST816D touch reading
-  // For now, return no touch
-  data->state = LV_INDEV_STATE_REL;
+  static bool was_pressed = false;
+  uint16_t x, y;
+  bool pressed = touch_ok && read_touch(x, y);
+  if (pressed) {
+    data->state = LV_INDEV_STATE_PR;
+    data->point.x = x;
+    data->point.y = y;
+    if (!was_pressed) Serial.printf("Touch: %u,%u\n", x, y);
+  } else {
+    data->state = LV_INDEV_STATE_REL;
+  }
+  was_pressed = pressed;
 }
 
 // ============================================================================
@@ -452,6 +503,9 @@ void setup() {
   disp_drv.flush_cb = display_flush;
   disp_drv.draw_buf = &draw_buf;
   lv_disp_drv_register(&disp_drv);
+
+  touch_ok = init_touch();
+  Serial.println(touch_ok ? "Touch controller found" : "WARNING: Touch controller not responding");
 
   static lv_indev_drv_t indev_drv;
   lv_indev_drv_init(&indev_drv);
