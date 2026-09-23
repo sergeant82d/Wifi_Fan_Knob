@@ -235,7 +235,8 @@ ACTIVE (2)
 
 STANDBY (1)
   ├─ Dragon eye animation (closed, twitching)
-  ├─ MCU in deep sleep
+  ├─ MCU in light sleep, waking periodically for a slow animation frame
+  │  (deep sleep ruled out: CPU halts, can't animate)
   ├─ Display minimal power
   └─ Touch screen → Wake to ACTIVE
 ```

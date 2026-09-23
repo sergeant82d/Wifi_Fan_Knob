@@ -2,10 +2,12 @@
 #include <lvgl.h>
 #include <WiFi.h>
 #include <time.h>
+#include <esp_sntp.h>
 #include <Adafruit_EMC2101.h>
 #include "lv_conf.h"
 
 #include "config.h"  // Add near top with other includes
+#include "webserver.h"
 
 // ============================================================================
 // PIN DEFINITIONS (Elecrow 1.28" Rotary Display)
@@ -39,6 +41,9 @@
 #define ENCODER_SW_PIN 41
 
 // Power Control
+// Elecrow example: GPIO 1 and 2 are rails that "must remain enabled while
+// the display is operating".
+#define DISPLAY_RAIL_PIN 1
 #define KEEP_ALIVE_PIN 2
 #define POWER_LIGHT_PIN 40
 
@@ -51,11 +56,58 @@
 // ============================================================================
 
 #define LGFX_USE_V1
-#include <LGFX_AUTODETECT.hpp>
+#include <LovyanGFX.hpp>
 
-// LovyanGFX auto-detects and creates 'gfx' instance
-// (defined by LGFX_AUTODETECT.hpp, no need to redefine)
+static const uint32_t screenWidth = 240;
+static const uint32_t screenHeight = 240;
 
+// GC9A01 panel config, taken from Elecrow's RotaryScreen_1_28 example
+class LGFX : public lgfx::LGFX_Device {
+  lgfx::Panel_GC9A01 _panel_instance;
+  lgfx::Bus_SPI _bus_instance;
+
+ public:
+  LGFX(void) {
+    {
+      auto cfg = _bus_instance.config();
+      cfg.spi_host = SPI2_HOST;
+      cfg.spi_mode = 0;
+      cfg.freq_write = 80000000;
+      cfg.freq_read = 20000000;
+      cfg.spi_3wire = true;
+      cfg.use_lock = true;
+      cfg.dma_channel = SPI_DMA_CH_AUTO;
+      cfg.pin_sclk = DISPLAY_SCLK_PIN;
+      cfg.pin_mosi = DISPLAY_MOSI_PIN;
+      cfg.pin_miso = -1;
+      cfg.pin_dc = DISPLAY_DC_PIN;
+      _bus_instance.config(cfg);
+      _panel_instance.setBus(&_bus_instance);
+    }
+    {
+      auto cfg = _panel_instance.config();
+      cfg.pin_cs = DISPLAY_CS_PIN;
+      cfg.pin_rst = DISPLAY_RST_PIN;
+      cfg.pin_busy = -1;
+      cfg.memory_width = screenWidth;
+      cfg.memory_height = screenHeight;
+      cfg.panel_width = screenWidth;
+      cfg.panel_height = screenHeight;
+      cfg.offset_x = 0;
+      cfg.offset_y = 0;
+      cfg.offset_rotation = 0;
+      cfg.dummy_read_pixel = 8;
+      cfg.dummy_read_bits = 1;
+      cfg.readable = false;
+      cfg.invert = true;
+      cfg.rgb_order = false;
+      cfg.dlen_16bit = false;
+      cfg.bus_shared = false;
+      _panel_instance.config(cfg);
+    }
+    setPanel(&_panel_instance);
+  }
+};
 
 LGFX gfx;
 
@@ -63,8 +115,6 @@ LGFX gfx;
 // LVGL BUFFER & DISPLAY CALLBACK
 // ============================================================================
 
-static const uint32_t screenWidth = 240;
-static const uint32_t screenHeight = 240;
 static lv_disp_draw_buf_t draw_buf;
 static lv_color_t buf[screenWidth * 10];
 
@@ -130,7 +180,7 @@ enum SystemState {
 };
 
 volatile SystemState current_state = STATE_ACTIVE;
-unsigned long last_ntp_sync = 0;
+bool time_synced = false;
 const unsigned long NTP_SYNC_INTERVAL = 60 * 60 * 1000; // 60 minutes
 
 // ============================================================================
@@ -210,23 +260,12 @@ void init_wifi() {
 // NTP TIME SYNC
 // ============================================================================
 
-void sync_time_ntp() {
+// Starts the background SNTP client; it re-syncs every NTP_SYNC_INTERVAL
+// on its own, so nothing here blocks.
+void start_ntp() {
+  esp_sntp_set_sync_interval(NTP_SYNC_INTERVAL);
   configTime(0, 0, "pool.ntp.org", "time.nist.gov");
-  time_t now = time(nullptr);
-  int attempts = 0;
-  while (now < 24 * 3600 && attempts < 20) {
-    delay(500);
-    now = time(nullptr);
-    attempts++;
-  }
-  
-  if (now > 24 * 3600) {
-    Serial.print("Time synced: ");
-    Serial.println(ctime(&now));
-    last_ntp_sync = millis();
-  } else {
-    Serial.println("NTP sync failed");
-  }
+  Serial.println("NTP started");
 }
 
 // ============================================================================
@@ -234,6 +273,8 @@ void sync_time_ntp() {
 // ============================================================================
 
 void init_power_latch() {
+  pinMode(DISPLAY_RAIL_PIN, OUTPUT);
+  digitalWrite(DISPLAY_RAIL_PIN, HIGH);
   pinMode(KEEP_ALIVE_PIN, OUTPUT);
   digitalWrite(KEEP_ALIVE_PIN, HIGH); // Keep system powered on boot
   Serial.println("Power latch engaged");
@@ -254,6 +295,9 @@ void shutdown_system() {
 // ============================================================================
 
 void setup() {
+  // Soft Power Latch — must be first, before any delay
+  init_power_latch();
+
   Serial.begin(115200);
   delay(1000);
   Serial.println("\n\n=== PWM Fan Controller Startup ===\n");
@@ -266,9 +310,6 @@ void setup() {
   pinMode(SCREEN_BACKLIGHT_PIN, OUTPUT);
   digitalWrite(POWER_LIGHT_PIN, HIGH);
   digitalWrite(SCREEN_BACKLIGHT_PIN, HIGH);
-
-  // Soft Power Latch
-  init_power_latch();
 
   // Display & LVGL
   Serial.println("Initializing display...");
@@ -323,6 +364,12 @@ if (config.advanced.debugMode) {
   Serial.println("[MAIN] Debug mode enabled");
 }
 
+  init_wifi();
+  if (WiFi.status() == WL_CONNECTED) {
+    start_ntp();
+  }
+  init_webserver();
+
 
   // UI Setup
   // TODO: Create main screen UI (LVGL screens)
@@ -336,9 +383,12 @@ if (config.advanced.debugMode) {
 // ============================================================================
 
 void loop() {
-  // Handle periodic NTP sync
-  if (millis() - last_ntp_sync > NTP_SYNC_INTERVAL) {
-    sync_time_ntp();
+  // Report first NTP sync (re-syncs happen in the background)
+  if (!time_synced && time(nullptr) > 24 * 3600) {
+    time_synced = true;
+    time_t now = time(nullptr);
+    Serial.print("Time synced: ");
+    Serial.println(ctime(&now));
   }
 
   // Handle encoder rotation
