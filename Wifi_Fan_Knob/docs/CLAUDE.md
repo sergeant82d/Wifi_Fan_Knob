@@ -136,7 +136,9 @@ See `platformio.ini`. Libraries:
 ### ✅ Verified on hardware
 - Serial boot output over native USB CDC
 - 16 MB flash + 8 MB PSRAM detected
-- Display powers up and LVGL renders (default light screen; no UI yet)
+- Display: black screen with centered status box — `IP:port` + mode (WiFi / AP mode /
+  WiFi lost), refreshed 1 s. Flashes red/white via `status_set_attention()` when a saved
+  network is configured but not connected.
 - SPIFFS mount + config defaults written
 - WiFi AP mode (`WiFi-Fan-Knob-XXXXXX` / `12345678`)
 - Webserver serves `index.html` at `http://192.168.4.1:8080`
