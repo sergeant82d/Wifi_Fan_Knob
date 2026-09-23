@@ -498,7 +498,8 @@
                 <div class="form-grid">
                     <div class="form-group">
                         <label for="wifi-ssid">SSID</label>
-                        <input type="text" id="wifi-ssid" placeholder="Network name" required>
+                        <input type="text" id="wifi-ssid" placeholder="Network name" list="wifi-networks" required>
+                        <datalist id="wifi-networks"></datalist>
                     </div>
                     <div class="form-group">
                         <label for="wifi-pass">Password</label>
@@ -679,21 +680,56 @@
             document.getElementById('brightness-label').textContent = value;
         }
 
-        function saveWiFi(event) {
+        async function postForm(url, fields) {
+            const res = await fetch(url, { method: 'POST', body: new URLSearchParams(fields) });
+            const text = await res.text();
+            if (!res.ok) throw new Error(text);
+            return text;
+        }
+
+        async function saveWiFi(event) {
             event.preventDefault();
             const ssid = document.getElementById('wifi-ssid').value;
             const pass = document.getElementById('wifi-pass').value;
-            console.log('Saving WiFi:', ssid);
-            alert('WiFi credentials saved. Reconnecting...');
+            try {
+                alert(await postForm('/api/wifi', { ssid, pass }) +
+                      '\n\nThe device will leave AP mode if it connects; find its new IP on your router or serial log.');
+            } catch (e) {
+                alert('Save failed: ' + e.message);
+            }
         }
 
-        function scanWiFi() {
-            alert('Scanning for available networks...\nFound: Home WiFi (-55 dBm), Guest WiFi (-70 dBm), Neighbor (-85 dBm)');
+        async function scanWiFi() {
+            const list = document.getElementById('wifi-networks');
+            try {
+                let res;
+                // Poll until the non-blocking scan finishes (~2-5 s)
+                for (let i = 0; i < 20; i++) {
+                    res = await fetch('/api/wifi/scan');
+                    if (res.status !== 202) break;
+                    await new Promise(r => setTimeout(r, 500));
+                }
+                if (!res.ok) throw new Error('scan did not complete');
+                const networks = (await res.json()).sort((a, b) => b.rssi - a.rssi);
+                list.innerHTML = '';
+                networks.forEach(n => {
+                    const opt = document.createElement('option');
+                    opt.value = n.ssid;
+                    opt.label = n.rssi + ' dBm';
+                    list.appendChild(opt);
+                });
+                alert('Found ' + networks.length + ' networks. Click the SSID field to choose one.');
+            } catch (e) {
+                alert('Scan failed: ' + e.message);
+            }
         }
 
-        function forgetWiFi() {
-            if (confirm('Forget saved WiFi network?')) {
-                alert('Network forgotten. Device will enter AP mode on next reboot.');
+        async function forgetWiFi() {
+            if (!confirm('Forget saved WiFi network?')) return;
+            try {
+                alert(await postForm('/api/wifi/forget', {}));
+            } catch (e) {
+                alert('Forget failed: ' + e.message);
             }
         }
 

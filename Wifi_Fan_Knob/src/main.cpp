@@ -228,7 +228,7 @@ bool init_fan_controller() {
 
 void startAPMode() {
   Serial.println("Starting AP mode...");
-  WiFi.mode(WIFI_AP);
+  WiFi.mode(WIFI_AP_STA);  // STA side needed for network scans from the web UI
   
   String apName = "WiFi-Fan-Knob-" + String((uint32_t)(ESP.getEfuseMac() >> 24), HEX);
   String apPass = "12345678";  // User can change in webserver

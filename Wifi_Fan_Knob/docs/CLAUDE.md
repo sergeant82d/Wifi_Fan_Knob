@@ -46,8 +46,8 @@ cd Wifi_Fan_Knob/Wifi_Fan_Knob     # PlatformIO project is nested
 | `src/main.cpp` | ✅ Working | Boot, display (LGFX + LVGL), encoder, WiFi, NTP, state machine skeleton |
 | `include/config.h` / `src/config.cpp` | ✅ Working | SPIFFS JSON config load/save/validate/defaults |
 | `include/lv_conf.h` | ✅ Minimal | LVGL 8 config (240×240, 16-bit) |
-| `include/webserver.h` / `src/webserver.cpp` | 🟡 Minimal | Serves `data/index.html` at `/` only; no form handlers yet |
-| `data/index.html` | 🟡 UI only | 4-tab web UI; buttons not wired to firmware yet |
+| `include/webserver.h` / `src/webserver.cpp` | 🟡 Partial | `/` → index.html; `/api/wifi` save, `/api/wifi/forget`, `/api/wifi/scan` (async, poll for 202→200) |
+| `data/index.html` | 🟡 Partial | 4-tab web UI; WiFi tab wired, other tabs still mock `alert()`s |
 | `include/mqtt.h` / `src/mqtt.cpp` | ⬜ Empty | MQTT + HA discovery (TODO; needs an MQTT library in `lib_deps`) |
 | `include/fan_control.h` / `src/fan_control.cpp` | ⬜ Empty | EMC2101 PWM + tach (TODO) |
 | `lib/Adafruit_EMC2101/` | Vendored | Adafruit EMC2101 driver (local copy, not from registry) |
@@ -143,7 +143,7 @@ See `platformio.ini`. Libraries:
 - EMC2101 detection at 0x4C on I2C 38/39.
 
 ### ⬜ Not started
-- Web UI handlers (WiFi setup, settings save, OTA)
+- Web UI handlers: Home (needs fan_control), Config save, OTA
 - `fan_control.cpp`, `mqtt.cpp`
 - LVGL screens (main gauge, menus, dragon-eye standby)
 - Touch (CST816D) — Elecrow's `CST816D.cpp/.h` can be reused
