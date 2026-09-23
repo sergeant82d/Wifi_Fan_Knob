@@ -5,6 +5,8 @@
 #include <Adafruit_EMC2101.h>
 #include "lv_conf.h"
 
+#include "config.h"  // Add near top with other includes
+
 // ============================================================================
 // PIN DEFINITIONS (Elecrow 1.28" Rotary Display)
 // ============================================================================
@@ -150,23 +152,58 @@ bool init_fan_controller() {
 // WIFI SETUP
 // ============================================================================
 
-void init_wifi() {
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(); // Will use saved credentials if available
+void startAPMode() {
+  Serial.println("Starting AP mode...");
+  WiFi.mode(WIFI_AP);
   
-  int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 20) {
-    delay(500);
-    attempts++;
-  }
+  String apName = "WiFi-Fan-Knob-" + String((uint32_t)(ESP.getEfuseMac() >> 24), HEX);
+  String apPass = "12345678";  // User can change in webserver
+  
+  WiFi.softAP(apName.c_str(), apPass.c_str());
+  IPAddress apIP = WiFi.softAPIP();
+  
+  Serial.print("AP started: ");
+  Serial.println(apName);
+  Serial.print("IP: ");
+  Serial.println(apIP);
+  Serial.print("Password: ");
+  Serial.println(apPass);
+  
+  // Display AP info on screen (TODO: show on LVGL)
+}
 
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.print("WiFi connected: ");
-    Serial.println(WiFi.localIP());
+void init_wifi() {
+// ============================================================================
+// WIFI INITIALIZATION
+// ============================================================================
+  Serial.println("Initializing WiFi...");
+
+  if (config.wifi.saveCredentials && config.wifi.ssid[0] != '\0') {
+    // Try to connect with saved credentials
+    Serial.print("Connecting to: ");
+    Serial.println(config.wifi.ssid);
+    
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(config.wifi.ssid, config.wifi.password);
+    
+    int attempts = 0;
+    while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+      delay(500);
+      attempts++;
+    }
+    
+    if (WiFi.status() == WL_CONNECTED) {
+      Serial.print("WiFi connected: ");
+      Serial.println(WiFi.localIP());
+    } else {
+      Serial.println("WiFi connection failed, starting AP mode");
+      startAPMode();
+    }
   } else {
-    Serial.println("WiFi not connected, starting AP mode");
-    // TODO: Start AP mode for configuration
-  }
+    // No saved credentials, start AP mode
+    Serial.println("No saved WiFi credentials, starting AP mode");
+    startAPMode();
+}
 }
 
 // ============================================================================
@@ -272,12 +309,20 @@ void setup() {
   attachInterrupt(ENCODER_A_PIN, encoder_isr, CHANGE);
   attachInterrupt(ENCODER_SW_PIN, button_isr, CHANGE);
 
-  // WiFi & Time
-  Serial.println("Initializing WiFi...");
-  init_wifi();
-  
-  Serial.println("Syncing time via NTP...");
-  sync_time_ntp();
+// ============================================================================
+// CONFIGURATION & SPIFFS
+// ============================================================================
+
+Serial.println("Initializing configuration system...");
+initConfig();  // Load config from SPIFFS (or set defaults)
+
+// Update device info with actual chip ID (optional, for logging)
+snprintf(config.chipId, sizeof(config.chipId), "%06X", (uint32_t)(ESP.getEfuseMac() >> 24));
+
+if (config.advanced.debugMode) {
+  Serial.println("[MAIN] Debug mode enabled");
+}
+
 
   // UI Setup
   // TODO: Create main screen UI (LVGL screens)
