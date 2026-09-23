@@ -144,29 +144,53 @@ void touchpad_read(lv_indev_drv_t *indev_drv, lv_indev_data_t *data) {
 // ENCODER & BUTTON HANDLING
 // ============================================================================
 
-      int32_t encoder_count = 0;
+// Quadrature decoding adapted from Elecrow's RotaryScreen_1_28 example.
+// encoder_count holds whole detents (4 valid transitions each).
+volatile int32_t encoder_count = 0;
+volatile int8_t encoder_quarter_steps = 0;
+volatile uint8_t encoder_last_state = 0;
 volatile bool encoder_button_pressed = false;
+portMUX_TYPE encoder_mux = portMUX_INITIALIZER_UNLOCKED;
+
+// Index = (last_state << 2) | current_state, with A = bit1, B = bit0.
+// Invalid (skipped) transitions and no-change map to 0.
+DRAM_ATTR static const int8_t encoder_transition_table[16] = {
+   0, -1,  1,  0,
+   1,  0,  0, -1,
+  -1,  0,  0,  1,
+   0,  1, -1,  0
+};
+
+const unsigned long BUTTON_DEBOUNCE_MS = 20;
 
 void IRAM_ATTR encoder_isr() {
-  static uint8_t last_state = 0;
-  uint8_t a = digitalRead(ENCODER_A_PIN);
-  uint8_t b = digitalRead(ENCODER_B_PIN);
-  uint8_t current_state = (a << 1) | b;
+  uint8_t current_state = ((uint8_t)digitalRead(ENCODER_A_PIN) << 1) |
+                          (uint8_t)digitalRead(ENCODER_B_PIN);
+  int8_t movement = encoder_transition_table[(encoder_last_state << 2) | current_state];
 
-  // Simple Gray code decoding
-  if ((last_state == 0 && current_state == 1) || 
-      (last_state == 2 && current_state == 3) ||
-      (last_state == 3 && current_state == 2) ||
-      (last_state == 1 && current_state == 0)) {
-    encoder_count++;  // Remove volatile cast
-  } else {
-    encoder_count--;  // Remove volatile cast
+  portENTER_CRITICAL_ISR(&encoder_mux);
+  encoder_last_state = current_state;
+  if (movement != 0) {
+    encoder_quarter_steps += movement;
+    if (encoder_quarter_steps >= 4) {
+      encoder_count++;
+      encoder_quarter_steps -= 4;
+    } else if (encoder_quarter_steps <= -4) {
+      encoder_count--;
+      encoder_quarter_steps += 4;
+    }
   }
-  last_state = current_state;
+  portEXIT_CRITICAL_ISR(&encoder_mux);
 }
 
+// Latches a press on a debounced falling edge; loop() clears it
 void IRAM_ATTR button_isr() {
-  encoder_button_pressed = !digitalRead(ENCODER_SW_PIN);
+  static unsigned long last_interrupt_time = 0;
+  unsigned long now = millis();
+  if (now - last_interrupt_time > BUTTON_DEBOUNCE_MS && !digitalRead(ENCODER_SW_PIN)) {
+    encoder_button_pressed = true;
+  }
+  last_interrupt_time = now;
 }
 
 // ============================================================================
@@ -347,7 +371,10 @@ void setup() {
 
   // Encoder Input
   Serial.println("Initializing encoder...");
+  encoder_last_state = ((uint8_t)digitalRead(ENCODER_A_PIN) << 1) |
+                       (uint8_t)digitalRead(ENCODER_B_PIN);
   attachInterrupt(ENCODER_A_PIN, encoder_isr, CHANGE);
+  attachInterrupt(ENCODER_B_PIN, encoder_isr, CHANGE);
   attachInterrupt(ENCODER_SW_PIN, button_isr, CHANGE);
 
 // ============================================================================
@@ -392,9 +419,11 @@ void loop() {
   }
 
   // Handle encoder rotation
-  if (encoder_count != 0) {
-    int32_t delta = encoder_count;
-    encoder_count = 0;
+  portENTER_CRITICAL(&encoder_mux);
+  int32_t delta = encoder_count;
+  encoder_count = 0;
+  portEXIT_CRITICAL(&encoder_mux);
+  if (delta != 0) {
     // TODO: Update fan speed by delta * 100 RPM
     Serial.print("Encoder: ");
     Serial.println(delta);
