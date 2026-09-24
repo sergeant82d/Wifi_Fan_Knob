@@ -502,6 +502,7 @@
 
             <button class="btn-primary" onclick="applySpeed()">Apply Speed</button>
             <button class="btn-secondary" style="margin-left: 10px;" id="standby-btn" onclick="standbyMode()">Standby</button>
+            <button class="btn-secondary" style="margin-left: 10px;" id="saver-btn" onclick="toggleScreensaver()">Screensaver</button>
 
             <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid rgba(255, 215, 0, 0.2);">
                 <a href="https://github.com/sergeant82d/Wifi_Fan_Knob" target="_blank" style="color: #ffd700; text-decoration: none; font-size: 0.9rem;">
@@ -861,6 +862,17 @@
             applySpeed(rpm);
         }
 
+        // Start the screensaver, or wake the display from it
+        let saverOn = false;
+        async function toggleScreensaver() {
+            try {
+                await postForm('/api/screensaver', { on: saverOn ? '0' : '1' });
+                loadStatus();
+            } catch (e) {
+                alert('Screensaver failed: ' + e.message);
+            }
+        }
+
         // Immediate stop: target 0, no confirmation
         async function fanOff() {
             try {
@@ -1117,6 +1129,9 @@
                 set('periph-power', s.periph_power ? 'On' : 'Off');
                 inStandby = s.power_mode === 'Standby';
                 set('standby-btn', inStandby ? 'Wake' : 'Standby');
+                saverOn = s.power_mode === 'Active (screensaver)';
+                set('saver-btn', saverOn ? 'Wake display' : 'Screensaver');
+                document.getElementById('saver-btn').disabled = inStandby;  // Standby shows the eye itself
                 set('mqtt-status', s.mqtt_connected ? 'Yes' : 'No');
                 set('speed-range', s.min_rpm + '-' + s.max_rpm);
                 const slider = document.getElementById('speed-slider');

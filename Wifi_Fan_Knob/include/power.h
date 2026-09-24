@@ -6,6 +6,7 @@
 void power_request_standby(bool standby);
 bool power_is_standby();
 bool power_screensaver_on();              // Dragon eye showing while Active (idle)
+void power_request_screensaver(bool on);  // Start/dismiss it (web); ignored in standby
 
 // Peripheral power switch (GPIO 4): on while awake, off in standby.
 // Level (active HIGH/LOW) comes from config.power.activeHigh.

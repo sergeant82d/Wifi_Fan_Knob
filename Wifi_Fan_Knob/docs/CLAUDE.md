@@ -201,6 +201,9 @@ See `platformio.ini`. Libraries:
   Verified on hardware: starts after the delay; touch/knob/short press dismiss; long press ->
   standby; web speed change dismisses.
   `/api/status` power_mode is "Active (screensaver)" while it shows (`power_screensaver_on()`).
+  Web Home tab "Screensaver" / "Wake display" button: `POST /api/screensaver` on=1/0 (login),
+  a flag applied in loop() (`power_request_screensaver()`), ignored in standby (button
+  disabled). Also reported to HA (binary_sensor Screensaver).
 - Standby (`power.h`, verified): knob button held 1 s (fires while held) or web Standby/Wake
   button (`POST /api/standby`, login). Dims backlight to 10% and loads a standby screen (large
   grey clock) and sets fan target to 0. Any touch, knob turn or button press wakes (fan stays 0);
@@ -234,11 +237,14 @@ See `platformio.ini`. Libraries:
 - MQTT / Home Assistant (verified with HA + Mosquitto add-on at 192.168.10.85, login required):
   `mqtt.cpp` runs PubSubClient in its own task (core 0) so blocking connects never stall loop();
   retries every 15 s; reconnects after Config save. Topics `<topicPrefix>/<chipId>/...`
-  (`wifi_fan_knob/24C55D/`): `speed`, `speed/set`, `standby`, `standby/set`, `running`, `rssi`,
-  `uptime`, `ip`, `status` (LWT online/offline, retained). Discovery (retained, `homeassistant/<comp>/
-  wifi_fan_knob_<chipId>/<obj>/config`): number Fan Speed, switch Standby, binary_sensor Fan
-  Running, sensors WiFi Signal + Uptime + IP Address (diagnostic). State retained, on change;
-  rssi/uptime/ip every 60 s.
+  (`wifi_fan_knob/24C55D/`): `speed`, `speed/set`, `standby`, `standby/set`, `brightness`,
+  `brightness/set`, `screensaver`, `running`, `rssi`, `uptime`, `ip`, `status` (LWT
+  online/offline, retained). Discovery (retained, `homeassistant/<comp>/
+  wifi_fan_knob_<chipId>/<obj>/config`): number Fan Speed, switch Standby, number LCD
+  Brightness (10-100 %, applied + saved like the web slider), binary_sensors Fan Running and
+  Screensaver, sensors WiFi Signal + Uptime + IP Address (diagnostic). State retained, on
+  change; rssi/uptime/ip every 60 s. Brightness/Screensaver added 2026-09-24 (discovery
+  confirmed published; HA side to be checked by the user).
   Commands go through `fan_set_target()` / `power_request_standby()`. Deviations from
   MQTT_SCHEMA.md: chip ID in ids/topics, LWT instead of "MQTT Connected" sensor, Standby switch
   instead of Power Mode sensor, no RPM sensor until EMC2101.
@@ -422,13 +428,6 @@ STANDBY (1)
   drawn at 240 px (Adafruit_Learning_System/M4_Eyes), so more detail than the upscaled 128 px
   Uncanny Eyes. Different engine (runtime eyeball/lid rendering, per-eye config + images), so a
   real port, not a data swap. All 10 current styles verified and liked (2026-09-24).
-- **LCD brightness in Home Assistant** — a `number` (or `light`) entity so automations can dim
-  the knob, e.g. at night. Presets in HA: not wanted.
-- **Screensaver on the web / Home Assistant** — the web Home tab now shows "Active
-  (screensaver)" in Power Mode while the eye is up (done, `/api/status` power_mode). Options
-  not taken yet: (2) a web "Screensaver" / "Wake display" button next to Standby (login), to
-  start or dismiss the eye remotely; (3) a Home Assistant "Screensaver" binary_sensor (or a
-  switch, if (2) is done) for automations, e.g. dim the bench lights when the knob goes idle.
 
 ---
 

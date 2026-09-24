@@ -98,6 +98,26 @@ static void publish_discovery() {
     doc["entity_category"] = "diagnostic";
     publish_config("sensor", "ip", doc);
   }
+  {
+    StaticJsonDocument<768> doc;
+    doc["name"] = "LCD Brightness";
+    doc["command_topic"] = topic("brightness/set");
+    doc["state_topic"] = topic("brightness");
+    doc["min"] = 10;
+    doc["max"] = 100;
+    doc["step"] = 1;
+    doc["unit_of_measurement"] = "%";
+    doc["mode"] = "slider";
+    doc["icon"] = "mdi:brightness-6";
+    publish_config("number", "brightness", doc);
+  }
+  {
+    StaticJsonDocument<768> doc;
+    doc["name"] = "Screensaver";
+    doc["state_topic"] = topic("screensaver");
+    doc["icon"] = "mdi:eye";
+    publish_config("binary_sensor", "screensaver", doc);
+  }
   Serial.println("[MQTT] Home Assistant discovery published");
 }
 
@@ -120,6 +140,18 @@ static void publish_state(bool force) {
   if (force || standby != last_standby) {
     client.publish(topic("standby").c_str(), standby ? "ON" : "OFF", true);
     last_standby = standby;
+  }
+  static int last_saver = -1;
+  int saver = power_screensaver_on();
+  if (force || saver != last_saver) {
+    client.publish(topic("screensaver").c_str(), saver ? "ON" : "OFF", true);
+    last_saver = saver;
+  }
+  static int last_brightness = -1;
+  int brightness = config.display.brightness;  // Changed by LCD slider, web or HA
+  if (force || brightness != last_brightness) {
+    client.publish(topic("brightness").c_str(), String(brightness).c_str(), true);
+    last_brightness = brightness;
   }
   if (force || millis() - last_diag > 60000) {
     client.publish(topic("rssi").c_str(), String(WiFi.RSSI()).c_str(), true);
@@ -145,6 +177,14 @@ static void on_message(char *t, byte *payload, unsigned int len) {
     fan_set_target(lroundf(msg.toFloat()));
   } else if (tp == topic("standby/set")) {
     if (msg == "ON" || msg == "OFF") power_request_standby(msg == "ON");
+  } else if (tp == topic("brightness/set")) {
+    // Same as the web slider: apply and save (HA sends once, when the slider is released)
+    long b = lroundf(msg.toFloat());
+    if (b >= 10 && b <= 100) {
+      config.display.brightness = b;
+      applyDisplaySettings();
+      saveConfig();
+    }
   }
 }
 
@@ -166,6 +206,7 @@ static void try_connect() {
   if (config.mqtt.discoveryEnabled) publish_discovery();
   client.subscribe(topic("speed/set").c_str());
   client.subscribe(topic("standby/set").c_str());
+  client.subscribe(topic("brightness/set").c_str());
   publish_state(true);
 }
 

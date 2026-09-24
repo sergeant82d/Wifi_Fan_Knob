@@ -490,6 +490,12 @@ bool power_screensaver_on() {
   return saver_on;
 }
 
+static volatile int8_t saver_request = -1;  // -1 none, 0 dismiss, 1 start (web); loop() applies
+
+void power_request_screensaver(bool on) {
+  saver_request = on ? 1 : 0;
+}
+
 static bool eye_showing() {
   return saver_on || power_is_standby();
 }
@@ -737,6 +743,11 @@ void loop() {
   if (standby_request >= 0) {
     set_standby(standby_request == 1);
     standby_request = -1;
+  }
+  // Screensaver started/dismissed from the web (standby shows the eye itself)
+  if (saver_request >= 0) {
+    if (!power_is_standby()) set_saver(saver_request == 1);
+    saver_request = -1;
   }
 
   // Refresh clock + status box once a second

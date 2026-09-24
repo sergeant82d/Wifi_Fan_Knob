@@ -19,9 +19,10 @@ For the technical details of each feature, see `CLAUDE.md`. For changing the scr
 | **Standby** | External power off, eye slowed to 15 frames per second to save power |
 | **Web: presets and fan max** | Preset speeds and the fan's max RPM are editable on the Config tab. Presets set their exact value everywhere (web and LCD) |
 | **Web: brightness** | The LCD brightness slider is on the Home tab |
+| **Web: screensaver button** | Home tab button starts the screensaver, or wakes the display from it |
 | **Web: network** | Static IP or DHCP on the WiFi tab. Saving restarts the board, with a notice beside the button |
 | **Web: other** | GitHub link on Home, power icon on the FAN OFF button now shows on Android, the page no longer goes stale after a firmware update |
-| **Home Assistant** | New IP Address sensor |
+| **Home Assistant** | New IP Address sensor, LCD Brightness slider and Screensaver sensor |
 | **Docs** | `DISPLAY_GUIDE.md`: how to change colours, fonts, segments, pages and eye styles |
 
 ## Problems found and fixed today
@@ -47,4 +48,4 @@ For the technical details of each feature, see `CLAUDE.md`. For changing the scr
 
 1. **EMC2101 arrives:** fan drive and tachometer, then measured RPM on the LCD, web page and Home Assistant.
 2. Fan calibration and bench testing.
-3. Later list (`CLAUDE.md`): LCD brightness in Home Assistant, screensaver button/sensor, eye upgrades, M4 Eyes.
+3. Later list (`CLAUDE.md`): eye upgrades, M4 Eyes.

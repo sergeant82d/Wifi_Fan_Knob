@@ -333,6 +333,14 @@ void init_webserver() {
     request->send(200, "text/plain", "Brightness saved");
   });
 
+  // Screensaver start (on=1) / dismiss (on=0); applied by loop(), ignored in standby
+  server->on(AsyncURIMatcher::exact("/api/screensaver"), HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (!require_login(request)) return;
+    bool on = form_value(request, "on") == "1";
+    power_request_screensaver(on);
+    request->send(200, "text/plain", on ? "Screensaver on" : "Display awake");
+  });
+
   // Check credentials (page login bar)
   server->on(AsyncURIMatcher::exact("/api/login"), HTTP_POST, [](AsyncWebServerRequest *request) {
     if (!require_login(request)) return;
