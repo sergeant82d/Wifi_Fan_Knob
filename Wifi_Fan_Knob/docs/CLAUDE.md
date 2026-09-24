@@ -151,8 +151,8 @@ See `platformio.ini`. Libraries:
 - Static IP / DHCP (WiFi tab "Network Configuration", `POST /api/wifi/config`, login): stored in
   `config.wifi.useStaticIp/staticIp/staticGateway/staticSubnet/staticDns`; server checks each is
   a valid address and that IP and gateway share the subnet before changing anything. Applied by
-  `apply_ip_config()` before every `WiFi.begin()`, so it takes effect at the next restart; DNS
-  defaults to the gateway. DHCP path verified on hardware; static save/apply not yet verified.
+  `apply_ip_config()` before every `WiFi.begin()`; saving reboots the board to apply it. DNS
+  defaults to the gateway. Verified on hardware (DHCP and static).
   A wrong static IP can leave the board unreachable while WiFi still reports connected (so
   the fallback hotspot never starts): recover over USB with the SPIFFS erase below.
 - Time zones (worldwide, verified on hardware): page embeds posix_tz_db (MIT, 461 IANA zones -> POSIX rules) with a

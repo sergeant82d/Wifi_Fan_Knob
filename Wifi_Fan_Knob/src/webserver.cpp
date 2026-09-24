@@ -337,7 +337,7 @@ void init_webserver() {
     request->send(200, "text/plain", "Hotspot password saved. It applies the next time the hotspot starts.");
   });
 
-  // DHCP or static IP; validated before anything changes, applied at next restart
+  // DHCP or static IP; validated before anything changes, then reboot to apply
   server->on(AsyncURIMatcher::exact("/api/wifi/config"), HTTP_POST, [](AsyncWebServerRequest *request) {
     if (!require_login(request)) return;
     bool use_static = form_value(request, "use_static_ip") == "true";
@@ -370,9 +370,8 @@ void init_webserver() {
       return;
     }
     Serial.printf("[WEB] Network config: %s\n", use_static ? config.wifi.staticIp : "DHCP");
-    request->send(200, "text/plain", use_static
-      ? "Saved. Applies after the board restarts; then open http://" + ip + ":8080"
-      : String("Saved. DHCP applies after the board restarts."));
+    request->send(200, "text/plain", "Saved. Restarting...");
+    restart_after_response(request);
   });
 
   // Current settings for the Config tab (no passwords)

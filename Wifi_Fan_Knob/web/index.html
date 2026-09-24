@@ -574,7 +574,12 @@
                             </div>
                         </div>
                     </div>
-                    <button type="submit" class="btn-primary" style="margin-top: 15px;">Save Network Config</button>
+                    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 15px;">
+                        <button type="submit" class="btn-primary">Save &amp; Restart</button>
+                        <span id="net-status" style="color: #a0a0a0; font-size: 0.9rem;">
+                            Saving restarts the board; it is offline for about 15 seconds.
+                        </span>
+                    </div>
                 </form>
             </div>
 
@@ -1168,10 +1173,22 @@
                     return;
                 }
             }
+            const where = enable ? 'http://' + data.static_ip + ':8080' : null;
+            if (!confirm('Save and restart the board?\n\nIt will be offline for about 15 seconds' +
+                         (enable ? ', then reachable at ' + where : '. With DHCP its address may change') + '.')) return;
+            const status = document.getElementById('net-status');
             try {
-                alert(await postForm('/api/wifi/config', data));
+                await postForm('/api/wifi/config', data);
             } catch (e) {
-                alert('Save failed: ' + e.message);
+                status.textContent = 'Save failed: ' + e.message;
+                return;
+            }
+            if (enable) {
+                status.textContent = 'Saved. Restarting... this page will open ' + where + ' in 15 s.';
+                setTimeout(() => { location.href = where; }, 15000);
+            } else {
+                status.textContent = 'Saved. Restarting with DHCP; if the address changes, find it on the LCD or your router.';
+                setTimeout(() => location.reload(), 15000);
             }
         }
 
