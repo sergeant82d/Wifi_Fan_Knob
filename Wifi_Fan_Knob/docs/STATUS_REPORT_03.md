@@ -30,14 +30,12 @@ For the technical details of each feature, see `CLAUDE.md`. For changing the scr
 - **LCD taps on a segment's outer edge set a stepped speed:** the RPM arc's touch zone reached into the segments. It now stops at their edge.
 - **Browser kept running an old copy of the page after a firmware update:** the board now tells browsers not to keep a stored copy.
 - **One-off WiFi driver crash** on the first boot after a flash (inside Espressif's precompiled WiFi code). Not seen again in 6 restarts or during testing; watching for it.
-
 - **Startup crash (fixed):** about 1 boot in 10 yesterday crashed while the knob's interrupts were set up. The knob now uses the chip's hardware encoder counter instead of pin interrupts, which removes the code path every recorded crash came from. 60 of 60 restarts clean, and the knob checked by hand (direction, one step per click, short and long press, fast spinning). The "before" test today was also 0 of 60, so this shows reliability rather than a measured improvement.
 
 ## Decisions made
 
 - Home Assistant fan speed stays in RPM.
 - Fan drive limits (min/max PWM) wait until the fan is connected.
-- No audio for now.
 - The eye styles stay Adafruit's 128-pixel art, scaled up; Adafruit's "M4 Eyes" (drawn at 240 px) come after the fan hardware.
 - Presets are not needed in Home Assistant; an LCD brightness control is on the later list.
 
