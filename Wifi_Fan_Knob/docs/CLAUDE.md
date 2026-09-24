@@ -203,7 +203,7 @@ See `platformio.ini`. Libraries:
   `/api/status` power_mode is "Active (screensaver)" while it shows (`power_screensaver_on()`).
   Web Home tab "Screensaver" / "Wake display" button: `POST /api/screensaver` on=1/0 (login),
   a flag applied in loop() (`power_request_screensaver()`), ignored in standby (button
-  disabled). Also reported to HA (binary_sensor Screensaver).
+  disabled). Also a HA switch (Screensaver).
 - Standby (`power.h`, verified): knob button held 1 s (fires while held) or web Standby/Wake
   button (`POST /api/standby`, login). Dims backlight to 10% and loads a standby screen (large
   grey clock) and sets fan target to 0. Any touch, knob turn or button press wakes (fan stays 0);
@@ -238,11 +238,12 @@ See `platformio.ini`. Libraries:
   `mqtt.cpp` runs PubSubClient in its own task (core 0) so blocking connects never stall loop();
   retries every 15 s; reconnects after Config save. Topics `<topicPrefix>/<chipId>/...`
   (`wifi_fan_knob/24C55D/`): `speed`, `speed/set`, `standby`, `standby/set`, `brightness`,
-  `brightness/set`, `screensaver`, `running`, `rssi`, `uptime`, `ip`, `status` (LWT
+  `brightness/set`, `screensaver`, `screensaver/set`, `running`, `rssi`, `uptime`, `ip`, `status` (LWT
   online/offline, retained). Discovery (retained, `homeassistant/<comp>/
   wifi_fan_knob_<chipId>/<obj>/config`): number Fan Speed, switch Standby, number LCD
-  Brightness (10-100 %, applied + saved like the web slider), binary_sensors Fan Running and
-  Screensaver, sensors WiFi Signal + Uptime + IP Address (diagnostic). State retained, on
+  Brightness (10-100 %, applied + saved like the web slider), switch Screensaver (start /
+  dismiss, ignored in standby; was a binary_sensor briefly, whose config is cleared on each
+  connect), binary_sensor Fan Running, sensors WiFi Signal + Uptime + IP Address (diagnostic). State retained, on
   change; rssi/uptime/ip every 60 s. Brightness/Screensaver added 2026-09-24 (discovery
   confirmed published; HA side to be checked by the user).
   Commands go through `fan_set_target()` / `power_request_standby()`. Deviations from

@@ -22,7 +22,7 @@ For the technical details of each feature, see `CLAUDE.md`. For changing the scr
 | **Web: screensaver button** | Home tab button starts the screensaver, or wakes the display from it |
 | **Web: network** | Static IP or DHCP on the WiFi tab. Saving restarts the board, with a notice beside the button |
 | **Web: other** | GitHub link on Home, power icon on the FAN OFF button now shows on Android, the page no longer goes stale after a firmware update |
-| **Home Assistant** | New IP Address sensor, LCD Brightness slider and Screensaver sensor |
+| **Home Assistant** | New IP Address sensor, LCD Brightness slider and Screensaver switch |
 | **Docs** | `DISPLAY_GUIDE.md`: how to change colours, fonts, segments, pages and eye styles |
 
 ## Problems found and fixed today

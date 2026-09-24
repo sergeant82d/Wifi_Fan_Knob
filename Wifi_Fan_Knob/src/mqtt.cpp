@@ -114,10 +114,13 @@ static void publish_discovery() {
   {
     StaticJsonDocument<768> doc;
     doc["name"] = "Screensaver";
+    doc["command_topic"] = topic("screensaver/set");
     doc["state_topic"] = topic("screensaver");
     doc["icon"] = "mdi:eye";
-    publish_config("binary_sensor", "screensaver", doc);
+    publish_config("switch", "screensaver", doc);
   }
+  // Screensaver was briefly a binary_sensor: an empty retained config removes that entity
+  client.publish((String("homeassistant/binary_sensor/") + dev_id + "/screensaver/config").c_str(), "", true);
   Serial.println("[MQTT] Home Assistant discovery published");
 }
 
@@ -177,6 +180,8 @@ static void on_message(char *t, byte *payload, unsigned int len) {
     fan_set_target(lroundf(msg.toFloat()));
   } else if (tp == topic("standby/set")) {
     if (msg == "ON" || msg == "OFF") power_request_standby(msg == "ON");
+  } else if (tp == topic("screensaver/set")) {
+    if (msg == "ON" || msg == "OFF") power_request_screensaver(msg == "ON");  // Ignored in standby
   } else if (tp == topic("brightness/set")) {
     // Same as the web slider: apply and save (HA sends once, when the slider is released)
     long b = lroundf(msg.toFloat());
@@ -207,6 +212,7 @@ static void try_connect() {
   client.subscribe(topic("speed/set").c_str());
   client.subscribe(topic("standby/set").c_str());
   client.subscribe(topic("brightness/set").c_str());
+  client.subscribe(topic("screensaver/set").c_str());
   publish_state(true);
 }
 
