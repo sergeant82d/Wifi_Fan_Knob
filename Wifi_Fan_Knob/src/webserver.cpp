@@ -2,6 +2,7 @@
 #include "config.h"
 #include "fan_control.h"
 #include "power.h"
+#include "mqtt.h"
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
 #include <WiFi.h>
@@ -191,7 +192,7 @@ void init_webserver() {
     doc["fan_controller"] = fan_controller_present();
     doc["power_mode"] = power_is_standby() ? "Standby" : "Active";
     doc["periph_power"] = power_peripherals_on();
-    doc["mqtt_connected"] = false;  // MQTT not implemented yet
+    doc["mqtt_connected"] = mqtt_connected();
     doc["fw_version"] = config.firmwareVersion;
     char build_id[9];  // First 8 hex chars of firmware ELF SHA-256: unique per build
     esp_app_get_elf_sha256(build_id, sizeof(build_id));
@@ -215,7 +216,6 @@ void init_webserver() {
       return;
     }
     fan_set_target(rpm);
-    if (rpm > 0 && power_is_standby()) power_request_standby(false);  // Fan only runs when awake
     request->send(200, "text/plain", "Target set to " + String(fan_get_target()) + " RPM");
   });
 
@@ -341,6 +341,7 @@ void init_webserver() {
     }
     applyDisplaySettings();
     applyPowerSettings();
+    mqtt_reconfigure();  // Broker/credentials may have changed
     request->send(200, "text/plain", "Configuration saved.");
   });
 

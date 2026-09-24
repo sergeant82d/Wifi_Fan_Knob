@@ -8,7 +8,8 @@ bool fan_controller_present();          // EMC2101 answered at last power-up
 void fan_power_lost();                  // Peripheral power cut: EMC2101 unavailable until fan_init()
 
 // Target RPM, clamped to config.fan.minRpm..maxRpm. Safe to call from any task;
-// the UI picks up changes in loop(). Not yet applied to hardware (needs EMC2101).
+// the UI picks up changes in loop(). A non-zero target wakes from standby.
+// Not yet applied to hardware (needs EMC2101).
 void fan_set_target(int32_t rpm);
 uint16_t fan_get_target();
 

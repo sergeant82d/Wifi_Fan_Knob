@@ -10,6 +10,7 @@
 #include "ui.h"
 #include "fan_control.h"
 #include "power.h"
+#include "mqtt.h"
 
 // ============================================================================
 // PIN DEFINITIONS (Elecrow 1.28" Rotary Display)
@@ -566,6 +567,7 @@ if (config.advanced.debugMode) {
     start_ntp();
   }
   init_webserver();
+  mqtt_init();  // Own task; connects once WiFi (STA) is up
   ui_update();
 
 

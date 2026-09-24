@@ -52,7 +52,7 @@ cd Wifi_Fan_Knob/Wifi_Fan_Knob     # PlatformIO project is nested
 | `include/lv_conf.h` | ✅ Minimal | LVGL 8 config (240×240, 16-bit) |
 | `include/webserver.h` / `src/webserver.cpp` | 🟡 Partial | `/` → embedded index.html; `GET /api/status` (network + target RPM/range, fan controller, power mode); `POST /api/fan` (target RPM); `POST /api/ota` (firmware upload); `/api/wifi` save/forget/scan (scan async: 202→200); `GET/POST /api/config`, `POST /api/config/reset` |
 | `web/index.html` | 🟡 Partial | 4-tab web UI; All 4 tabs wired (Home, WiFi, Config, OTA); Standby button says not implemented |
-| `include/mqtt.h` / `src/mqtt.cpp` | ⬜ Empty | MQTT + HA discovery (TODO; needs an MQTT library in `lib_deps`) |
+| `include/mqtt.h` / `src/mqtt.cpp` | ✅ Working | MQTT (PubSubClient) + Home Assistant discovery in own task |
 | `include/fan_control.h` / `src/fan_control.cpp` | 🟡 Partial | Target RPM (knob + web, clamped to config) and EMC2101 probe; PWM/tach TODO |
 | `lib/Adafruit_EMC2101/` | Vendored | Adafruit EMC2101 driver (local copy, not from registry) |
 | `include/ui.h` / `src/ui.cpp` | ✅ Working | LVGL main screen: RPM arc, target RPM, clock, status box |
@@ -62,7 +62,7 @@ cd Wifi_Fan_Knob/Wifi_Fan_Knob     # PlatformIO project is nested
 | File | Purpose |
 |------|---------|
 | `STATUS_REPORT_01.md` | End-of-day report from the pre-hardware sessions |
-| `MQTT_SCHEMA.md` | Home Assistant auto-discovery schema (7 entities) |
+| `MQTT_SCHEMA.md` | Original HA discovery design (superseded; see MQTT below) |
 | `SPIFFS_CONFIG_SCHEMA.md` | JSON config structure |
 | `CrowPanel1.28inchRotary-11.jpg` | Board photo |
 | `Uncanny Eyes ... Instructables.pdf` | Reference for the dragon-eye animation |
@@ -159,6 +159,16 @@ See `platformio.ini`. Libraries:
   the switch OFF (pull-down if active-HIGH, pull-up if active-LOW). EMC2101 is on the switched
   rail: probed 50 ms after power-on at boot and on every wake; marked absent in standby.
   I2C caution: an unpowered EMC2101 must not back-power from or drag down SDA/SCL.
+- MQTT / Home Assistant (verified with HA + Mosquitto add-on at 192.168.10.85, login required):
+  `mqtt.cpp` runs PubSubClient in its own task (core 0) so blocking connects never stall loop();
+  retries every 15 s; reconnects after Config save. Topics `<topicPrefix>/<chipId>/...`
+  (`wifi_fan_knob/24C55D/`): `speed`, `speed/set`, `standby`, `standby/set`, `running`, `rssi`,
+  `uptime`, `status` (LWT online/offline, retained). Discovery (retained, `homeassistant/<comp>/
+  wifi_fan_knob_<chipId>/<obj>/config`): number Fan Speed, switch Standby, binary_sensor Fan
+  Running, sensors WiFi Signal + Uptime (diagnostic). State retained, on change; rssi/uptime 60 s.
+  Commands go through `fan_set_target()` / `power_request_standby()`. Deviations from
+  MQTT_SCHEMA.md: chip ID in ids/topics, LWT instead of "MQTT Connected" sensor, Standby switch
+  instead of Power Mode sensor, no RPM sensor until EMC2101.
 - Decisions: fan target starts at 0 after power loss (not resumed). Standby turns the fan
   off (target 0).
 - Home tab has a large FAN OFF button (target 0, no confirmation).
@@ -276,7 +286,7 @@ STANDBY (1)
 1. `fan_control.cpp`: EMC2101 PWM + tach once the module arrives (target RPM already wired)
 2. Dragon-eye animation on the standby screen; light sleep in standby
 3. Knob short press → menu (currently only logged)
-4. `mqtt.cpp` + Home Assistant discovery
+4. MQTT: add actual RPM sensor once the EMC2101 reads tach
 5. Calibration UI, audio, field testing
 6. GPIO 2 role on non-USB power (see Hardware Reference)
 
