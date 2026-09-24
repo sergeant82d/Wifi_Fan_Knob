@@ -543,25 +543,6 @@
             <div id="wifi-networks" style="margin-top: 15px; display: grid; gap: 8px;"></div>
 
             <div class="status-card" style="margin-top: 20px;">
-                <h3>Hotspot Password</h3>
-                <p style="color: #a0a0a0; margin-bottom: 15px; font-size: 0.9rem;">
-                    Password for the <span id="ap-ssid">WiFi-Fan-Knob</span> hotspot, used when the
-                    board can't reach your WiFi. Applies the next time the hotspot starts.
-                </p>
-                <div class="status-item">
-                    <span class="status-label">Hotspot:</span>
-                    <span class="status-value" id="hotspot-state">--</span>
-                </div>
-                <form onsubmit="saveApPassword(event)">
-                    <div class="form-group">
-                        <label for="ap-pass">New Hotspot Password</label>
-                        <input type="password" id="ap-pass" minlength="8" maxlength="63" placeholder="8-63 characters" required>
-                    </div>
-                    <button type="submit" class="btn-primary" style="margin-top: 15px;">Save Hotspot Password</button>
-                </form>
-            </div>
-
-            <div class="status-card" style="margin-top: 20px;">
                 <h3>Network Configuration</h3>
                 <p style="color: #a0a0a0; margin-bottom: 15px; font-size: 0.9rem;">
                     By default, the device uses DHCP to get an IP address. Enable static IP for a fixed address.
@@ -594,6 +575,25 @@
                         </div>
                     </div>
                     <button type="submit" class="btn-primary" style="margin-top: 15px;">Save Network Config</button>
+                </form>
+            </div>
+
+            <div class="status-card" style="margin-top: 20px;">
+                <h3>Hotspot Password</h3>
+                <p style="color: #a0a0a0; margin-bottom: 15px; font-size: 0.9rem;">
+                    Password for the <span id="ap-ssid">WiFi-Fan-Knob</span> hotspot, used when the
+                    board can't reach your WiFi. Applies the next time the hotspot starts.
+                </p>
+                <div class="status-item">
+                    <span class="status-label">Hotspot:</span>
+                    <span class="status-value" id="hotspot-state">--</span>
+                </div>
+                <form onsubmit="saveApPassword(event)">
+                    <div class="form-group">
+                        <label for="ap-pass">New Hotspot Password</label>
+                        <input type="password" id="ap-pass" minlength="8" maxlength="63" placeholder="8-63 characters" required>
+                    </div>
+                    <button type="submit" class="btn-primary" style="margin-top: 15px;">Save Hotspot Password</button>
                 </form>
             </div>
         </div>
