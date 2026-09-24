@@ -249,8 +249,7 @@ See `platformio.ini`. Libraries:
   Brightness (10-100 %, applied + saved like the web slider), switch Screensaver (start /
   dismiss, ignored in standby; was a binary_sensor briefly, whose config is cleared on each
   connect), binary_sensor Fan Running, sensors WiFi Signal + Uptime + IP Address (diagnostic). State retained, on
-  change; rssi/uptime/ip every 60 s. Brightness/Screensaver added 2026-09-24 (discovery
-  confirmed published; HA side to be checked by the user).
+  change; rssi/uptime/ip every 60 s. Brightness/Screensaver added 2026-09-24, verified in HA.
   Commands go through `fan_set_target()` / `power_request_standby()`. Deviations from
   MQTT_SCHEMA.md: chip ID in ids/topics, LWT instead of "MQTT Connected" sensor, Standby switch
   instead of Power Mode sensor, no RPM sensor until EMC2101.

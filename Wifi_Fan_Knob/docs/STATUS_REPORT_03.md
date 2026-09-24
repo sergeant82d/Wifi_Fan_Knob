@@ -22,7 +22,7 @@ For the technical details of each feature, see `CLAUDE.md`. For changing the scr
 | **Web: screensaver button** | Home tab button starts the screensaver, or wakes the display from it |
 | **Web: network** | Static IP or DHCP on the WiFi tab. Saving restarts the board, with a notice beside the button |
 | **Web: other** | GitHub link on Home, power icon on the FAN OFF button now shows on Android, the page no longer goes stale after a firmware update |
-| **Home Assistant** | New IP Address sensor and LCD Brightness slider. Screensaver is a switch (start or dismiss the eye): the board sends it to Home Assistant; not yet checked on the Home Assistant side |
+| **Home Assistant** | New IP Address sensor and LCD Brightness slider. Screensaver switch (start or dismiss the eye) |
 | **Docs** | `DISPLAY_GUIDE.md`: how to change colours, fonts, segments, pages and eye styles |
 
 ## Problems found and fixed today
@@ -53,7 +53,6 @@ For the technical details of each feature, see `CLAUDE.md`. For changing the scr
 - **Wake gestures:** to be designed together with the sleeping eye.
 - **GPIO 2:** test on the board's normal power supply (not USB).
 - **GPIO 4 pull resistor:** keeps external power off at boot before the firmware takes control.
-- **Home Assistant:** check the new Screensaver switch.
 
 ## Next steps
 
