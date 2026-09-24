@@ -146,8 +146,12 @@ void init_webserver() {
   // Routes use exact matching: a plain "/api/wifi" would also swallow "/api/wifi/forget" etc.
 
   // UI page from flash (excluding the appended NUL)
+  // no-store: after a firmware update the browser must not keep running the old page
   server->on(AsyncURIMatcher::exact("/"), HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send(200, "text/html", index_html_start, index_html_end - index_html_start - 1);
+    AsyncWebServerResponse *response =
+      request->beginResponse(200, "text/html", index_html_start, index_html_end - index_html_start - 1);
+    response->addHeader("Cache-Control", "no-store");
+    request->send(response);
   });
 
   // Save WiFi credentials, then reboot to connect
