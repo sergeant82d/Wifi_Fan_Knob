@@ -117,7 +117,8 @@ class LGFX : public lgfx::LGFX_Device {
 
 LGFX gfx;
 
-#include "dragon_eye.h"  // Standby animation, draws straight to gfx
+#include "dragon_eye.h"  // Standby/screensaver eye, draws straight to gfx
+#include "eye_styles.h"
 
 // ============================================================================
 // LVGL BUFFER & DISPLAY CALLBACK
@@ -381,6 +382,7 @@ void init_wifi() {
 // on its own, so nothing here blocks.
 // Apply saved brightness and time zone (boot, and after Config tab save)
 const uint8_t STANDBY_BRIGHTNESS = 10;  // % backlight in standby
+const int STANDBY_EYE_FPS = 15;         // Eye frame rate in standby (screensaver: as fast as it draws)
 
 static void set_backlight(uint8_t percent) {
   uint32_t duty = percent * 255 / 100;
@@ -594,6 +596,7 @@ void setup() {
 Serial.println("Initializing configuration system...");
 initConfig();  // Load config from SPIFFS (or set defaults)
 applyDisplaySettings();
+if (!eye_set_style(config.display.eyeStyle)) eye_set_style(EYE_STYLES[0]->id);  // Unknown: first style
 
 // Peripheral power needs config (active level). Any glitch from pinMode is toward ON,
 // which is where it is going anyway.
@@ -717,6 +720,12 @@ void loop() {
     last_status_update = millis();
     maintain_wifi();
     ui_update();
+    // Eye style chosen on the web page (built here: PSRAM tables, ~0.3 s)
+    static char tried_style[sizeof(config.display.eyeStyle)] = "";
+    if (strcmp(config.display.eyeStyle, eye_style_id()) != 0 && strcmp(config.display.eyeStyle, tried_style) != 0) {
+      strlcpy(tried_style, config.display.eyeStyle, sizeof(tried_style));  // Don't retry a failure every second
+      eye_set_style(config.display.eyeStyle);
+    }
   }
 
   // Screensaver after the idle delay (a held button counts as activity)
@@ -729,7 +738,15 @@ void loop() {
   if (eye_showing()) {
     // Standby or screensaver: dragon eye owns the display; LVGL (and its touch read)
     // is paused, so poll touch directly. LVGL redraws Main when the screen reloads.
-    eye_frame();
+    // Standby saves power by drawing fewer frames; the screensaver runs flat out.
+    static unsigned long last_eye_frame = 0;
+    bool draw = !power_is_standby() || millis() - last_eye_frame >= 1000 / STANDBY_EYE_FPS;
+    if (draw) {
+      last_eye_frame = millis();
+      eye_frame();
+    } else {
+      delay(5);  // Keep polling touch, knob and button between frames
+    }
     // Wake only on a NEW touch: pressing the knob puts a finger on the glass,
     // so the touch that accompanied the long press must lift first.
     uint16_t tx, ty;
@@ -744,7 +761,7 @@ void loop() {
     }
 
     static uint32_t eye_frames = 0, eye_fps_start = 0;
-    eye_frames++;
+    if (draw) eye_frames++;
     if (millis() - eye_fps_start >= 10000) {
       if (eye_fps_start) Serial.printf("[EYE] %lu fps\n", eye_frames * 1000UL / (millis() - eye_fps_start));
       eye_frames = 0;

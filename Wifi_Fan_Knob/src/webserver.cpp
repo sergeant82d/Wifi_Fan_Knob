@@ -3,6 +3,7 @@
 #include "fan_control.h"
 #include "power.h"
 #include "mqtt.h"
+#include "eye_styles.h"
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
 #include <WiFi.h>
@@ -93,6 +94,8 @@ static String apply_config_form(AsyncWebServerRequest *request) {
   if (min_pwm > max_pwm) return "Min PWM must not exceed Max PWM";
   if (!form_int(request, "mqtt_port", 1, 65535, mqtt_port)) return "MQTT port must be 1-65535";
   if (!form_int(request, "screensaver_sec", 0, 3600, saver_sec)) return "Screensaver delay must be 0-3600 seconds";
+  String eye_style = form_value(request, "eye_style");
+  if (!eye_style_find(eye_style.c_str())) return "Unknown eye style";
   // Fan's rated top speed; everything else (presets, knob, arc, web, HA) is limited to it
   long max_rpm;
   if (!form_int(request, "fan_max_rpm", config.fan.minRpm + config.fan.rpmStep, 20000, max_rpm)) {
@@ -136,6 +139,7 @@ static String apply_config_form(AsyncWebServerRequest *request) {
   }
   config.mqtt.discoveryEnabled = form_value(request, "mqtt_discovery") == "1";
   config.display.screensaverSec = saver_sec;
+  strlcpy(config.display.eyeStyle, eye_style.c_str(), sizeof(config.display.eyeStyle));  // loop() applies it
   config.power.activeHigh = level == "high";
   return "";
 }

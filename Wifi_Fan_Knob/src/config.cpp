@@ -1,4 +1,5 @@
 #include "config.h"
+#include "eye_styles.h"
 #include <SPIFFS.h>
 #include <ArduinoJson.h>
 
@@ -149,6 +150,7 @@ bool loadConfig() {
   strlcpy(config.display.posixTz, doc["display"]["posixTz"] | "", sizeof(config.display.posixTz));
   if (config.display.posixTz[0] == '\0') migrateLegacyTimezone();
   strlcpy(config.display.timeFormat, doc["display"]["timeFormat"] | "12h", sizeof(config.display.timeFormat));
+  strlcpy(config.display.eyeStyle, doc["display"]["eyeStyle"] | "dragon", sizeof(config.display.eyeStyle));
   config.display.brightness = doc["display"]["brightness"] | 80;
   config.display.screenTimeout = doc["display"]["screenTimeout"] | 0;
   config.display.screensaverSec = doc["display"]["screensaverSec"] | 30;
@@ -231,6 +233,7 @@ bool saveConfig() {
   doc["display"]["timezone"] = config.display.timezone;
   doc["display"]["posixTz"] = config.display.posixTz;
   doc["display"]["timeFormat"] = config.display.timeFormat;
+  doc["display"]["eyeStyle"] = config.display.eyeStyle;
   doc["display"]["brightness"] = config.display.brightness;
   doc["display"]["screenTimeout"] = config.display.screenTimeout;
   doc["display"]["screensaverSec"] = config.display.screensaverSec;
@@ -331,6 +334,7 @@ void setDefaultConfig() {
   strlcpy(config.display.timezone, "America/Chicago", sizeof(config.display.timezone));
   strlcpy(config.display.posixTz, "CST6CDT,M3.2.0,M11.1.0", sizeof(config.display.posixTz));
   strlcpy(config.display.timeFormat, "12h", sizeof(config.display.timeFormat));
+  strlcpy(config.display.eyeStyle, "dragon", sizeof(config.display.eyeStyle));
   config.display.brightness = 80;
   config.display.screenTimeout = 0;
   config.display.screensaverSec = 30;
@@ -415,7 +419,7 @@ void printConfig() {
 }
 
 String getConfigAsJson() {
-  StaticJsonDocument<1536> doc;
+  DynamicJsonDocument doc(3072);
 
   doc["device"]["name"] = config.name;
   doc["device"]["chipId"] = config.chipId;
@@ -438,6 +442,13 @@ String getConfigAsJson() {
   doc["display"]["timeFormat"] = config.display.timeFormat;
   doc["display"]["brightness"] = config.display.brightness;
   doc["display"]["screensaverSec"] = config.display.screensaverSec;
+  doc["display"]["eyeStyle"] = config.display.eyeStyle;
+  JsonArray styles = doc.createNestedArray("eyeStyles");
+  for (int i = 0; i < EYE_STYLE_COUNT; i++) {
+    JsonObject o = styles.createNestedObject();
+    o["id"] = EYE_STYLES[i]->id;
+    o["name"] = EYE_STYLES[i]->name;
+  }
 
   doc["fan"]["calibration"]["minPwm"] = config.fan.calibration.minPwm;
   doc["fan"]["calibration"]["maxPwm"] = config.fan.calibration.maxPwm;

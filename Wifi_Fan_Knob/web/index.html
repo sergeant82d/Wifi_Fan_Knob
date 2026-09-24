@@ -727,6 +727,10 @@
                     <h3>Display & Interface</h3>
                     <div class="form-grid">
                         <div class="form-group">
+                            <label for="eye-style">Eye style (screensaver and standby)</label>
+                            <select id="eye-style" required></select>
+                        </div>
+                        <div class="form-group">
                             <label for="screensaver-sec">Screensaver (dragon eye) after</label>
                             <input type="number" id="screensaver-sec" min="0" max="3600" value="30" required>
                             <small style="color: #606060;">Seconds with no knob, touch or speed change. 0 = off</small>
@@ -1067,6 +1071,15 @@
                 document.getElementById('mqtt-discovery').checked = c.network.mqtt.discoveryEnabled;
                 document.getElementById('brightness').value = c.display.brightness;
                 document.getElementById('screensaver-sec').value = c.display.screensaverSec;
+                const eyeSelect = document.getElementById('eye-style');
+                eyeSelect.innerHTML = '';
+                c.eyeStyles.forEach(st => {
+                    const opt = document.createElement('option');
+                    opt.value = st.id;
+                    opt.textContent = st.name;
+                    eyeSelect.appendChild(opt);
+                });
+                eyeSelect.value = c.display.eyeStyle;
                 document.getElementById('power-level').value = c.power.activeHigh ? 'high' : 'low';
                 updateBrightnessLabel(c.display.brightness);
                 const w = c.network.wifi;
@@ -1159,6 +1172,7 @@
                     mqtt_pass: v('mqtt-pass'),
                     mqtt_discovery: document.getElementById('mqtt-discovery').checked ? '1' : '0',
                     screensaver_sec: v('screensaver-sec'),
+                    eye_style: v('eye-style'),
                     power_level: v('power-level')
                 }));
                 document.getElementById('mqtt-pass').value = '';

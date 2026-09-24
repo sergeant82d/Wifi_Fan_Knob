@@ -4,9 +4,11 @@
 #define LGFX_USE_V1
 #include <LovyanGFX.hpp>
 
-// Animated dragon eye for the standby screen, drawn directly with LovyanGFX
+// Animated eye for standby and the screensaver, drawn directly with LovyanGFX
 // (LVGL must not be flushing while it runs). Ported from Adafruit "Uncanny Eyes".
 void eye_begin(lgfx::LGFX_Device *display);
-void eye_frame();   // Render one full-screen frame (non-blocking; call repeatedly)
+bool eye_set_style(const char *id);  // Style from eye_styles.h; false if unknown or no memory
+const char *eye_style_id();          // Current style id ("" before the first eye_set_style)
+void eye_frame();                    // Render one full-screen frame (non-blocking; call repeatedly)
 
 #endif

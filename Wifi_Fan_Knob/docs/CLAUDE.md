@@ -55,7 +55,9 @@ cd Wifi_Fan_Knob/Wifi_Fan_Knob     # PlatformIO project is nested
 | `include/mqtt.h` / `src/mqtt.cpp` | ✅ Working | MQTT (PubSubClient) + Home Assistant discovery in own task |
 | `include/fan_control.h` / `src/fan_control.cpp` | 🟡 Partial | Target RPM (knob + web, clamped to config) and EMC2101 probe; PWM/tach TODO |
 | `lib/Adafruit_EMC2101/` | Vendored | Adafruit EMC2101 driver (local copy, not from registry) |
-| `include/ui.h` / `src/ui.cpp` | ✅ Working | LVGL tileview pages (Main / Presets / Settings) + standby screen |
+| `include/ui.h` / `src/ui.cpp` | ✅ Working | LVGL tileview pages (Main / Settings), segments, knob menu |
+| `include/dragon_eye.h` / `src/dragon_eye.cpp` | ✅ Working | Animated eye (standby + screensaver), native 240x240 |
+| `include/eye_styles.h` / `src/eye_styles.cpp` | ✅ Working | The 10 eye styles; `include/eyes/*.h` = Adafruit tables |
 
 ### Documentation (`docs/`)
 
@@ -196,19 +198,29 @@ See `platformio.ini`. Libraries:
   (`note_activity()`) or any fan target change. Fan/peripherals keep running, brightness
   unchanged. Touch, knob turn or short press only dismiss it; long press still -> standby;
   a web/MQTT speed change dismisses it. Standby clears it and shows the eye itself.
-  Verified: starts 30 s after boot. Dismissal paths not yet verified on hardware.
+  Verified on hardware: starts after the delay; touch/knob/short press dismiss; long press ->
+  standby; web speed change dismisses.
   `/api/status` power_mode is "Active (screensaver)" while it shows (`power_screensaver_on()`).
 - Standby (`power.h`, verified): knob button held 1 s (fires while held) or web Standby/Wake
   button (`POST /api/standby`, login). Dims backlight to 10% and loads a standby screen (large
   grey clock) and sets fan target to 0. Any touch, knob turn or button press wakes (fan stays 0);
   the waking input is discarded. A web fan speed > 0 while in standby also wakes.
-  Requests from web/touch are flags applied in `loop()` (LVGL not thread-safe). No light sleep yet.
-- Dragon eye standby screen (verified, ~62 fps): `dragon_eye.cpp` ports Adafruit "Uncanny Eyes"
-  (MIT, Phil Burgess; via Bodmer's TFT_eSPI example) to LovyanGFX. Data: `include/eyes/
-  dragonEye.h` (unmodified tables, ~260 KB flash). Single eye, symmetrical lids, 128x128 drawn
-  at 2x and cropped to 240x240; one frame per `eye_frame()` call (original's blocking iris loop
-  replaced). In standby `loop()` renders eye frames instead of running LVGL and polls touch
-  directly. Touch wake only after the screen has read "no touch" once (`standby_touch_armed`):
+  Requests from web/touch are flags applied in `loop()` (LVGL not thread-safe). Power saving in
+  standby = external power off (GPIO 4) + eye at 15 fps; no light sleep (decided 2026-09-24).
+- Eye (standby + screensaver, verified): `dragon_eye.cpp` ports Adafruit "Uncanny Eyes" (MIT,
+  Phil Burgess; via Bodmer's TFT_eSPI example) to LovyanGFX. 10 styles (`eye_styles.cpp`):
+  Dragon, Human, Cat, Goat, Owl, Doe, Newt, Nauga, No sclera, Terminator. Data:
+  `include/eyes/*.h` = Adafruit's `uncannyEyes/graphics` tables (unmodified, 128 px, each
+  included in its own namespace; `eye_limits.h` / `eye_undef.h` handle the macros). Chosen on
+  the web (Config -> Display & Interface, `eye_style`, `config.display.eyeStyle`, default
+  "dragon"); loop() applies a change within 1 s. Native 240x240: when a style is selected its
+  tables are upscaled once into PSRAM (bilinear sclera/lids, iris polar angles recomputed,
+  distance interpolated; 0.3-0.5 s, ~0.4-0.7 MB). The source art is 128 px, so it's smooth, not
+  more detailed. Pixels outside the round screen are skipped. Iris formula and per-style pupil
+  limits are the original's (Bodmer's differed). Measured 37-52 fps (all 10 styles cycled twice,
+  no leaks). Standby draws at most `STANDBY_EYE_FPS` (15; measured 14), screensaver flat out.
+  Firmware 3.3 MB of the 6.5 MB OTA slot. In standby/screensaver `loop()` renders eye frames
+  instead of running LVGL and polls touch directly. Touch wake only after the screen has read "no touch" once (`standby_touch_armed`):
   pressing the knob also touches the glass. Each wake logs its cause (`Wake: button/knob/touch/
   fan target`).
 - `include/ui.h` standby LVGL screen (grey clock) still exists but is no longer shown.
@@ -261,9 +273,10 @@ See `platformio.ini`. Libraries:
 - EMC2101 detection at 0x4C on I2C 38/39 — module not yet delivered; `EMC2101 not found!` expected.
 
 ### ⬜ Not started
-- `fan_control.cpp`, `mqtt.cpp`
-- LVGL menus, dragon-eye standby
-- Light-sleep standby
+- Fan PWM output and tachometer reading (EMC2101 not delivered yet; `fan_control.cpp` only
+  holds the target RPM and probes for the chip)
+- Measured RPM: on the LCD, web page and Home Assistant (MQTT sensor), once the tach reads
+- Fan calibration (min/max PWM are stored but not used yet), audio
 
 ### Known quirks
 - **Forgotten web login**: every change needs it, so recovery is over USB — erase the SPIFFS
@@ -373,7 +386,7 @@ STANDBY (1)
 | UI Layout | 4-tab (Home/WiFi/Config/OTA) | Mobile-responsive |
 | HA Integration | MQTT Auto-Discovery | Zero-config |
 | Fan Speed | 100 RPM steps, 0-2500 RPM | Noctua fan range |
-| Standby | Light sleep + slow animation | Deep sleep can't animate |
+| Standby | External power off + eye at 15 fps | Deep sleep can't animate; light sleep not needed for now |
 | Time Sync | SNTP background, 60 min interval | No blocking in loop |
 | OTA | Web form upload | Local, no cloud |
 
@@ -382,21 +395,22 @@ STANDBY (1)
 ## Next Steps
 
 1. `fan_control.cpp`: EMC2101 PWM + tach once the module arrives (target RPM already wired)
-2. Light sleep / throttling in standby (see dragon eye upgrades)
-3. MQTT: add actual RPM sensor once the EMC2101 reads tach
-4. Calibration UI, audio, field testing
-5. GPIO 2 role on non-USB power (see Hardware Reference)
+2. Measured RPM from the tach: Home Assistant sensor (MQTT, "Fan RPM", state class
+   measurement), plus the LCD and the web Home tab
+3. Calibration UI, audio, field testing
+4. GPIO 2 role on non-USB power (see Hardware Reference)
 
 ### Later (user notes)
-- **Dragon eye upgrades (re-look after project is complete)** — current version works as
-  agreed. Candidates: full 240x240 graphics (regenerate tables with Adafruit's tablegen from the
-  source images) instead of 2x pixel doubling; "sleeping" behaviour (mostly closed / twitching /
-  peeking, opening on approach); own standby brightness (currently 10%, dim for the eye);
-  throttled frame rate or light sleep between frames (renders flat out at ~62 fps now);
-  other eye styles (Uncanny Eyes has several); revisit wake gestures (knob press = glass touch);
+- **Eye upgrades (re-look after project is complete)** — done: native 240x240, 10 styles
+  selectable on the web, 15 fps in standby. Candidates left: "sleeping" behaviour (mostly
+  closed / twitching / peeking, opening on approach); own standby brightness (currently 10%);
+  light sleep between frames; eyes with genuinely 240 px art (Adafruit "M4 Eyes": different
+  engine, bigger port); revisit wake gestures (knob press = glass touch);
   extract as standalone project — break out all dragon eye code, display config, and setup steps
   into a semi-universal project that works with any LovyanGFX-compatible display. Document the
   GC9A01 example and how to adapt it to other boards.
+- **LCD brightness in Home Assistant** — a `number` (or `light`) entity so automations can dim
+  the knob, e.g. at night. Presets in HA: not wanted.
 - **Screensaver on the web / Home Assistant** — the web Home tab now shows "Active
   (screensaver)" in Power Mode while the eye is up (done, `/api/status` power_mode). Options
   not taken yet: (2) a web "Screensaver" / "Wake display" button next to Standby (login), to

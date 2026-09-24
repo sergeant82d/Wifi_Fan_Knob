@@ -1,22 +1,38 @@
-// Dragon eye, ported from "Uncanny Eyes" by Phil Burgess / Paint Your Dragon for
-// Adafruit Industries (MIT license), via Bodmer's TFT_eSPI Animated_Eyes example.
-// Changes: single eye; LovyanGFX output; 128x128 eye drawn at 2x and cropped to
-// 240x240; one frame per call (the original's blocking iris loop is replaced by a
-// non-blocking iris ramp).
+// Animated eye ("dragon eye" and other styles), ported from "Uncanny Eyes" by Phil Burgess /
+// Paint Your Dragon for Adafruit Industries (MIT license), via Bodmer's TFT_eSPI
+// Animated_Eyes example.
+// Changes: single eye; LovyanGFX output; native 240x240: the style's 128 px tables are
+// upscaled once into PSRAM when the style is chosen (bilinear; iris angles recomputed),
+// so there are no 2x2 pixel blocks; pixels outside the round screen are skipped; one
+// frame per call (the original's blocking iris loop is replaced by a non-blocking ramp).
+// Iris/pupil formula and per-style pupil limits are the original's.
 
 #include "dragon_eye.h"
+#include "eye_styles.h"
 #include <Arduino.h>
-
-#define SYMMETRICAL_EYELID  // Single centred eye: left/right symmetrical lids
-#include "eyes/dragonEye.h"  // SCLERA_*, IRIS_*, SCREEN_* (128), tables
+#include <esp_heap_caps.h>
+#include <math.h>
 
 static lgfx::LGFX_Device *tft = nullptr;
 
-// 128 px eye at 2x = 256; crop 4 source px each edge → 240
-static const int SCALE = 2;
-static const int CROP = (SCREEN_WIDTH * SCALE - 240) / (2 * SCALE);
-static const int OUT = (SCREEN_WIDTH - 2 * CROP) * SCALE;  // 240
+static const int SRC = 128;  // Screen size the styles' tables were drawn for
+static const int OUT = 240;  // This screen
+static int up(int v) { return (v * OUT + SRC / 2) / SRC; }  // Source px -> screen px (x1.875)
+
+// Selected style, upscaled to screen resolution (PSRAM)
+struct Tables {
+  const EyeStyle *style = nullptr;
+  uint16_t *sclera = nullptr;          // sclera_w x sclera_h
+  int sclera_w = 0, sclera_h = 0;
+  uint8_t *upper = nullptr;            // OUT x OUT eyelid thresholds
+  uint8_t *lower = nullptr;
+  uint16_t *polar = nullptr;           // iris_size x iris_size
+  int iris_size = 0;
+};
+static Tables eye;
+
 static uint16_t line_buf[OUT];
+static uint8_t row_x0[OUT], row_x1[OUT];  // Visible span of each row on the round screen
 
 // Ease in/out curve for eye movements (3t^2 - 2t^3), from the original
 static const uint8_t ease[] = {
@@ -46,60 +62,218 @@ static struct {
   uint32_t startTime = 0;
 } blink;
 
-void eye_begin(lgfx::LGFX_Device *display) {
-  tft = display;
+// ============================================================================
+// UPSCALING (runs once per style change)
+// ============================================================================
+
+// Source sample position for destination index i (pixel centres aligned): i0, i1 and
+// the weight of i1 in 1/256ths
+static void src_pos(int i, int src_n, int dst_n, int &i0, int &i1, int &f) {
+  float s = (i + 0.5f) * src_n / dst_n - 0.5f;
+  if (s < 0) s = 0;
+  if (s > src_n - 1) s = src_n - 1;
+  i0 = (int)s;
+  i1 = i0 + 1 < src_n ? i0 + 1 : i0;
+  f = (int)((s - i0) * 256);
 }
 
-// Renders the eye. Inputs are sclera offsets of the 128x128 view window plus
-// eyelid thresholds; same pixel logic as the original drawEye().
-static void draw_eye(uint32_t iScale, uint32_t scleraX, uint32_t scleraY, uint32_t uT, uint32_t lT) {
+static int lerp2(int a, int b, int c, int d, int fx, int fy) {
+  int top = a * 256 + (b - a) * fx;
+  int bot = c * 256 + (d - c) * fx;
+  return (top * 256 + (bot - top) * fy + 32768) >> 16;
+}
+
+static void *psram_alloc(size_t bytes) {
+  return heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+}
+
+static uint8_t *scale_u8(const uint8_t *src, int sn, int dn) {
+  uint8_t *dst = (uint8_t *)psram_alloc(dn * dn);
+  if (!dst) return nullptr;
+  for (int y = 0; y < dn; y++) {
+    int y0, y1, fy;
+    src_pos(y, sn, dn, y0, y1, fy);
+    for (int x = 0; x < dn; x++) {
+      int x0, x1, fx;
+      src_pos(x, sn, dn, x0, x1, fx);
+      dst[y * dn + x] = lerp2(src[y0 * sn + x0], src[y0 * sn + x1],
+                              src[y1 * sn + x0], src[y1 * sn + x1], fx, fy);
+    }
+  }
+  return dst;
+}
+
+static uint16_t *scale_rgb565(const uint16_t *src, int sw, int sh, int dw, int dh) {
+  uint16_t *dst = (uint16_t *)psram_alloc(dw * dh * 2);
+  if (!dst) return nullptr;
+  for (int y = 0; y < dh; y++) {
+    int y0, y1, fy;
+    src_pos(y, sh, dh, y0, y1, fy);
+    for (int x = 0; x < dw; x++) {
+      int x0, x1, fx;
+      src_pos(x, sw, dw, x0, x1, fx);
+      uint16_t a = src[y0 * sw + x0], b = src[y0 * sw + x1];
+      uint16_t c = src[y1 * sw + x0], d = src[y1 * sw + x1];
+      int r = lerp2(a >> 11, b >> 11, c >> 11, d >> 11, fx, fy);
+      int g = lerp2((a >> 5) & 63, (b >> 5) & 63, (c >> 5) & 63, (d >> 5) & 63, fx, fy);
+      int bl = lerp2(a & 31, b & 31, c & 31, d & 31, fx, fy);
+      dst[y * dw + x] = (r << 11) | (g << 5) | bl;
+    }
+  }
+  return dst;
+}
+
+// Iris polar table at screen resolution: angle recomputed exactly, distance (which
+// carries the pupil shape for dragon/cat/goat) interpolated from the style's table.
+// Source entries outside its circle (127) count as the rim (0) so the edge stays clean.
+static uint16_t *build_polar(const EyeStyle *s, int n) {
+  uint16_t *dst = (uint16_t *)psram_alloc(n * n * 2);
+  if (!dst) return nullptr;
+  const int sn = s->iris_size;
+  const float r = n / 2.0f;
+  auto dist = [&](int sy, int sx) {
+    uint16_t p = s->polar[sy * sn + sx];
+    return p == 127 ? 0 : (int)(p & 0x7F);
+  };
+  for (int y = 0; y < n; y++) {
+    int y0, y1, fy;
+    src_pos(y, sn, n, y0, y1, fy);
+    float dy = y - r + 0.5f;
+    for (int x = 0; x < n; x++) {
+      float dx = x - r + 0.5f;
+      if (dx * dx + dy * dy >= r * r) {  // Outside the iris circle
+        dst[y * n + x] = 127;
+        continue;
+      }
+      int x0, x1, fx;
+      src_pos(x, sn, n, x0, x1, fx);
+      int a = (int)((atan2f(dy, dx) + (float)M_PI) / (2.0f * (float)M_PI) * 512.0f);
+      if (a > 511) a = 511;
+      int d = lerp2(dist(y0, x0), dist(y0, x1), dist(y1, x0), dist(y1, x1), fx, fy);
+      dst[y * n + x] = (a << 7) | (d > 127 ? 127 : d);
+    }
+  }
+  return dst;
+}
+
+static void free_tables(Tables &t) {
+  heap_caps_free(t.sclera);
+  heap_caps_free(t.upper);
+  heap_caps_free(t.lower);
+  heap_caps_free(t.polar);
+  t = Tables();
+}
+
+bool eye_set_style(const char *id) {
+  const EyeStyle *s = eye_style_find(id);
+  if (!s) {
+    Serial.printf("[EYE] Unknown style '%s'\n", id);
+    return false;
+  }
+  if (s == eye.style) return true;
+
+  uint32_t start = millis();
+  Tables t;
+  t.style = s;
+  t.sclera_w = up(s->sclera_w);
+  t.sclera_h = up(s->sclera_h);
+  t.iris_size = up(s->iris_size);
+  t.sclera = scale_rgb565(s->sclera, s->sclera_w, s->sclera_h, t.sclera_w, t.sclera_h);
+  t.upper = scale_u8(s->upper, SRC, OUT);
+  t.lower = scale_u8(s->lower, SRC, OUT);
+  t.polar = build_polar(s, t.iris_size);
+  if (!t.sclera || !t.upper || !t.lower || !t.polar) {
+    free_tables(t);
+    Serial.printf("[EYE] Not enough PSRAM for style %s\n", s->name);
+    return false;
+  }
+  free_tables(eye);
+  eye = t;
+  Serial.printf("[EYE] Style %s ready in %lu ms\n", s->name, millis() - start);
+  return true;
+}
+
+const char *eye_style_id() {
+  return eye.style ? eye.style->id : "";
+}
+
+void eye_begin(lgfx::LGFX_Device *display) {
+  tft = display;
+  for (int y = 0; y < OUT; y++) {  // Round screen: only these pixels are visible
+    float dy = y + 0.5f - OUT / 2.0f;
+    float half = sqrtf(OUT * OUT / 4.0f - dy * dy);
+    int x0 = (int)(OUT / 2.0f - half);
+    row_x0[y] = x0 < 0 ? 0 : x0;
+    row_x1[y] = OUT - row_x0[y];
+  }
+}
+
+// ============================================================================
+// DRAWING
+// ============================================================================
+
+// Renders one frame. scleraX/Y: view window offset in the sclera; uT/lT: eyelid
+// thresholds; iScale: pupil size (0-1023). Same pixel logic as the original drawEye().
+static void draw_eye(uint32_t iScale, int scleraX, int scleraY, uint32_t uT, uint32_t lT) {
+  const EyeStyle *s = eye.style;
+  uint32_t irisThreshold = (128 * (1023 - iScale) + 512) / 1024;
+  if (irisThreshold == 0) irisThreshold = 1;  // iScale near 1023 (nauga): avoid /0
+  uint32_t irisScale = s->iris_map_h * 65536 / irisThreshold;
+  const int irisOffX = (eye.sclera_w - eye.iris_size) / 2;
+  const int irisOffY = (eye.sclera_h - eye.iris_size) / 2;
+
   tft->startWrite();
   tft->setAddrWindow(0, 0, OUT, OUT);
-
-  uint32_t scleraXsave = scleraX + CROP;
-  scleraY += CROP;
-  int32_t irisY = scleraY - (SCLERA_HEIGHT - IRIS_HEIGHT) / 2;
-
-  for (uint32_t screenY = CROP; screenY < SCREEN_HEIGHT - CROP; screenY++, scleraY++, irisY++) {
-    uint32_t sx = scleraXsave;
-    int32_t irisX = scleraXsave - (SCLERA_WIDTH - IRIS_WIDTH) / 2;
-    uint16_t *out = line_buf;
-    for (uint32_t screenX = CROP; screenX < SCREEN_WIDTH - CROP; screenX++, sx++, irisX++) {
+  for (int y = 0; y < OUT; y++) {
+    const int sy = scleraY + y;
+    const int iy = sy - irisOffY;
+    const uint16_t *sclera_row = eye.sclera + sy * eye.sclera_w;
+    const uint8_t *upper_row = eye.upper + y * OUT;
+    const uint8_t *lower_row = eye.lower + y * OUT;
+    const int x0 = row_x0[y], x1 = row_x1[y];
+    for (int x = 0; x < x0; x++) line_buf[x] = 0;
+    for (int x = x1; x < OUT; x++) line_buf[x] = 0;
+    for (int x = x0; x < x1; x++) {
+      const int sx = scleraX + x;
+      const int ix = sx - irisOffX;
       uint32_t p;
-      if ((lower[screenY * SCREEN_WIDTH + screenX] <= lT) ||
-          (upper[screenY * SCREEN_WIDTH + screenX] <= uT)) {  // Covered by eyelid
+      if (lower_row[x] <= lT || upper_row[x] <= uT) {                     // Eyelid
         p = 0;
-      } else if ((irisY < 0) || (irisY >= IRIS_HEIGHT) ||
-                 (irisX < 0) || (irisX >= IRIS_WIDTH)) {      // In sclera
-        p = sclera[scleraY * SCLERA_WIDTH + sx];
-      } else {                                                // Maybe iris
-        p = polar[irisY * IRIS_WIDTH + irisX];                // Polar angle/dist
-        uint32_t d = (iScale * (p & 0x7F)) / 128;             // Distance (Y)
-        if (d < IRIS_MAP_HEIGHT) {
-          uint32_t a = (IRIS_MAP_WIDTH * (p >> 7)) / 512;     // Angle (X)
-          p = iris[d * IRIS_MAP_WIDTH + a];
+      } else if (iy < 0 || iy >= eye.iris_size || ix < 0 || ix >= eye.iris_size) {
+        p = sclera_row[sx];                                                // Sclera
+      } else {                                                             // Maybe iris
+        p = eye.polar[iy * eye.iris_size + ix];
+        uint32_t d = p & 0x7F;                                             // Distance
+        if (d < irisThreshold) {
+          d = d * irisScale / 65536;
+          uint32_t a = (s->iris_map_w * (p >> 7)) / 512;                  // Angle
+          p = s->iris[d * s->iris_map_w + a];
         } else {
-          p = sclera[scleraY * SCLERA_WIDTH + sx];
+          p = sclera_row[sx];
         }
       }
-      *out++ = p;  // 2x horizontally
-      *out++ = p;
+      line_buf[x] = p;
     }
-    tft->writePixels((lgfx::rgb565_t *)line_buf, OUT);  // 2x vertically
     tft->writePixels((lgfx::rgb565_t *)line_buf, OUT);
   }
   tft->endWrite();
 }
 
-// Iris size: non-blocking ramp between random targets (original used a blocking
-// recursive "split" that ran for ~10 s)
+// Pupil size: non-blocking ramp between random targets in the style's range (the
+// original used a blocking recursive "split" that ran for ~10 s)
 static uint16_t next_iris(uint32_t t) {
-  static uint16_t from = (IRIS_MIN + IRIS_MAX) / 2, to = from;
+  const EyeStyle *s = eye.style;
+  static uint16_t from = 0, to = 0;
   static uint32_t start = 0, duration = 1;
+  static const EyeStyle *for_style = nullptr;
+  if (for_style != s) {  // New style: start mid-range
+    for_style = s;
+    from = to = (s->iris_min + s->iris_max) / 2;
+  }
   uint32_t dt = t - start;
   if (dt >= duration) {
     from = to;
-    to = random(IRIS_MIN, IRIS_MAX);
+    to = random(s->iris_min, s->iris_max);
     start = t;
     duration = random(500000, 2500000);
     dt = 0;
@@ -108,11 +282,11 @@ static uint16_t next_iris(uint32_t t) {
 }
 
 void eye_frame() {
-  if (!tft) return;
+  if (!tft || !eye.style) return;
   uint32_t t = micros();
   int16_t eyeX, eyeY;
 
-  // Autonomous eye motion: move to a random point, hold, repeat
+  // Autonomous eye motion: move to a random point, hold, repeat (0-1023 range)
   static bool inMotion = false;
   static int16_t oldX = 512, oldY = 512, newX = 512, newY = 512;
   static uint32_t moveStart = 0;
@@ -168,20 +342,20 @@ void eye_frame() {
     }
   }
 
-  // Scale motion to sclera pixel offsets of the 128x128 view window
-  eyeX = map(eyeX, 0, 1023, 0, SCLERA_WIDTH - SCREEN_WIDTH);
-  eyeY = map(eyeY, 0, 1023, 0, SCLERA_HEIGHT - SCREEN_HEIGHT);
+  // Scale motion to sclera offsets of the 240x240 view window
+  eyeX = map(eyeX, 0, 1023, 0, eye.sclera_w - OUT);
+  eyeY = map(eyeY, 0, 1023, 0, eye.sclera_h - OUT);
 
   // Upper lid tracks the pupil (sample the lid map just above it)
   static uint8_t uThreshold = 128;
   uint8_t lThreshold, n;
-  int16_t sampleX = SCLERA_WIDTH / 2 - (eyeX / 2);
-  int16_t sampleY = SCLERA_HEIGHT / 2 - (eyeY + IRIS_HEIGHT / 4);
+  int sampleX = constrain(eye.sclera_w / 2 - eyeX / 2, 0, OUT - 1);
+  int sampleY = eye.sclera_h / 2 - (eyeY + eye.iris_size / 4);
   if (sampleY < 0) {
     n = 0;
   } else {
-    n = (upper[sampleY * SCREEN_WIDTH + sampleX] +
-         upper[sampleY * SCREEN_WIDTH + (SCREEN_WIDTH - 1 - sampleX)]) / 2;
+    sampleY = min(sampleY, OUT - 1);
+    n = (eye.upper[sampleY * OUT + sampleX] + eye.upper[sampleY * OUT + (OUT - 1 - sampleX)]) / 2;
   }
   uThreshold = (uThreshold * 3 + n) / 4;
   lThreshold = 254 - uThreshold;

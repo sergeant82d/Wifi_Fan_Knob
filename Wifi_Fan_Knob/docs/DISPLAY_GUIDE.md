@@ -17,7 +17,7 @@ PlatformIO and press **Upload**. You don't need to know LVGL, the graphics libra
 | Almost everything on the screen | `src/ui.cpp` |
 | Which font sizes are available | `include/lv_conf.h` |
 | Standby brightness, how the screensaver starts and stops | `src/main.cpp` |
-| The dragon eye itself | `src/dragon_eye.cpp`, `include/eyes/dragonEye.h` |
+| The eye itself, and the list of eye styles | `src/dragon_eye.cpp`, `src/eye_styles.cpp`, `include/eyes/` |
 
 Some things need no code at all. They're on the web page:
 
@@ -28,6 +28,7 @@ Some things need no code at all. They're on the web page:
 | Preset speeds (Low / Med / High / Max) | Config → Fan Presets |
 | 12 / 24-hour clock, time zone | Config |
 | Screensaver delay (0 = off) | Config → Display & Interface |
+| Eye style (Dragon, Cat, Owl, …) | Config → Display & Interface |
 
 ### Getting a change onto the screen
 
@@ -342,11 +343,19 @@ In `create_menu()` and `menu_highlight()`:
 | To change | Where |
 |---|---|
 | Screensaver delay, or turn it off | Web page → Config → Display & Interface (seconds; 0 = off) |
+| Eye style | Web page → Config → Display & Interface |
 | Standby brightness (10 %) | `STANDBY_BRIGHTNESS` in `src/main.cpp` |
+| Eye speed in standby (15 frames per second) | `STANDBY_EYE_FPS` in `src/main.cpp` |
 | What counts as "activity" | `note_activity()` calls in `src/main.cpp` (knob, button, touch, speed changes) |
-| The eye's look | `src/dragon_eye.cpp` and the image tables in `include/eyes/dragonEye.h` |
+| The styles on offer, and their order | `EYE_STYLES` in `src/eye_styles.cpp` |
 
-The screensaver shows the dragon eye while the fan keeps running. A touch, knob turn or
+The eye styles come from Adafruit's "Uncanny Eyes". Each one is a data file in
+`include/eyes/`, drawn for a 128-pixel screen. When you pick a style, the knob scales it up
+to this screen's 240 pixels, so it's smooth but not more detailed than the original art.
+To remove a style from the web list, delete its line in `EYE_STYLES`. To add one, copy a
+block in `src/eye_styles.cpp` (the file explains how).
+
+The screensaver shows the eye while the fan keeps running. A touch, knob turn or
 short press only dismisses it. Standby shows the same eye, but also stops the fan and
 switches external power off.
 

@@ -58,6 +58,7 @@ typedef struct {
     char timezone[48];              // IANA zone name, e.g. "America/Chicago" (for the web UI)
     char posixTz[64];               // POSIX TZ rule applied to the clock, e.g. "CST6CDT,M3.2.0,M11.1.0"
     char timeFormat[4];             // "12h" or "24h"
+    char eyeStyle[16];              // Standby/screensaver eye style id (eye_styles.cpp), e.g. "dragon"
     uint8_t brightness;             // 0-100%
     uint16_t screenTimeout;         // Minutes (0 = never)
     uint16_t screensaverSec;        // Dragon eye after this many idle seconds (0 = off)

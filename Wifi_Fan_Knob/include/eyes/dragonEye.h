@@ -1,15 +1,15 @@
-// Dragon eye graphics tables from "Uncanny Eyes" by Phil Burgess / Paint Your Dragon
-// for Adafruit Industries (MIT license), as distributed in Bodmer's TFT_eSPI
-// examples/Generic/Animated_Eyes_1/data/dragonEye.h. Unmodified below this header.
-// 128x128 eye; sclera 160x160, iris map 512x80, polar 160x160, upper/lower eyelid maps.
+// Eye graphics tables from "Uncanny Eyes" by Phil Burgess / Paint Your Dragon for
+// Adafruit Industries (MIT license): github.com/adafruit/Uncanny_Eyes,
+// uncannyEyes/graphics/dragonEye.h at d2103e8. Unmodified below this header; included
+// inside a namespace by src/eye_styles.cpp. 128 px tables, upscaled to 240 at runtime.
 
-#define IRIS_MIN  90 // Override default iris size limits in sketch
-#define IRIS_MAX 140
+#define IRIS_MIN  80 // Override default iris size limits in sketch
+#define IRIS_MAX 400
 
 #define SCLERA_WIDTH  160
 #define SCLERA_HEIGHT 160
 
-const uint16_t sclera[SCLERA_HEIGHT * SCLERA_WIDTH] PROGMEM= {
+const uint16_t sclera[SCLERA_HEIGHT][SCLERA_WIDTH] = {
   0X0000, 0X0000, 0X0000, 0X0000, 0X0000, 0X0000, 0X0000, 0X0000,
   0X0000, 0X0000, 0X0000, 0X0000, 0X0000, 0X0000, 0X0000, 0X0000,
   0X0000, 0X0000, 0X0000, 0X0000, 0X0000, 0X0000, 0X0000, 0X0000,
@@ -3214,7 +3214,7 @@ const uint16_t sclera[SCLERA_HEIGHT * SCLERA_WIDTH] PROGMEM= {
 #define IRIS_MAP_WIDTH  512
 #define IRIS_MAP_HEIGHT 80
 
-const uint16_t iris[IRIS_MAP_HEIGHT * IRIS_MAP_WIDTH] PROGMEM= {
+const uint16_t iris[IRIS_MAP_HEIGHT][IRIS_MAP_WIDTH] = {
   0X8020, 0X8840, 0XA061, 0XA861, 0XA860, 0X9040, 0X8840, 0X9040,
   0X9040, 0X8840, 0X8840, 0X8040, 0X7820, 0X7020, 0X6820, 0X6820,
   0X7020, 0X7020, 0X6820, 0X5800, 0X4000, 0X6820, 0X6820, 0X7820,
@@ -8341,7 +8341,7 @@ const uint16_t iris[IRIS_MAP_HEIGHT * IRIS_MAP_WIDTH] PROGMEM= {
 
 #ifdef SYMMETRICAL_EYELID
 
-const uint8_t upper[SCREEN_HEIGHT * SCREEN_WIDTH] PROGMEM= {
+const uint8_t upper[SCREEN_HEIGHT][SCREEN_WIDTH] = {
   0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00,
   0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00,
   0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00,
@@ -9709,7 +9709,7 @@ const uint8_t upper[SCREEN_HEIGHT * SCREEN_WIDTH] PROGMEM= {
   0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF,
   0XFF, 0XFF, 0XFF, 0XFF };
 
-const uint8_t lower[SCREEN_HEIGHT * SCREEN_WIDTH] PROGMEM= {
+const uint8_t lower[SCREEN_HEIGHT][SCREEN_WIDTH] = {
   0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF,
   0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF,
   0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF,
@@ -11079,7 +11079,7 @@ const uint8_t lower[SCREEN_HEIGHT * SCREEN_WIDTH] PROGMEM= {
 
 #else
 
-const uint8_t upper[SCREEN_HEIGHT * SCREEN_WIDTH] PROGMEM= {
+const uint8_t upper[SCREEN_HEIGHT][SCREEN_WIDTH] = {
   0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF,
   0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF,
   0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF,
@@ -12447,7 +12447,7 @@ const uint8_t upper[SCREEN_HEIGHT * SCREEN_WIDTH] PROGMEM= {
   0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00,
   0X00, 0X00, 0X00, 0X00 };
 
-const uint8_t lower[SCREEN_HEIGHT * SCREEN_WIDTH] PROGMEM= {
+const uint8_t lower[SCREEN_HEIGHT][SCREEN_WIDTH] = {
   0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00,
   0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00,
   0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00,
@@ -13820,7 +13820,7 @@ const uint8_t lower[SCREEN_HEIGHT * SCREEN_WIDTH] PROGMEM= {
 #define IRIS_WIDTH  160
 #define IRIS_HEIGHT 160
 
-const uint16_t polar[160 * 160] PROGMEM= {
+const uint16_t polar[160][160] = {
   0X007F, 0X007F, 0X007F, 0X007F, 0X007F, 0X007F, 0X007F, 0X007F,
   0X007F, 0X007F, 0X007F, 0X007F, 0X007F, 0X007F, 0X007F, 0X007F,
   0X007F, 0X007F, 0X007F, 0X007F, 0X007F, 0X007F, 0X007F, 0X007F,
