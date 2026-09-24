@@ -429,7 +429,22 @@ STANDBY (1)
   - **Wake gestures** — needs more thought before starting; design it together with the
     sleeping eye (e.g. a touch makes the sleeping eye open/peek first, a second touch or hold
     wakes). Today any new touch wakes; the touch from a knob press is ignored until lifted.
-  - **Standalone eye project** (later, after M4 Eyes) — break out all dragon eye code, display config, and setup steps
+  - **Standalone eye project** (later, after M4 Eyes)
+  - **Eyelid images** (user is looking for closed-dragon-eye imagery; belongs with the
+    standalone eye project). Today every lid-covered pixel is drawn black (`p = 0` in
+    `draw_eye()`), so a shut eye is a black screen and blinks/twitches/peeks show black lids.
+    Two options discussed 2026-09-24:
+    1. Show the image only when fully shut (simple; lids stay black while opening/closing, so
+       the image pops in and out).
+    2. **Recommended:** use the image as the eyelid texture: each lid-covered pixel takes its
+       colour from the image instead of 0, so the shut eye shows the whole image and
+       twitches/peeks/blinks open through it. Same cost as 1 (one lookup per lid pixel).
+    Images: 240x240, cropped to the round screen, closed eye centred; any common format,
+    converted to RGB565 (~115 KB each). Either built into the firmware at build time
+    (simpler) or uploaded via the web page to SPIFFS (swappable without reflashing). With
+    several: random per sleep, or matched to eye styles (e.g. dragon lid for Dragon). Only
+    images the user has rights to (the repo is public). User to choose: option 1 or 2,
+    built-in or uploaded, random or per style. — break out all dragon eye code, display config, and setup steps
   into a semi-universal project that works with any LovyanGFX-compatible display. Document the
   GC9A01 example and how to adapt it to other boards.
 - **Adafruit "M4 Eyes" (user wants this, after the fan hardware is done)** — eyes with art
