@@ -85,6 +85,8 @@ static String apply_config_form(AsyncWebServerRequest *request) {
   if (broker.length() == 0 || broker.length() >= sizeof(config.mqtt.broker)) return "MQTT broker required (max 63 chars)";
   if (user.length() >= sizeof(config.mqtt.username)) return "MQTT username too long (max 31)";
   if (pass.length() >= sizeof(config.mqtt.password)) return "MQTT password too long (max 31)";
+  String level = form_value(request, "power_level");
+  if (level != "high" && level != "low") return "Invalid power switch level";
 
   strlcpy(config.display.timezone, tz.c_str(), sizeof(config.display.timezone));
   strlcpy(config.display.timeFormat, fmt.c_str(), sizeof(config.display.timeFormat));
@@ -98,6 +100,7 @@ static String apply_config_form(AsyncWebServerRequest *request) {
   }
   config.mqtt.discoveryEnabled = form_value(request, "mqtt_discovery") == "1";
   config.display.brightness = brightness;
+  config.power.activeHigh = level == "high";
   return "";
 }
 
@@ -187,6 +190,7 @@ void init_webserver() {
     doc["rpm_step"] = config.fan.rpmStep;
     doc["fan_controller"] = fan_controller_present();
     doc["power_mode"] = power_is_standby() ? "Standby" : "Active";
+    doc["periph_power"] = power_peripherals_on();
     doc["mqtt_connected"] = false;  // MQTT not implemented yet
     doc["fw_version"] = config.firmwareVersion;
     char build_id[9];  // First 8 hex chars of firmware ELF SHA-256: unique per build
@@ -336,6 +340,7 @@ void init_webserver() {
       return;
     }
     applyDisplaySettings();
+    applyPowerSettings();
     request->send(200, "text/plain", "Configuration saved.");
   });
 

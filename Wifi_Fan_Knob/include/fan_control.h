@@ -3,8 +3,9 @@
 
 #include <Arduino.h>
 
-bool fan_init();                        // Probe EMC2101 on Wire (call after Wire.begin)
-bool fan_controller_present();          // EMC2101 answered at boot
+bool fan_init();                        // Probe EMC2101 on Wire (after Wire.begin + peripheral power on)
+bool fan_controller_present();          // EMC2101 answered at last power-up
+void fan_power_lost();                  // Peripheral power cut: EMC2101 unavailable until fan_init()
 
 // Target RPM, clamped to config.fan.minRpm..maxRpm. Safe to call from any task;
 // the UI picks up changes in loop(). Not yet applied to hardware (needs EMC2101).

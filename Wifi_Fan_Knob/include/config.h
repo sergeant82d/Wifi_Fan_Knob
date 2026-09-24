@@ -83,6 +83,11 @@ typedef struct {
     bool autoUpdate;                // Auto check for OTA updates
   } system;
 
+  // Peripheral power switch (GPIO 4 transistor: fan, lights, sensors, EMC2101)
+  struct {
+    bool activeHigh;                // true = pin HIGH turns power on (default)
+  } power;
+
   // Advanced Settings
   struct {
     bool debugMode;                 // Serial debug output

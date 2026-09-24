@@ -95,6 +95,7 @@ https://github.com/Elecrow-RD/CrowPanel-1.28inch-HMI-ESP32-Rotary-Display-240-24
 | Display Backlight | 46 | HIGH = on; PWM-capable |
 | **Display rail** | **1** | Must be HIGH or the display is dark |
 | **"KEEP_ALIVE"** | **2** | Role unknown — see note below |
+| **Peripheral power switch** | **4** | Transistor for external devices; level in config |
 | Touch SDA / SCL | 6 / 7 | |
 | Touch INT / RST | 5 / 13 | |
 | Main I2C SDA / SCL | 38 / 39 | EMC2101 (0x4C) + optional OLED |
@@ -151,6 +152,13 @@ See `platformio.ini`. Libraries:
   grey clock) and sets fan target to 0. Any touch, knob turn or button press wakes (fan stays 0);
   the waking input is discarded. A web fan speed > 0 while in standby also wakes.
   Requests from web/touch are flags applied in `loop()` (LVGL not thread-safe). No light sleep yet.
+- Peripheral power switch (verified): GPIO 4 drives a transistor that powers everything except
+  MCU/LCD (fan, lights, sensors, EMC2101). ON while awake, OFF in standby; Fan Off only sets
+  target/PWM 0. ON level configurable (`config.power.activeHigh`, Config tab, default HIGH;
+  applied on save). Pin undriven until config loads at boot, so hardware needs a pull holding
+  the switch OFF (pull-down if active-HIGH, pull-up if active-LOW). EMC2101 is on the switched
+  rail: probed 50 ms after power-on at boot and on every wake; marked absent in standby.
+  I2C caution: an unpowered EMC2101 must not back-power from or drag down SDA/SCL.
 - Decisions: fan target starts at 0 after power loss (not resumed). Standby turns the fan
   off (target 0).
 - Home tab has a large FAN OFF button (target 0, no confirmation).
@@ -273,13 +281,6 @@ STANDBY (1)
 6. GPIO 2 role on non-USB power (see Hardware Reference)
 
 ### Later (user notes)
-- **Peripheral power switch (planned hardware)**: transistor on an as-yet undefined GPIO cuts
-  external power to everything except MCU/LCD (fan, lights, sensors). Firmware plan: one
-  `set_peripheral_power(bool)`; off in standby / Fan Off, on when a speed is set. Open: which pin
-  (free: GPIO 4, 12; avoid strapping pins 0, 3, 45, 46), active level (P-MOSFET high-side is
-  usually active-LOW), and whether the EMC2101 is on the switched rail (if so: power up + settle
-  before I2C, and an unpowered I2C device can back-power via or drag down SDA/SCL). Hardware:
-  gate pull so the rail stays OFF during boot/reset/OTA reboot.
 - **Worldwide time zones** (Config tab): currently US zones + UTC only (`posix_tz()` in
   `main.cpp`, validated list in `webserver.cpp`). Non-US users need a full list. Likely approach:
   page offers IANA zone names (e.g. a searchable list) and sends the matching POSIX TZ string;

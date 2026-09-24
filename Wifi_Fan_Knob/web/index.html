@@ -454,6 +454,10 @@
                     <span class="status-value" id="power-mode">Active</span>
                 </div>
                 <div class="status-item">
+                    <span class="status-label">Peripheral Power:</span>
+                    <span class="status-value" id="periph-power">--</span>
+                </div>
+                <div class="status-item">
                     <span class="status-label">WiFi Signal:</span>
                     <span class="status-value" id="wifi-signal">-55 dBm</span>
                 </div>
@@ -613,6 +617,21 @@
                             <input type="checkbox" id="mqtt-discovery" checked>
                             <label for="mqtt-discovery" style="margin: 0;">Enable Home Assistant Auto-Discovery</label>
                         </div>
+                    </div>
+                </div>
+
+                <div class="status-card">
+                    <h3>Peripheral Power Switch</h3>
+                    <p style="color: #a0a0a0; margin-bottom: 15px; font-size: 0.9rem;">
+                        GPIO 4 transistor that powers the fan, lights, sensors and fan controller.
+                        On while awake, off in standby.
+                    </p>
+                    <div class="form-group">
+                        <label for="power-level">Switch turns power ON when GPIO 4 is</label>
+                        <select id="power-level" required>
+                            <option value="high">HIGH (e.g. N-channel / NPN driver)</option>
+                            <option value="low">LOW (e.g. P-channel high-side)</option>
+                        </select>
                     </div>
                 </div>
 
@@ -912,6 +931,7 @@
                 document.getElementById('mqtt-pass').placeholder = '(unchanged if blank)';
                 document.getElementById('mqtt-discovery').checked = c.network.mqtt.discoveryEnabled;
                 document.getElementById('brightness').value = c.display.brightness;
+                document.getElementById('power-level').value = c.power.activeHigh ? 'high' : 'low';
                 updateBrightnessLabel(c.display.brightness);
             } catch (e) {
                 console.log('Could not load config:', e);
@@ -938,6 +958,7 @@
                 set('fan-status', !s.fan_controller ? 'No fan controller'
                                   : (s.target_rpm > 0 ? 'Running' : 'Stopped'));
                 set('power-mode', s.power_mode);
+                set('periph-power', s.periph_power ? 'On' : 'Off');
                 inStandby = s.power_mode === 'Standby';
                 set('standby-btn', inStandby ? 'Wake' : 'Standby');
                 set('mqtt-status', s.mqtt_connected ? 'Yes' : 'No');
@@ -985,7 +1006,8 @@
                     mqtt_user: v('mqtt-user'),
                     mqtt_pass: v('mqtt-pass'),
                     mqtt_discovery: document.getElementById('mqtt-discovery').checked ? '1' : '0',
-                    brightness: v('brightness')
+                    brightness: v('brightness'),
+                    power_level: v('power-level')
                 }));
                 document.getElementById('mqtt-pass').value = '';
             } catch (e) {

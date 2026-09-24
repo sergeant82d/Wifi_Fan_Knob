@@ -49,8 +49,11 @@
 #define KEEP_ALIVE_PIN 2
 #define POWER_LIGHT_PIN 40
 
+// Peripheral power switch: transistor cutting external power (fan, lights, sensors,
+// EMC2101). Undriven until config loads; hardware pull must hold it OFF.
+#define PERIPH_POWER_PIN 4
+
 // Test I/O (available for future use)
-#define TEST_PIN_1 4
 #define TEST_PIN_2 12
 
 // ============================================================================
@@ -380,6 +383,36 @@ void applyDisplaySettings() {
 }
 
 // ============================================================================
+// PERIPHERAL POWER (GPIO 4 transistor switch)
+// ============================================================================
+
+static bool periph_power_on = false;
+
+static void set_peripheral_power(bool on) {
+  periph_power_on = on;
+  bool level = (on == config.power.activeHigh);
+  digitalWrite(PERIPH_POWER_PIN, level ? HIGH : LOW);
+  Serial.printf("[POWER] Peripherals %s (GPIO %d %s)\n", on ? "ON" : "OFF", PERIPH_POWER_PIN, level ? "HIGH" : "LOW");
+}
+
+// Power up external devices, let them settle, then probe the EMC2101 (on the switched rail)
+static void power_up_peripherals() {
+  set_peripheral_power(true);
+  delay(50);
+  if (!fan_init()) {
+    Serial.println("WARNING: Fan controller not responding");
+  }
+}
+
+bool power_peripherals_on() {
+  return periph_power_on;
+}
+
+void applyPowerSettings() {
+  set_peripheral_power(periph_power_on);
+}
+
+// ============================================================================
 // STANDBY (knob long-press, web Standby button; any input wakes)
 // ============================================================================
 
@@ -397,7 +430,13 @@ bool power_is_standby() {
 static void set_standby(bool standby) {
   if (standby == power_is_standby()) return;
   current_state = standby ? STATE_STANDBY : STATE_ACTIVE;
-  if (standby) fan_set_target(0);  // Standby stops the fan; waking leaves it at 0
+  if (standby) {
+    fan_set_target(0);  // Standby stops the fan; waking leaves it at 0
+    set_peripheral_power(false);
+    fan_power_lost();
+  } else {
+    power_up_peripherals();
+  }
   ui_set_standby(standby);
   set_backlight(standby ? STANDBY_BRIGHTNESS : config.display.brightness);
   Serial.println(standby ? "Standby" : "Wake");
@@ -487,12 +526,9 @@ void setup() {
   indev_drv.read_cb = touchpad_read;
   lv_indev_drv_register(&indev_drv);
 
-  // I2C & EMC2101
-  Serial.println("Initializing I2C and fan controller...");
+  // I2C (EMC2101 is probed after peripheral power comes on, below)
+  Serial.println("Initializing I2C...");
   Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
-  if (!fan_init()) {
-    Serial.println("WARNING: Fan controller not responding");
-  }
 
   // Encoder Input
   Serial.println("Initializing encoder...");
@@ -509,6 +545,11 @@ void setup() {
 Serial.println("Initializing configuration system...");
 initConfig();  // Load config from SPIFFS (or set defaults)
 applyDisplaySettings();
+
+// Peripheral power needs config (active level). Any glitch from pinMode is toward ON,
+// which is where it is going anyway.
+pinMode(PERIPH_POWER_PIN, OUTPUT);
+power_up_peripherals();
 
 ui_init();          // Needs config (RPM range, time format)
 lv_task_handler();  // Show screen while WiFi connects

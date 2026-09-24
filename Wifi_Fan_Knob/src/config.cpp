@@ -141,6 +141,9 @@ bool loadConfig() {
   config.system.audioEnabled = doc["system"]["audioEnabled"] | true;
   config.system.autoUpdate = doc["system"]["autoUpdate"] | false;
 
+  // Peripheral power switch
+  config.power.activeHigh = doc["power"]["activeHigh"] | true;
+
   // Advanced
   config.advanced.debugMode = doc["advanced"]["debugMode"] | false;
   strlcpy(config.advanced.logLevel, doc["advanced"]["logLevel"] | "info", sizeof(config.advanced.logLevel));
@@ -213,6 +216,9 @@ bool saveConfig() {
   doc["system"]["audioEnabled"] = config.system.audioEnabled;
   doc["system"]["autoUpdate"] = config.system.autoUpdate;
 
+  // Peripheral power switch
+  doc["power"]["activeHigh"] = config.power.activeHigh;
+
   // Advanced
   doc["advanced"]["debugMode"] = config.advanced.debugMode;
   doc["advanced"]["logLevel"] = config.advanced.logLevel;
@@ -259,6 +265,7 @@ void setDefaultConfig() {
   config.wifi.password[0] = '\0';
   config.wifi.saveCredentials = true;
   strlcpy(config.wifi.apPassword, "12345678", sizeof(config.wifi.apPassword));
+  config.power.activeHigh = true;
 
   // Webserver
   config.webserver.port = 8080;
@@ -384,6 +391,8 @@ String getConfigAsJson() {
 
   doc["fan"]["calibration"]["minPwm"] = config.fan.calibration.minPwm;
   doc["fan"]["calibration"]["maxPwm"] = config.fan.calibration.maxPwm;
+
+  doc["power"]["activeHigh"] = config.power.activeHigh;
 
   String jsonString;
   serializeJson(doc, jsonString);

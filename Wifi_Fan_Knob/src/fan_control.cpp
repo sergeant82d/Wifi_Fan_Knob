@@ -16,6 +16,10 @@ bool fan_controller_present() {
   return controller_present;
 }
 
+void fan_power_lost() {
+  controller_present = false;
+}
+
 void fan_set_target(int32_t rpm) {
   target_rpm = constrain(rpm, (int32_t)config.fan.minRpm, (int32_t)config.fan.maxRpm);
 }

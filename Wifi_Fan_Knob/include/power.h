@@ -6,4 +6,9 @@
 void power_request_standby(bool standby);
 bool power_is_standby();
 
+// Peripheral power switch (GPIO 4): on while awake, off in standby.
+// Level (active HIGH/LOW) comes from config.power.activeHigh.
+bool power_peripherals_on();
+void applyPowerSettings();              // Re-drive the pin after the level setting changes
+
 #endif
