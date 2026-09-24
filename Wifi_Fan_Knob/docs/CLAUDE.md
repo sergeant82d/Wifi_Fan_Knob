@@ -404,11 +404,14 @@ STANDBY (1)
 - **Eye upgrades (re-look after project is complete)** — done: native 240x240, 10 styles
   selectable on the web, 15 fps in standby. Candidates left: "sleeping" behaviour (mostly
   closed / twitching / peeking, opening on approach); own standby brightness (currently 10%);
-  light sleep between frames; eyes with genuinely 240 px art (Adafruit "M4 Eyes": different
-  engine, bigger port); revisit wake gestures (knob press = glass touch);
+  light sleep between frames; revisit wake gestures (knob press = glass touch);
   extract as standalone project — break out all dragon eye code, display config, and setup steps
   into a semi-universal project that works with any LovyanGFX-compatible display. Document the
   GC9A01 example and how to adapt it to other boards.
+- **Adafruit "M4 Eyes" (user wants this, after the fan hardware is done)** — eyes with art
+  drawn at 240 px (Adafruit_Learning_System/M4_Eyes), so more detail than the upscaled 128 px
+  Uncanny Eyes. Different engine (runtime eyeball/lid rendering, per-eye config + images), so a
+  real port, not a data swap. All 10 current styles verified and liked (2026-09-24).
 - **LCD brightness in Home Assistant** — a `number` (or `light`) entity so automations can dim
   the knob, e.g. at night. Presets in HA: not wanted.
 - **Screensaver on the web / Home Assistant** — the web Home tab now shows "Active
