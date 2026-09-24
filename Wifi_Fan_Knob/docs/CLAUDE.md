@@ -258,14 +258,19 @@ STANDBY (1)
 
 ## Next Steps
 
-1. Flash + verify encoder (rotation direction, 1 count per detent, button)
-2. Determine GPIO 2 role (see Hardware Reference)
-3. Web UI handlers: WiFi credentials, settings save, then OTA
-4. `fan_control.cpp` (EMC2101 PWM, tach) → encoder drives RPM
-5. LVGL main screen (RPM arc, clock); touch driver
-6. `mqtt.cpp` + Home Assistant discovery
-7. Dragon-eye standby in light sleep
-8. Calibration UI, audio, field testing
+1. `fan_control.cpp`: EMC2101 PWM + tach once the module arrives (target RPM already wired)
+2. Knob button long-press → standby; later dragon-eye animation in light sleep
+3. Decide: resume last target RPM after power loss, or start at 0?
+4. `mqtt.cpp` + Home Assistant discovery
+5. Calibration UI, audio, field testing
+6. GPIO 2 role on non-USB power (see Hardware Reference)
+
+### Later (user notes)
+- **Worldwide time zones** (Config tab): currently US zones + UTC only (`posix_tz()` in
+  `main.cpp`, validated list in `webserver.cpp`). Non-US users need a full list. Likely approach:
+  page offers IANA zone names (e.g. a searchable list) and sends the matching POSIX TZ string;
+  firmware stores/applies it directly. Needs `config.display.timezone` widened from `char[8]`
+  (POSIX strings run ~50 chars) and validation relaxed to a POSIX-TZ syntax check.
 
 ---
 
