@@ -9,7 +9,6 @@
 // Main screen (240x240 round) is a horizontal tileview built from PAGES (below); swipe left from Main:
 //   Main:     RPM arc · band of Off + preset segments inside it (top) · RPM number
 //             (centre) · clock · status box (bottom gap)
-//   Presets:  config presets + OFF (tap sets target, slides back to Main)
 //   Settings: brightness slider (live; saved on release) + network/MQTT info
 // Page dots sit in the arc's bottom gap. Knob turns and wake return to Main.
 // Knob short press opens a menu of the pages: turn to choose, press or tap to go.
@@ -34,7 +33,6 @@ static lv_obj_t *info_label = nullptr;
 
 static void create_standby_screen();
 static void create_main_page(lv_obj_t *tile);
-static void create_presets_page(lv_obj_t *tile);
 static void create_settings_page(lv_obj_t *tile);
 static void create_page_dots(lv_obj_t *parent);
 static void tap_back_cb(lv_event_t *);
@@ -49,7 +47,6 @@ struct Page {
 };
 static const Page PAGES[] = {
   {"Main", create_main_page},
-  {"Presets", create_presets_page},
   {"Settings", create_settings_page},
 };
 static const int PAGE_COUNT = sizeof(PAGES) / sizeof(PAGES[0]);
@@ -207,7 +204,9 @@ static void seg_highlight() {
     lv_color_t c = lit         ? lv_palette_main(LV_PALETTE_CYAN)
                  : i == 0      ? lv_color_hex(0x8B1E1E)   // Off: dark red
                                : lv_color_hex(0x4A5058);  // Presets: steel grey
-    lv_obj_set_style_arc_color(segs[i], c, LV_PART_MAIN);
+    if (lv_obj_get_style_arc_color(segs[i], LV_PART_MAIN).full != c.full) {
+      lv_obj_set_style_arc_color(segs[i], c, LV_PART_MAIN);  // Only on change (avoids redraws)
+    }
   }
 }
 
@@ -504,37 +503,6 @@ static lv_obj_t *page_title(lv_obj_t *tile, const char *text) {
   return title;
 }
 
-static void preset_cb(lv_event_t *e) {
-  fan_set_target((int32_t)(intptr_t)lv_event_get_user_data(e));
-  ui_show_main();
-}
-
-static void preset_button(lv_obj_t *tile, const char *name, uint16_t rpm, int x, int y, int w, lv_color_t color) {
-  lv_obj_t *btn = lv_btn_create(tile);
-  lv_obj_set_size(btn, w, 44);
-  lv_obj_align(btn, LV_ALIGN_CENTER, x, y);
-  lv_obj_set_style_bg_color(btn, color, 0);
-  lv_obj_add_event_cb(btn, preset_cb, LV_EVENT_CLICKED, (void *)(intptr_t)rpm);
-  lv_obj_t *label = lv_label_create(btn);
-  if (rpm > 0) {
-    lv_label_set_text_fmt(label, "%s\n%u", name, rpm);
-  } else {
-    lv_label_set_text(label, name);
-  }
-  lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
-  lv_obj_center(label);
-}
-
-static void create_presets_page(lv_obj_t *tile) {
-  page_title(tile, "Presets");
-  lv_color_t c = lv_color_hex(0x1E4E5A);
-  preset_button(tile, "Low", config.fan.presets.low, -45, -32, 84, c);
-  preset_button(tile, "Med", config.fan.presets.medium, 45, -32, 84, c);
-  preset_button(tile, "High", config.fan.presets.high, -45, 20, 84, c);
-  preset_button(tile, "Max", config.fan.presets.max, 45, 20, 84, c);
-  preset_button(tile, "OFF", 0, 0, 72, 110, lv_palette_main(LV_PALETTE_RED));
-}
-
 static void brightness_cb(lv_event_t *e) {
   if (lv_event_get_code(e) == LV_EVENT_VALUE_CHANGED) {
     config.display.brightness = lv_slider_get_value(brightness_slider);
@@ -603,6 +571,12 @@ void ui_set_standby(bool standby) {
 }
 
 void ui_update() {
+  seg_highlight();  // Presets may have been changed on the web page
+  // Brightness may have been changed on the web page (leave it alone while dragged)
+  if (lv_slider_get_value(brightness_slider) != config.display.brightness && !lv_slider_is_dragged(brightness_slider)) {
+    lv_slider_set_value(brightness_slider, config.display.brightness, LV_ANIM_OFF);
+    lv_label_set_text_fmt(brightness_label, "Brightness %u%%", config.display.brightness);
+  }
   update_clock();
   update_status_box();
   update_info();

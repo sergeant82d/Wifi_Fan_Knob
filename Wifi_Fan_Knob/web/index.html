@@ -474,10 +474,10 @@
             <div class="status-card">
                 <h3>Quick Start Presets</h3>
                 <div class="presets-grid">
-                    <button class="preset-btn" onclick="setPreset(800)">Low (800)</button>
-                    <button class="preset-btn" onclick="setPreset(1200)">Med (1200)</button>
-                    <button class="preset-btn" onclick="setPreset(1600)">High (1600)</button>
-                    <button class="preset-btn" onclick="setPreset(2000)">Max (2000)</button>
+                    <button class="preset-btn" id="preset-btn-low">Low</button>
+                    <button class="preset-btn" id="preset-btn-medium">Med</button>
+                    <button class="preset-btn" id="preset-btn-high">High</button>
+                    <button class="preset-btn" id="preset-btn-max">Max</button>
                 </div>
             </div>
 
@@ -488,6 +488,16 @@
                     <span class="speed-value" id="speed-display">1500</span>
                 </div>
                 <small style="color: #606060; display: block; margin-top: 10px;">Set fan speed manually (<span id="speed-range">0-2500</span> RPM)</small>
+            </div>
+
+            <div class="speed-control">
+                <h3>LCD Brightness</h3>
+                <div class="speed-input-group">
+                    <input type="range" id="brightness" min="10" max="100" value="80"
+                           oninput="updateBrightnessLabel(this.value)" onchange="saveBrightness(this.value)">
+                    <span class="speed-value"><span id="brightness-label">80</span>%</span>
+                </div>
+                <small style="color: #606060; display: block; margin-top: 10px;">Saved when you let go of the slider</small>
             </div>
 
             <button class="btn-primary" onclick="applySpeed()">Apply Speed</button>
@@ -640,6 +650,32 @@
                 </div>
 
                 <div class="status-card">
+                    <h3>Fan Presets</h3>
+                    <p style="color: #a0a0a0; margin-bottom: 15px; font-size: 0.9rem;">
+                        Speeds for the Low / Med / High / Max buttons here and on the LCD.
+                        Must be in order, within <span id="preset-range">the fan's range</span>.
+                    </p>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="preset-low">Low (RPM)</label>
+                            <input type="number" id="preset-low" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="preset-medium">Med (RPM)</label>
+                            <input type="number" id="preset-medium" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="preset-high">High (RPM)</label>
+                            <input type="number" id="preset-high" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="preset-max">Max (RPM)</label>
+                            <input type="number" id="preset-max" required>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="status-card">
                     <h3>MQTT Configuration</h3>
                     <div class="form-grid">
                         <div class="form-group">
@@ -686,9 +722,9 @@
                     <h3>Display & Interface</h3>
                     <div class="form-grid">
                         <div class="form-group">
-                            <label for="brightness">LCD Brightness</label>
-                            <input type="range" id="brightness" min="10" max="100" value="80" oninput="updateBrightnessLabel(this.value)">
-                            <small style="color: #606060;">Current: <span id="brightness-label">80</span>%</small>
+                            <label for="screensaver-sec">Screensaver (dragon eye) after</label>
+                            <input type="number" id="screensaver-sec" min="0" max="3600" value="30" required>
+                            <small style="color: #606060;">Seconds with no knob, touch or speed change. 0 = off</small>
                         </div>
                     </div>
                 </div>
@@ -841,6 +877,14 @@
 
         function updateBrightnessLabel(value) {
             document.getElementById('brightness-label').textContent = value;
+        }
+
+        async function saveBrightness(value) {
+            try {
+                await postForm('/api/brightness', { brightness: value });
+            } catch (e) {
+                alert('Brightness not saved: ' + e.message);
+            }
         }
 
         // Web login, kept for this browser tab (survives reloads; cleared when the tab closes)
@@ -1004,12 +1048,20 @@
                 document.getElementById('time-format').value = c.display.timeFormat;
                 document.getElementById('fan-min-pwm').value = c.fan.calibration.minPwm;
                 document.getElementById('fan-max-pwm').value = c.fan.calibration.maxPwm;
+                ['low', 'medium', 'high', 'max'].forEach(k => {
+                    const rpm = c.fan.presets[k];
+                    document.getElementById('preset-' + k).value = rpm;
+                    const btn = document.getElementById('preset-btn-' + k);
+                    btn.textContent = btn.textContent.split(' ')[0] + ' (' + rpm + ')';
+                    btn.onclick = () => setPreset(rpm);
+                });
                 document.getElementById('mqtt-broker').value = c.network.mqtt.broker;
                 document.getElementById('mqtt-port').value = c.network.mqtt.port;
                 document.getElementById('mqtt-user').value = c.network.mqtt.username;
                 document.getElementById('mqtt-pass').placeholder = '(unchanged if blank)';
                 document.getElementById('mqtt-discovery').checked = c.network.mqtt.discoveryEnabled;
                 document.getElementById('brightness').value = c.display.brightness;
+                document.getElementById('screensaver-sec').value = c.display.screensaverSec;
                 document.getElementById('power-level').value = c.power.activeHigh ? 'high' : 'low';
                 updateBrightnessLabel(c.display.brightness);
                 const w = c.network.wifi;
@@ -1051,6 +1103,12 @@
                 set('speed-range', s.min_rpm + '-' + s.max_rpm);
                 const slider = document.getElementById('speed-slider');
                 slider.min = s.min_rpm;
+                set('preset-range', s.min_rpm + '-' + s.max_rpm + ' RPM');
+                ['low', 'medium', 'high', 'max'].forEach(k => {
+                    const input = document.getElementById('preset-' + k);
+                    input.min = s.min_rpm;
+                    input.max = s.max_rpm;
+                });
                 slider.max = s.max_rpm;
                 slider.step = s.rpm_step;
                 if (!sliderDirty) {
@@ -1088,15 +1146,20 @@
                     time_format: v('time-format'),
                     min_pwm: v('fan-min-pwm'),
                     max_pwm: v('fan-max-pwm'),
+                    preset_low: v('preset-low'),
+                    preset_medium: v('preset-medium'),
+                    preset_high: v('preset-high'),
+                    preset_max: v('preset-max'),
                     mqtt_broker: v('mqtt-broker'),
                     mqtt_port: v('mqtt-port'),
                     mqtt_user: v('mqtt-user'),
                     mqtt_pass: v('mqtt-pass'),
                     mqtt_discovery: document.getElementById('mqtt-discovery').checked ? '1' : '0',
-                    brightness: v('brightness'),
+                    screensaver_sec: v('screensaver-sec'),
                     power_level: v('power-level')
                 }));
                 document.getElementById('mqtt-pass').value = '';
+                loadConfig();  // Home tab preset buttons show the new speeds
             } catch (e) {
                 alert('Save failed: ' + e.message);
             }

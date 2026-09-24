@@ -62,6 +62,7 @@ cd Wifi_Fan_Knob/Wifi_Fan_Knob     # PlatformIO project is nested
 | File | Purpose |
 |------|---------|
 | `STATUS_REPORT_01.md` | End-of-day report from the pre-hardware sessions |
+| `DISPLAY_GUIDE.md` | How to change the LCD: colours, fonts, segments, pages (human-readable) |
 | `STATUS_REPORT_02.md` | End-of-day report, 2026-09-23 (first hardware session) |
 | `MQTT_SCHEMA.md` | Original HA discovery design (superseded; see MQTT below) |
 | `SPIFFS_CONFIG_SCHEMA.md` | JSON config structure |
@@ -162,8 +163,7 @@ See `platformio.ini`. Libraries:
   both fields' characters/lengths only; the page supplies the rule from its table.
 - LCD pages (verified): horizontal LVGL tileview, swipe left from Main. Main: RPM arc (drag
   along the ring to set speed, snaps to rpmStep; ring-only hit test (needs LV_OBJ_FLAG_ADV_HITTEST, off by default) + 15 px ext area so
-  mid-screen swipes still page), clock, status box. Presets: config presets + red OFF (tap sets
-  target, slides back to Main). Settings: brightness slider (live; saveConfig on release) +
+  mid-screen swipes still page), clock, status box. Settings: brightness slider (live; saveConfig on release) +
   IP/SSID/MQTT info. Page dots in the arc's bottom gap. Knob turns and wake return to Main.
   Pages come from the `PAGES` table in `ui.cpp` (name + builder); tiles, dots and the knob
   menu follow it, so adding a page = one builder + one table row (Main stays first).
@@ -179,6 +179,20 @@ See `platformio.ini`. Libraries:
 - Double-tap on Main (verified): two taps within 400 ms (millis) stop the
   fan (target 0, red "Fan stopped" popup) or show "Fan is not running"; popup 1.5 s.
   Status box bubbles its taps to the page; the arc keeps its own touches.
+- LCD pages are now Main + Settings (the Presets page was dropped: Main's segments replace it).
+- Preset speeds editable on the web (Config -> Fan Presets): `preset_low/medium/high/max` in
+  `POST /api/config`, each within minRpm..maxRpm and in order Low <= Med <= High <= Max;
+  `/api/config` returns `fan.presets`. Home tab preset buttons are filled from them. The LCD
+  segments read them at tap time; `ui_update()` re-checks the lit segment each second.
+- LCD brightness on the web Home tab (below Manual Speed Control): `POST /api/brightness`
+  (login, 10-100), applied and saved on slider release; no longer part of `/api/config`.
+  The LCD Settings slider follows web changes (ui_update, unless being dragged).
+- Screensaver (`main.cpp`): dragon eye after `config.display.screensaverSec` idle seconds
+  (default 30, 0 = off, 0-3600, Config -> Display & Interface). Activity = knob, button, touch
+  (`note_activity()`) or any fan target change. Fan/peripherals keep running, brightness
+  unchanged. Touch, knob turn or short press only dismiss it; long press still -> standby;
+  a web/MQTT speed change dismisses it. Standby clears it and shows the eye itself.
+  Verified: starts 30 s after boot. Dismissal paths not yet verified on hardware.
 - Standby (`power.h`, verified): knob button held 1 s (fires while held) or web Standby/Wake
   button (`POST /api/standby`, login). Dims backlight to 10% and loads a standby screen (large
   grey clock) and sets fan target to 0. Any touch, knob turn or button press wakes (fan stays 0);

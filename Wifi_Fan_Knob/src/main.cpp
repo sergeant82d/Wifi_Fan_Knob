@@ -184,11 +184,14 @@ static bool read_touch(uint16_t &x, uint16_t &y) {
   return true;
 }
 
+static void note_activity();
+
 void touchpad_read(lv_indev_drv_t *indev_drv, lv_indev_data_t *data) {
   static bool was_pressed = false;
   uint16_t x, y;
   bool pressed = touch_ok && read_touch(x, y);
   if (pressed) {
+    note_activity();
     data->state = LV_INDEV_STATE_PR;
     data->point.x = x;
     data->point.y = y;
@@ -436,10 +439,40 @@ bool power_is_standby() {
   return current_state == STATE_STANDBY;
 }
 
+// ============================================================================
+// SCREENSAVER: dragon eye after config.display.screensaverSec idle seconds (0 = off).
+// Unlike standby, the fan and peripherals keep running and brightness is unchanged.
+// A touch, knob turn or short press only dismisses it; a long press still goes to
+// standby. A fan speed change (web, MQTT) also dismisses it so the new speed shows.
+// ============================================================================
+
+static bool saver_on = false;
+static unsigned long last_activity = 0;
+
+static void note_activity() {
+  last_activity = millis();
+}
+
+static bool eye_showing() {
+  return saver_on || power_is_standby();
+}
+
+// loop() only (LVGL)
+static void set_saver(bool on) {
+  if (on == saver_on) return;
+  saver_on = on;
+  note_activity();
+  if (on) standby_touch_armed = false;  // Wake needs a new touch
+  ui_set_standby(on);                   // LVGL steps aside for the eye; back to Main after
+  Serial.println(on ? "Screensaver on" : "Screensaver off");
+}
+
 // loop() only: switches screen (LVGL) and backlight
 static void set_standby(bool standby) {
   if (standby == power_is_standby()) return;
   current_state = standby ? STATE_STANDBY : STATE_ACTIVE;
+  saver_on = false;   // Standby shows the eye itself
+  note_activity();    // Idle timer restarts after standby or wake
   if (standby) {
     standby_touch_armed = false;  // Ignore the touch that came with the knob press
     fan_set_target(0);  // Standby stops the fan; waking leaves it at 0
@@ -587,6 +620,7 @@ if (config.advanced.debugMode) {
 
   Serial.println("=== Boot Complete ===\n");
   current_state = STATE_ACTIVE;
+  note_activity();  // Screensaver idle timer starts at boot complete
 }
 
 // ============================================================================
@@ -607,9 +641,12 @@ void loop() {
   int32_t delta = encoder_count;
   encoder_count = 0;
   portEXIT_CRITICAL(&encoder_mux);
+  if (delta != 0) note_activity();
   if (delta != 0 && power_is_standby()) {
     Serial.printf("Wake: knob (%ld)\n", (long)delta);
     power_request_standby(false);  // Turning the knob wakes; this turn is discarded
+  } else if (delta != 0 && saver_on) {
+    set_saver(false);  // Dismiss only; this turn is discarded
   } else if (delta != 0 && ui_menu_open()) {
     ui_menu_turn(delta);  // Menu open: knob chooses a page, RPM unchanged
   } else if (delta != 0) {
@@ -623,6 +660,8 @@ void loop() {
   static uint16_t shown_rpm = 0;
   if (fan_get_target() != shown_rpm) {
     shown_rpm = fan_get_target();
+    note_activity();
+    if (saver_on) set_saver(false);  // Show the new speed (web/MQTT change)
     ui_set_target_rpm(shown_rpm);
   }
 
@@ -631,10 +670,13 @@ void loop() {
   const unsigned long LONG_PRESS_MS = 1000;
   static unsigned long press_start = 0;
   static bool press_handled = false;
+  static bool press_in_saver = false;  // Short press only dismisses the screensaver
   if (encoder_button_pressed) {
     encoder_button_pressed = false;
+    note_activity();
     press_start = millis();
     press_handled = false;
+    press_in_saver = saver_on;
     if (power_is_standby()) {
       Serial.println("Wake: button");
       power_request_standby(false);
@@ -649,7 +691,9 @@ void loop() {
       Serial.println("Button long press");
       power_request_standby(true);
     } else if (!held && held_ms > 50) {  // Released (ignore bounce right after press)
-      if (!press_handled) {
+      if (!press_handled && press_in_saver) {
+        set_saver(false);
+      } else if (!press_handled) {
         Serial.println("Button short press");
         ui_menu_button();  // Open the page menu, or go to the chosen page
       }
@@ -671,9 +715,16 @@ void loop() {
     ui_update();
   }
 
-  if (power_is_standby()) {
-    // Standby: dragon eye owns the display; LVGL (and its touch read) is paused,
-    // so poll touch directly to wake. LVGL redraws Main when the screen reloads.
+  // Screensaver after the idle delay (a held button counts as activity)
+  if (press_start != 0) note_activity();
+  if (!eye_showing() && config.display.screensaverSec > 0 &&
+      millis() - last_activity >= config.display.screensaverSec * 1000UL) {
+    set_saver(true);
+  }
+
+  if (eye_showing()) {
+    // Standby or screensaver: dragon eye owns the display; LVGL (and its touch read)
+    // is paused, so poll touch directly. LVGL redraws Main when the screen reloads.
     eye_frame();
     // Wake only on a NEW touch: pressing the knob puts a finger on the glass,
     // so the touch that accompanied the long press must lift first.
@@ -681,6 +732,8 @@ void loop() {
     bool touching = touch_ok && read_touch(tx, ty);
     if (!touching) {
       standby_touch_armed = true;
+    } else if (standby_touch_armed && saver_on) {
+      set_saver(false);  // Dismiss only
     } else if (standby_touch_armed) {
       Serial.printf("Wake: touch %u,%u\n", tx, ty);
       power_request_standby(false);

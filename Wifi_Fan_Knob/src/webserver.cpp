@@ -87,12 +87,21 @@ static String apply_config_form(AsyncWebServerRequest *request) {
   String fmt = form_value(request, "time_format");
   if (fmt != "12h" && fmt != "24h") return "Invalid time format";
 
-  long min_pwm, max_pwm, mqtt_port, brightness;
+  long min_pwm, max_pwm, mqtt_port, saver_sec;
   if (!form_int(request, "min_pwm", 0, 255, min_pwm)) return "Min PWM must be 0-255";
   if (!form_int(request, "max_pwm", 0, 255, max_pwm)) return "Max PWM must be 0-255";
   if (min_pwm > max_pwm) return "Min PWM must not exceed Max PWM";
   if (!form_int(request, "mqtt_port", 1, 65535, mqtt_port)) return "MQTT port must be 1-65535";
-  if (!form_int(request, "brightness", 10, 100, brightness)) return "Brightness must be 10-100";
+  if (!form_int(request, "screensaver_sec", 0, 3600, saver_sec)) return "Screensaver delay must be 0-3600 seconds";
+  // Preset speeds: within the fan's range and in order (they sit in order along the LCD arc)
+  long presets[4];
+  const char *preset_fields[4] = {"preset_low", "preset_medium", "preset_high", "preset_max"};
+  for (int i = 0; i < 4; i++) {
+    if (!form_int(request, preset_fields[i], config.fan.minRpm, config.fan.maxRpm, presets[i])) {
+      return "Presets must be " + String(config.fan.minRpm) + "-" + String(config.fan.maxRpm) + " RPM";
+    }
+    if (i > 0 && presets[i] < presets[i - 1]) return "Presets must be in order: Low <= Med <= High <= Max";
+  }
 
   String broker = form_value(request, "mqtt_broker");
   String user = form_value(request, "mqtt_user");
@@ -108,6 +117,10 @@ static String apply_config_form(AsyncWebServerRequest *request) {
   strlcpy(config.display.timeFormat, fmt.c_str(), sizeof(config.display.timeFormat));
   config.fan.calibration.minPwm = min_pwm;
   config.fan.calibration.maxPwm = max_pwm;
+  config.fan.presets.low = presets[0];
+  config.fan.presets.medium = presets[1];
+  config.fan.presets.high = presets[2];
+  config.fan.presets.max = presets[3];
   strlcpy(config.mqtt.broker, broker.c_str(), sizeof(config.mqtt.broker));
   config.mqtt.port = mqtt_port;
   strlcpy(config.mqtt.username, user.c_str(), sizeof(config.mqtt.username));
@@ -115,7 +128,7 @@ static String apply_config_form(AsyncWebServerRequest *request) {
     strlcpy(config.mqtt.password, pass.c_str(), sizeof(config.mqtt.password));
   }
   config.mqtt.discoveryEnabled = form_value(request, "mqtt_discovery") == "1";
-  config.display.brightness = brightness;
+  config.display.screensaverSec = saver_sec;
   config.power.activeHigh = level == "high";
   return "";
 }
@@ -286,6 +299,23 @@ void init_webserver() {
     bool on = form_value(request, "on") == "1";
     power_request_standby(on);
     request->send(200, "text/plain", on ? "Standby" : "Awake");
+  });
+
+  // LCD brightness (Home tab slider): applied now and saved
+  server->on(AsyncURIMatcher::exact("/api/brightness"), HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (!require_login(request)) return;
+    long brightness;
+    if (!form_int(request, "brightness", 10, 100, brightness)) {
+      request->send(400, "text/plain", "Brightness must be 10-100");
+      return;
+    }
+    config.display.brightness = brightness;
+    applyDisplaySettings();
+    if (!saveConfig()) {
+      request->send(500, "text/plain", "Failed to write config to SPIFFS");
+      return;
+    }
+    request->send(200, "text/plain", "Brightness saved");
   });
 
   // Check credentials (page login bar)

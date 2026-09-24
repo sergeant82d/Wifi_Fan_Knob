@@ -151,6 +151,7 @@ bool loadConfig() {
   strlcpy(config.display.timeFormat, doc["display"]["timeFormat"] | "12h", sizeof(config.display.timeFormat));
   config.display.brightness = doc["display"]["brightness"] | 80;
   config.display.screenTimeout = doc["display"]["screenTimeout"] | 0;
+  config.display.screensaverSec = doc["display"]["screensaverSec"] | 30;
 
   // Fan
   config.fan.minRpm = doc["fan"]["minRpm"] | 0;
@@ -232,6 +233,7 @@ bool saveConfig() {
   doc["display"]["timeFormat"] = config.display.timeFormat;
   doc["display"]["brightness"] = config.display.brightness;
   doc["display"]["screenTimeout"] = config.display.screenTimeout;
+  doc["display"]["screensaverSec"] = config.display.screensaverSec;
 
   // Fan
   doc["fan"]["minRpm"] = config.fan.minRpm;
@@ -331,6 +333,7 @@ void setDefaultConfig() {
   strlcpy(config.display.timeFormat, "12h", sizeof(config.display.timeFormat));
   config.display.brightness = 80;
   config.display.screenTimeout = 0;
+  config.display.screensaverSec = 30;
 
   // Fan
   config.fan.minRpm = 0;
@@ -434,9 +437,14 @@ String getConfigAsJson() {
   doc["display"]["timezone"] = config.display.timezone;
   doc["display"]["timeFormat"] = config.display.timeFormat;
   doc["display"]["brightness"] = config.display.brightness;
+  doc["display"]["screensaverSec"] = config.display.screensaverSec;
 
   doc["fan"]["calibration"]["minPwm"] = config.fan.calibration.minPwm;
   doc["fan"]["calibration"]["maxPwm"] = config.fan.calibration.maxPwm;
+  doc["fan"]["presets"]["low"] = config.fan.presets.low;
+  doc["fan"]["presets"]["medium"] = config.fan.presets.medium;
+  doc["fan"]["presets"]["high"] = config.fan.presets.high;
+  doc["fan"]["presets"]["max"] = config.fan.presets.max;
 
   doc["power"]["activeHigh"] = config.power.activeHigh;
 

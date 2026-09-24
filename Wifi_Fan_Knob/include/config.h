@@ -60,6 +60,7 @@ typedef struct {
     char timeFormat[4];             // "12h" or "24h"
     uint8_t brightness;             // 0-100%
     uint16_t screenTimeout;         // Minutes (0 = never)
+    uint16_t screensaverSec;        // Dragon eye after this many idle seconds (0 = off)
   } display;
 
   // Fan Settings
