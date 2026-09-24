@@ -157,6 +157,9 @@ void ui_init() {
   lv_arc_set_bg_angles(rpm_arc, 0, 270);
   lv_arc_set_range(rpm_arc, config.fan.minRpm, config.fan.maxRpm);
   lv_arc_set_value(rpm_arc, config.fan.minRpm);
+  // Ring-only touch: ADV_HITTEST makes LVGL use the arc's ring hit test (off by default,
+  // in which case the whole 228 px square grabs every swipe). Ext area widens the ring.
+  lv_obj_add_flag(rpm_arc, LV_OBJ_FLAG_ADV_HITTEST);
   lv_obj_set_ext_click_area(rpm_arc, 15);  // 12 px ring is a small finger target
   lv_obj_set_style_arc_width(rpm_arc, 12, LV_PART_MAIN);
   lv_obj_set_style_arc_width(rpm_arc, 12, LV_PART_INDICATOR);
