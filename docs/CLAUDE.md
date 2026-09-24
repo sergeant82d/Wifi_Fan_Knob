@@ -3,7 +3,7 @@
 **Project**: ESP32-S3 PWM Fan Controller with Rotary Display + Home Assistant  
 **Repository**: https://github.com/sergeant82d/Wifi_Fan_Knob.git  
 **Repo root**: `D:\GitHub\VSCodeProjects\Wifi_Bench_Fan\Wifi_Fan_Knob`  
-**PlatformIO project**: `<repo root>\Wifi_Fan_Knob` (nested one level down)  
+**PlatformIO project**: the repo root (`platformio.ini` is at the top level)  
 **Status**: Hardware bring-up in progress — display, WiFi AP, SPIFFS and webserver verified on the board  
 **Last updated**: 2026-09-24
 
@@ -23,7 +23,7 @@
 
 ```bash
 git clone https://github.com/sergeant82d/Wifi_Fan_Knob.git
-cd Wifi_Fan_Knob/Wifi_Fan_Knob     # PlatformIO project is nested
+cd Wifi_Fan_Knob
 ```
 
 - Open `Wifi_Fan_Knob.code-workspace` (repo root) in VS Code with PlatformIO.
@@ -63,10 +63,10 @@ cd Wifi_Fan_Knob/Wifi_Fan_Knob     # PlatformIO project is nested
 
 | File | Purpose |
 |------|---------|
-| `STATUS_REPORT_01.md` | End-of-day report from the pre-hardware sessions |
 | `DISPLAY_GUIDE.md` | How to change the LCD: colours, fonts, segments, pages (human-readable) |
-| `STATUS_REPORT_02.md` | End-of-day report, 2026-09-23 (first hardware session) |
-| `STATUS_REPORT_03.md` | End-of-day report, 2026-09-24 (second hardware session) |
+| `Status_Reports/STATUS_REPORT_01.md` | End-of-day report from the pre-hardware sessions |
+| `Status_Reports/STATUS_REPORT_02.md` | End-of-day report, 2026-09-23 (first hardware session) |
+| `Status_Reports/STATUS_REPORT_03.md` | End-of-day report, 2026-09-24 (second hardware session) |
 | `MQTT_SCHEMA.md` | Original HA discovery design (superseded; see MQTT below) |
 | `SPIFFS_CONFIG_SCHEMA.md` | JSON config structure |
 | `CrowPanel1.28inchRotary-11.jpg` | Board photo |
