@@ -167,10 +167,11 @@ See `platformio.ini`. Libraries:
   IP/SSID/MQTT info. Page dots in the arc's bottom gap. Knob turns and wake return to Main.
   Pages come from the `PAGES` table in `ui.cpp` (name + builder); tiles, dots and the knob
   menu follow it, so adding a page = one builder + one table row (Main stays first).
-- Knob menu (not yet verified on hardware): short press shows the page names (current one
+  On every page after Main, a tap on empty space slides back to Main (not yet verified on hardware).
+- Knob menu (verified): short press shows the page names (current one
   highlighted); turn to choose, press again or tap a name to go; tap outside closes. While
   open, knob turns don't change RPM. Standby closes it.
-- Double-tap on Main (not yet verified on hardware): two taps within 400 ms (millis) stop the
+- Double-tap on Main (verified): two taps within 400 ms (millis) stop the
   fan (target 0, red "Fan stopped" popup) or show "Fan is not running"; popup 1.5 s.
   Status box bubbles its taps to the page; the arc keeps its own touches.
 - Standby (`power.h`, verified): knob button held 1 s (fires while held) or web Standby/Wake

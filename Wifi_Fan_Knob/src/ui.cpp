@@ -13,6 +13,7 @@
 // Page dots sit in the arc's bottom gap. Knob turns and wake return to Main.
 // Knob short press opens a menu of the pages: turn to choose, press or tap to go.
 // Double-tap on Main stops the fan (or pops up "Fan is not running").
+// On every other page, a tap on empty space slides back to Main.
 
 static lv_obj_t *rpm_arc = nullptr;
 static lv_obj_t *rpm_label = nullptr;
@@ -35,6 +36,7 @@ static void create_main_page(lv_obj_t *tile);
 static void create_presets_page(lv_obj_t *tile);
 static void create_settings_page(lv_obj_t *tile);
 static void create_page_dots(lv_obj_t *parent);
+static void tap_back_cb(lv_event_t *);
 static void create_menu(lv_obj_t *parent);
 
 // Swipe pages, left to right. To add or reorder a page, write a create_*_page(tile)
@@ -163,7 +165,10 @@ void ui_init() {
   lv_obj_set_scrollbar_mode(tileview, LV_SCROLLBAR_MODE_OFF);
   for (int i = 0; i < PAGE_COUNT; i++) {
     int dir = (i > 0 ? LV_DIR_LEFT : 0) | (i < PAGE_COUNT - 1 ? LV_DIR_RIGHT : 0);
-    PAGES[i].create(lv_tileview_add_tile(tileview, i, 0, (lv_dir_t)dir));
+    lv_obj_t *tile = lv_tileview_add_tile(tileview, i, 0, (lv_dir_t)dir);
+    PAGES[i].create(tile);
+    // Tap on empty space returns to Main (controls handle their own taps; swipes send no CLICKED)
+    if (i > 0) lv_obj_add_event_cb(tile, tap_back_cb, LV_EVENT_CLICKED, nullptr);
   }
   create_page_dots(main_screen);
   create_menu(main_screen);  // After the dots so it covers them
@@ -270,6 +275,10 @@ static void create_main_page(lv_obj_t *scr) {
 // ============================================================================
 // PAGES
 // ============================================================================
+
+static void tap_back_cb(lv_event_t *) {
+  ui_show_main();
+}
 
 void ui_show_main() {
   lv_obj_set_tile_id(tileview, 0, 0, LV_ANIM_ON);
