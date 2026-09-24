@@ -6,11 +6,13 @@
 #include <WiFi.h>
 #include <time.h>
 
-// Main screen (240x240 round) is a horizontal tileview; swipe left from Main:
-//   0 Main:     clock (top) · RPM number (centre) · status box · 270° RPM arc
-//   1 Presets:  config presets + OFF (tap sets target, slides back to Main)
-//   2 Settings: brightness slider (live; saved on release) + network/MQTT info
+// Main screen (240x240 round) is a horizontal tileview built from PAGES (below); swipe left from Main:
+//   Main:     clock (top) · RPM number (centre) · status box · 270° RPM arc
+//   Presets:  config presets + OFF (tap sets target, slides back to Main)
+//   Settings: brightness slider (live; saved on release) + network/MQTT info
 // Page dots sit in the arc's bottom gap. Knob turns and wake return to Main.
+// Knob short press opens a menu of the pages: turn to choose, press or tap to go.
+// Double-tap on Main stops the fan (or pops up "Fan is not running").
 
 static lv_obj_t *rpm_arc = nullptr;
 static lv_obj_t *rpm_label = nullptr;
@@ -23,17 +25,32 @@ static lv_obj_t *status_label = nullptr;
 static lv_timer_t *status_flash_timer = nullptr;
 static bool status_flash_red = false;
 
-static const int PAGE_COUNT = 3;
 static lv_obj_t *tileview = nullptr;
-static lv_obj_t *page_dots[PAGE_COUNT];
 static lv_obj_t *brightness_slider = nullptr;
 static lv_obj_t *brightness_label = nullptr;
 static lv_obj_t *info_label = nullptr;
 
 static void create_standby_screen();
+static void create_main_page(lv_obj_t *tile);
 static void create_presets_page(lv_obj_t *tile);
 static void create_settings_page(lv_obj_t *tile);
 static void create_page_dots(lv_obj_t *parent);
+static void create_menu(lv_obj_t *parent);
+
+// Swipe pages, left to right. To add or reorder a page, write a create_*_page(tile)
+// builder and edit this table: tiles, page dots and the knob menu all follow it.
+// Main must stay first (knob turns and wake return to page 0).
+struct Page {
+  const char *name;                 // Shown in the knob menu
+  void (*create)(lv_obj_t *tile);   // Builds the page's widgets on its tile
+};
+static const Page PAGES[] = {
+  {"Main", create_main_page},
+  {"Presets", create_presets_page},
+  {"Settings", create_settings_page},
+};
+static const int PAGE_COUNT = sizeof(PAGES) / sizeof(PAGES[0]);
+static lv_obj_t *page_dots[PAGE_COUNT];
 
 // ============================================================================
 // STATUS BOX (IP address; flashes when attention needed)
@@ -62,6 +79,7 @@ static void create_status_box(lv_obj_t *parent) {
   lv_obj_set_style_radius(status_box, 6, 0);
   lv_obj_set_style_pad_hor(status_box, 8, 0);
   lv_obj_set_style_pad_ver(status_box, 4, 0);
+  lv_obj_add_flag(status_box, LV_OBJ_FLAG_EVENT_BUBBLE);  // Taps reach the page (double-tap)
 
   status_label = lv_label_create(status_box);
   lv_obj_set_style_text_font(status_label, &lv_font_montserrat_14, 0);
@@ -143,10 +161,70 @@ void ui_init() {
   tileview = lv_tileview_create(main_screen);
   lv_obj_set_style_bg_opa(tileview, LV_OPA_TRANSP, 0);
   lv_obj_set_scrollbar_mode(tileview, LV_SCROLLBAR_MODE_OFF);
-  lv_obj_t *scr = lv_tileview_add_tile(tileview, 0, 0, LV_DIR_RIGHT);  // Main page
-  create_presets_page(lv_tileview_add_tile(tileview, 1, 0, LV_DIR_LEFT | LV_DIR_RIGHT));
-  create_settings_page(lv_tileview_add_tile(tileview, 2, 0, LV_DIR_LEFT));
+  for (int i = 0; i < PAGE_COUNT; i++) {
+    int dir = (i > 0 ? LV_DIR_LEFT : 0) | (i < PAGE_COUNT - 1 ? LV_DIR_RIGHT : 0);
+    PAGES[i].create(lv_tileview_add_tile(tileview, i, 0, (lv_dir_t)dir));
+  }
   create_page_dots(main_screen);
+  create_menu(main_screen);  // After the dots so it covers them
+  create_standby_screen();
+  ui_set_target_rpm(config.fan.minRpm);
+}
+
+// ============================================================================
+// DOUBLE-TAP ON MAIN: stop the fan, or say it isn't running
+// ============================================================================
+
+static lv_obj_t *popup = nullptr;
+static lv_timer_t *popup_timer = nullptr;
+
+static void popup_hide_cb(lv_timer_t *) {
+  lv_obj_add_flag(popup, LV_OBJ_FLAG_HIDDEN);
+  lv_timer_pause(popup_timer);
+}
+
+// Short message in the centre of the screen for 1.5 s
+static void show_popup(const char *text, lv_color_t bg) {
+  if (!popup) {
+    popup = lv_label_create(main_screen);
+    lv_obj_set_style_text_font(popup, &lv_font_montserrat_20, 0);
+    lv_obj_set_style_text_color(popup, lv_color_white(), 0);
+    lv_obj_set_style_bg_opa(popup, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius(popup, 10, 0);
+    lv_obj_set_style_pad_all(popup, 14, 0);
+    popup_timer = lv_timer_create(popup_hide_cb, 1500, nullptr);
+  }
+  lv_obj_set_style_bg_color(popup, bg, 0);
+  lv_label_set_text(popup, text);
+  lv_obj_center(popup);
+  lv_obj_clear_flag(popup, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_move_foreground(popup);
+  lv_timer_reset(popup_timer);
+  lv_timer_resume(popup_timer);
+}
+
+// Two taps within 400 ms (millis: lv_tick only approximates real time here).
+// Swipes and arc drags don't count: LVGL sends no CLICKED after a scroll, and
+// the arc handles its own touches.
+static void main_tap_cb(lv_event_t *) {
+  static unsigned long last_tap = 0;
+  unsigned long now = millis();
+  if (last_tap != 0 && now - last_tap < 400) {
+    last_tap = 0;
+    if (fan_get_target() > 0) {
+      fan_set_target(0);
+      Serial.println("Double-tap: fan stopped");
+      show_popup("Fan stopped", lv_palette_main(LV_PALETTE_RED));
+    } else {
+      show_popup("Fan is not running", lv_color_hex(0x404040));
+    }
+  } else {
+    last_tap = now;
+  }
+}
+
+static void create_main_page(lv_obj_t *scr) {
+  lv_obj_add_event_cb(scr, main_tap_cb, LV_EVENT_CLICKED, nullptr);
 
   // RPM arc: 270° sweep with the gap at the bottom. Drag along the ring to set speed
   // (arc only hit-tests on the ring, so swipes in the middle still change pages).
@@ -187,8 +265,6 @@ void ui_init() {
   lv_obj_align(unit_label, LV_ALIGN_CENTER, 0, 30);
 
   create_status_box(scr);
-  create_standby_screen();
-  ui_set_target_rpm(config.fan.minRpm);
 }
 
 // ============================================================================
@@ -199,9 +275,13 @@ void ui_show_main() {
   lv_obj_set_tile_id(tileview, 0, 0, LV_ANIM_ON);
 }
 
-static void page_changed_cb(lv_event_t *) {
+static int current_page() {
   lv_obj_t *tile = lv_tileview_get_tile_act(tileview);  // NULL until the first scroll
-  int page = tile ? lv_obj_get_x(tile) / lv_obj_get_width(tileview) : 0;
+  return tile ? lv_obj_get_x(tile) / lv_obj_get_width(tileview) : 0;
+}
+
+static void page_changed_cb(lv_event_t *) {
+  int page = current_page();
   for (int i = 0; i < PAGE_COUNT; i++) {
     lv_obj_set_style_bg_color(page_dots[i], i == page ? lv_color_white() : lv_color_hex(0x404040), 0);
   }
@@ -214,11 +294,101 @@ static void create_page_dots(lv_obj_t *parent) {
     lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_border_width(dot, 0, 0);
     lv_obj_clear_flag(dot, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_align(dot, LV_ALIGN_BOTTOM_MID, (i - 1) * 16, -10);
+    lv_obj_align(dot, LV_ALIGN_BOTTOM_MID, (2 * i - (PAGE_COUNT - 1)) * 8, -10);  // 16 px apart, centred
     page_dots[i] = dot;
   }
   lv_obj_add_event_cb(tileview, page_changed_cb, LV_EVENT_VALUE_CHANGED, nullptr);
   page_changed_cb(nullptr);
+}
+
+// ============================================================================
+// KNOB MENU (short press): list of PAGES; turn to choose, press or tap to go
+// ============================================================================
+
+static lv_obj_t *menu = nullptr;
+static lv_obj_t *menu_items[PAGE_COUNT];
+static int menu_sel = 0;
+
+static void menu_highlight() {
+  for (int i = 0; i < PAGE_COUNT; i++) {
+    bool sel = i == menu_sel;
+    lv_obj_set_style_bg_color(menu_items[i], sel ? lv_palette_main(LV_PALETTE_CYAN) : lv_color_hex(0x303030), 0);
+    lv_obj_set_style_text_color(menu_items[i], sel ? lv_color_black() : lv_color_white(), 0);
+  }
+  lv_obj_scroll_to_view(menu_items[menu_sel], LV_ANIM_ON);  // Long lists scroll
+}
+
+static void menu_close() {
+  lv_obj_add_flag(menu, LV_OBJ_FLAG_HIDDEN);
+}
+
+static void menu_go(int page) {
+  menu_close();
+  lv_obj_set_tile_id(tileview, page, 0, LV_ANIM_ON);
+}
+
+static void menu_item_cb(lv_event_t *e) {
+  menu_go((int)(intptr_t)lv_event_get_user_data(e));
+}
+
+static void menu_bg_cb(lv_event_t *) {
+  menu_close();  // Tap outside the list
+}
+
+static void create_menu(lv_obj_t *parent) {
+  menu = lv_obj_create(parent);
+  lv_obj_set_size(menu, 240, 240);
+  lv_obj_center(menu);
+  lv_obj_set_style_radius(menu, LV_RADIUS_CIRCLE, 0);
+  lv_obj_set_style_bg_color(menu, lv_color_black(), 0);
+  lv_obj_set_style_bg_opa(menu, LV_OPA_90, 0);
+  lv_obj_set_style_border_width(menu, 0, 0);
+  lv_obj_clear_flag(menu, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_add_event_cb(menu, menu_bg_cb, LV_EVENT_CLICKED, nullptr);
+
+  // Not clickable, so taps between items fall through to the background (close)
+  lv_obj_t *list = lv_obj_create(menu);
+  lv_obj_set_size(list, 170, 180);
+  lv_obj_center(list);
+  lv_obj_set_style_bg_opa(list, LV_OPA_TRANSP, 0);
+  lv_obj_set_style_border_width(list, 0, 0);
+  lv_obj_set_style_pad_all(list, 0, 0);
+  lv_obj_set_style_pad_row(list, 8, 0);
+  lv_obj_set_flex_flow(list, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_flex_align(list, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+  lv_obj_set_scrollbar_mode(list, LV_SCROLLBAR_MODE_OFF);
+  lv_obj_clear_flag(list, LV_OBJ_FLAG_CLICKABLE);
+
+  for (int i = 0; i < PAGE_COUNT; i++) {
+    lv_obj_t *btn = lv_btn_create(list);
+    lv_obj_set_size(btn, 150, 40);
+    lv_obj_add_event_cb(btn, menu_item_cb, LV_EVENT_CLICKED, (void *)(intptr_t)i);
+    lv_obj_t *label = lv_label_create(btn);
+    lv_obj_set_style_text_font(label, &lv_font_montserrat_20, 0);
+    lv_label_set_text(label, PAGES[i].name);
+    lv_obj_center(label);
+    menu_items[i] = btn;
+  }
+  menu_close();
+}
+
+bool ui_menu_open() {
+  return !lv_obj_has_flag(menu, LV_OBJ_FLAG_HIDDEN);
+}
+
+void ui_menu_button() {
+  if (ui_menu_open()) {
+    menu_go(menu_sel);
+    return;
+  }
+  menu_sel = current_page();
+  lv_obj_clear_flag(menu, LV_OBJ_FLAG_HIDDEN);
+  menu_highlight();
+}
+
+void ui_menu_turn(int delta) {
+  menu_sel = ((menu_sel + delta) % PAGE_COUNT + PAGE_COUNT) % PAGE_COUNT;  // Wraps
+  menu_highlight();
 }
 
 static lv_obj_t *page_title(lv_obj_t *tile, const char *text) {
@@ -323,6 +493,7 @@ static void create_standby_screen() {
 }
 
 void ui_set_standby(bool standby) {
+  if (standby) menu_close();
   if (!standby) lv_obj_set_tile_id(tileview, 0, 0, LV_ANIM_OFF);  // Wake on Main page
   lv_scr_load(standby ? standby_screen : main_screen);
 }

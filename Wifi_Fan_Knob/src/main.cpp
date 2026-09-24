@@ -610,6 +610,8 @@ void loop() {
   if (delta != 0 && power_is_standby()) {
     Serial.printf("Wake: knob (%ld)\n", (long)delta);
     power_request_standby(false);  // Turning the knob wakes; this turn is discarded
+  } else if (delta != 0 && ui_menu_open()) {
+    ui_menu_turn(delta);  // Menu open: knob chooses a page, RPM unchanged
   } else if (delta != 0) {
     // Knob sets target RPM (fan_control clamps to config range)
     fan_set_target((int32_t)fan_get_target() + delta * config.fan.rpmStep);
@@ -647,7 +649,10 @@ void loop() {
       Serial.println("Button long press");
       power_request_standby(true);
     } else if (!held && held_ms > 50) {  // Released (ignore bounce right after press)
-      if (!press_handled) Serial.println("Button short press");  // TODO: menu
+      if (!press_handled) {
+        Serial.println("Button short press");
+        ui_menu_button();  // Open the page menu, or go to the chosen page
+      }
       press_start = 0;
     }
   }
