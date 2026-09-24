@@ -354,6 +354,8 @@ STANDBY (1)
   peeking, opening on approach); own standby brightness (currently 10%, dim for the eye);
   throttled frame rate or light sleep between frames (renders flat out at ~62 fps now);
   other eye styles (Uncanny Eyes has several); revisit wake gestures (knob press = glass touch).
+- **GitHub link on the web page** — add a link to the project's GitHub repository at the
+  bottom of the Home tab (`web/index.html`).
 
 ---
 
