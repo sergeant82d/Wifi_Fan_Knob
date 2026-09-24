@@ -211,6 +211,7 @@ void init_webserver() {
       return;
     }
     fan_set_target(rpm);
+    if (rpm > 0 && power_is_standby()) power_request_standby(false);  // Fan only runs when awake
     request->send(200, "text/plain", "Target set to " + String(fan_get_target()) + " RPM");
   });
 

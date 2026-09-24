@@ -397,6 +397,7 @@ bool power_is_standby() {
 static void set_standby(bool standby) {
   if (standby == power_is_standby()) return;
   current_state = standby ? STATE_STANDBY : STATE_ACTIVE;
+  if (standby) fan_set_target(0);  // Standby stops the fan; waking leaves it at 0
   ui_set_standby(standby);
   set_backlight(standby ? STANDBY_BRIGHTNESS : config.display.brightness);
   Serial.println(standby ? "Standby" : "Wake");

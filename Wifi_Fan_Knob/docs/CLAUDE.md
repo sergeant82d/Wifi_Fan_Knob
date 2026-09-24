@@ -148,10 +148,11 @@ See `platformio.ini`. Libraries:
   8-63 chars) set on WiFi tab; applies next time hotspot starts. `/api/status` reports `hotspot_on`.
 - Standby (`power.h`, verified): knob button held 1 s (fires while held) or web Standby/Wake
   button (`POST /api/standby`, login). Dims backlight to 10% and loads a standby screen (large
-  grey clock). Any touch, knob turn or button press wakes; the waking input is discarded.
+  grey clock) and sets fan target to 0. Any touch, knob turn or button press wakes (fan stays 0);
+  the waking input is discarded. A web fan speed > 0 while in standby also wakes.
   Requests from web/touch are flags applied in `loop()` (LVGL not thread-safe). No light sleep yet.
-- Decisions: fan target starts at 0 after power loss (not resumed). Standby leaves the fan
-  target unchanged (display only).
+- Decisions: fan target starts at 0 after power loss (not resumed). Standby turns the fan
+  off (target 0).
 - Home tab has a large FAN OFF button (target 0, no confirmation).
 - Web login (HTTP Basic; `config.webserver.username/password`): required by every POST (fan, config,
   WiFi, hotspot password, OTA, factory reset) via `require_login()`; GETs stay open. No login set =
@@ -272,6 +273,13 @@ STANDBY (1)
 6. GPIO 2 role on non-USB power (see Hardware Reference)
 
 ### Later (user notes)
+- **Peripheral power switch (planned hardware)**: transistor on an as-yet undefined GPIO cuts
+  external power to everything except MCU/LCD (fan, lights, sensors). Firmware plan: one
+  `set_peripheral_power(bool)`; off in standby / Fan Off, on when a speed is set. Open: which pin
+  (free: GPIO 4, 12; avoid strapping pins 0, 3, 45, 46), active level (P-MOSFET high-side is
+  usually active-LOW), and whether the EMC2101 is on the switched rail (if so: power up + settle
+  before I2C, and an unpowered I2C device can back-power via or drag down SDA/SCL). Hardware:
+  gate pull so the rail stays OFF during boot/reset/OTA reboot.
 - **Worldwide time zones** (Config tab): currently US zones + UTC only (`posix_tz()` in
   `main.cpp`, validated list in `webserver.cpp`). Non-US users need a full list. Likely approach:
   page offers IANA zone names (e.g. a searchable list) and sends the matching POSIX TZ string;
