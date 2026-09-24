@@ -146,6 +146,12 @@ See `platformio.ini`. Libraries:
 - WiFi: hotspot (`WiFi-Fan-Knob-xxxxxx`) turns off once the saved network is joined; comes back if
   that network is lost for 60 s. Hotspot password (`config.wifi.apPassword`, default 12345678,
   8-63 chars) set on WiFi tab; applies next time hotspot starts. `/api/status` reports `hotspot_on`.
+- Standby (`power.h`, verified): knob button held 1 s (fires while held) or web Standby/Wake
+  button (`POST /api/standby`, login). Dims backlight to 10% and loads a standby screen (large
+  grey clock). Any touch, knob turn or button press wakes; the waking input is discarded.
+  Requests from web/touch are flags applied in `loop()` (LVGL not thread-safe). No light sleep yet.
+- Decisions: fan target starts at 0 after power loss (not resumed). Standby leaves the fan
+  target unchanged (display only).
 - Home tab has a large FAN OFF button (target 0, no confirmation).
 - Web login (HTTP Basic; `config.webserver.username/password`): required by every POST (fan, config,
   WiFi, hotspot password, OTA, factory reset) via `require_login()`; GETs stay open. No login set =
@@ -259,8 +265,8 @@ STANDBY (1)
 ## Next Steps
 
 1. `fan_control.cpp`: EMC2101 PWM + tach once the module arrives (target RPM already wired)
-2. Knob button long-press → standby; later dragon-eye animation in light sleep
-3. Decide: resume last target RPM after power loss, or start at 0?
+2. Dragon-eye animation on the standby screen; light sleep in standby
+3. Knob short press → menu (currently only logged)
 4. `mqtt.cpp` + Home Assistant discovery
 5. Calibration UI, audio, field testing
 6. GPIO 2 role on non-USB power (see Hardware Reference)

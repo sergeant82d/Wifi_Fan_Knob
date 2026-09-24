@@ -1,6 +1,7 @@
 #include "webserver.h"
 #include "config.h"
 #include "fan_control.h"
+#include "power.h"
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
 #include <WiFi.h>
@@ -185,7 +186,7 @@ void init_webserver() {
     doc["max_rpm"] = config.fan.maxRpm;
     doc["rpm_step"] = config.fan.rpmStep;
     doc["fan_controller"] = fan_controller_present();
-    doc["power_mode"] = "Active";   // Standby not implemented yet
+    doc["power_mode"] = power_is_standby() ? "Standby" : "Active";
     doc["mqtt_connected"] = false;  // MQTT not implemented yet
     doc["fw_version"] = config.firmwareVersion;
     char build_id[9];  // First 8 hex chars of firmware ELF SHA-256: unique per build
@@ -258,6 +259,14 @@ void init_webserver() {
         }
       }
     });
+
+  // Standby (on=1) / wake (on=0); applied by loop()
+  server->on(AsyncURIMatcher::exact("/api/standby"), HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (!require_login(request)) return;
+    bool on = form_value(request, "on") == "1";
+    power_request_standby(on);
+    request->send(200, "text/plain", on ? "Standby" : "Awake");
+  });
 
   // Check credentials (page login bar)
   server->on(AsyncURIMatcher::exact("/api/login"), HTTP_POST, [](AsyncWebServerRequest *request) {

@@ -9,6 +9,7 @@
 #include "webserver.h"
 #include "ui.h"
 #include "fan_control.h"
+#include "power.h"
 
 // ============================================================================
 // PIN DEFINITIONS (Elecrow 1.28" Rotary Display)
@@ -185,7 +186,10 @@ void touchpad_read(lv_indev_drv_t *indev_drv, lv_indev_data_t *data) {
     data->state = LV_INDEV_STATE_PR;
     data->point.x = x;
     data->point.y = y;
-    if (!was_pressed) Serial.printf("Touch: %u,%u\n", x, y);
+    if (!was_pressed) {
+      Serial.printf("Touch: %u,%u\n", x, y);
+      if (power_is_standby()) power_request_standby(false);  // Touch wakes
+    }
   } else {
     data->state = LV_INDEV_STATE_REL;
   }
@@ -361,12 +365,41 @@ static const char *posix_tz(const char *tz) {
 }
 
 // Apply saved brightness and time zone (boot, and after Config tab save)
-void applyDisplaySettings() {
-  uint32_t duty = config.display.brightness * 255 / 100;
+const uint8_t STANDBY_BRIGHTNESS = 10;  // % backlight in standby
+
+static void set_backlight(uint8_t percent) {
+  uint32_t duty = percent * 255 / 100;
   bool ok = ledcWrite(SCREEN_BACKLIGHT_PIN, duty);
-  Serial.printf("[DISPLAY] Brightness %u%% (duty %u/255) %s\n", config.display.brightness, duty, ok ? "OK" : "FAILED");
+  Serial.printf("[DISPLAY] Brightness %u%% (duty %u/255) %s\n", percent, duty, ok ? "OK" : "FAILED");
+}
+
+void applyDisplaySettings() {
+  set_backlight(current_state == STATE_STANDBY ? STANDBY_BRIGHTNESS : config.display.brightness);
   setenv("TZ", posix_tz(config.display.timezone), 1);
   tzset();
+}
+
+// ============================================================================
+// STANDBY (knob long-press, web Standby button; any input wakes)
+// ============================================================================
+
+static volatile int8_t standby_request = -1;  // -1 none, 0 wake, 1 standby
+
+void power_request_standby(bool standby) {
+  standby_request = standby ? 1 : 0;
+}
+
+bool power_is_standby() {
+  return current_state == STATE_STANDBY;
+}
+
+// loop() only: switches screen (LVGL) and backlight
+static void set_standby(bool standby) {
+  if (standby == power_is_standby()) return;
+  current_state = standby ? STATE_STANDBY : STATE_ACTIVE;
+  ui_set_standby(standby);
+  set_backlight(standby ? STANDBY_BRIGHTNESS : config.display.brightness);
+  Serial.println(standby ? "Standby" : "Wake");
 }
 
 void start_ntp() {
@@ -519,7 +552,9 @@ void loop() {
   int32_t delta = encoder_count;
   encoder_count = 0;
   portEXIT_CRITICAL(&encoder_mux);
-  if (delta != 0) {
+  if (delta != 0 && power_is_standby()) {
+    power_request_standby(false);  // Turning the knob wakes; this turn is discarded
+  } else if (delta != 0) {
     // Knob sets target RPM (fan_control clamps to config range)
     fan_set_target((int32_t)fan_get_target() + delta * config.fan.rpmStep);
     Serial.printf("Encoder: %ld -> target %u RPM\n", (long)delta, fan_get_target());
@@ -532,11 +567,37 @@ void loop() {
     ui_set_target_rpm(shown_rpm);
   }
 
-  // Handle encoder button
+  // Encoder button: ISR latches the (debounced) press; duration measured here.
+  // Held LONG_PRESS_MS → standby (fires while still held). Any press in standby wakes.
+  const unsigned long LONG_PRESS_MS = 1000;
+  static unsigned long press_start = 0;
+  static bool press_handled = false;
   if (encoder_button_pressed) {
     encoder_button_pressed = false;
-    // TODO: Trigger standby/shutdown menu
-    Serial.println("Button pressed");
+    press_start = millis();
+    press_handled = false;
+    if (power_is_standby()) {
+      power_request_standby(false);
+      press_handled = true;  // Waking consumes this press
+    }
+  }
+  if (press_start != 0) {
+    bool held = digitalRead(ENCODER_SW_PIN) == LOW;
+    unsigned long held_ms = millis() - press_start;
+    if (held && !press_handled && held_ms >= LONG_PRESS_MS) {
+      press_handled = true;
+      Serial.println("Button long press");
+      power_request_standby(true);
+    } else if (!held && held_ms > 50) {  // Released (ignore bounce right after press)
+      if (!press_handled) Serial.println("Button short press");  // TODO: menu
+      press_start = 0;
+    }
+  }
+
+  // Apply standby/wake requested by button, knob, touch or web
+  if (standby_request >= 0) {
+    set_standby(standby_request == 1);
+    standby_request = -1;
   }
 
   // Refresh clock + status box once a second

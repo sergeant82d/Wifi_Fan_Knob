@@ -11,10 +11,15 @@
 static lv_obj_t *rpm_arc = nullptr;
 static lv_obj_t *rpm_label = nullptr;
 static lv_obj_t *clock_label = nullptr;
+static lv_obj_t *main_screen = nullptr;
+static lv_obj_t *standby_screen = nullptr;   // Dimmed: large clock only (dragon eye later)
+static lv_obj_t *standby_clock = nullptr;
 static lv_obj_t *status_box = nullptr;
 static lv_obj_t *status_label = nullptr;
 static lv_timer_t *status_flash_timer = nullptr;
 static bool status_flash_red = false;
+
+static void create_standby_screen();
 
 // ============================================================================
 // STATUS BOX (IP address; flashes when attention needed)
@@ -101,6 +106,7 @@ static void update_clock() {
   }
   if (strcmp(text, lv_label_get_text(clock_label)) != 0) {
     lv_label_set_text(clock_label, text);
+    lv_label_set_text(standby_clock, text);
   }
 }
 
@@ -110,6 +116,7 @@ static void update_clock() {
 
 void ui_init() {
   lv_obj_t *scr = lv_scr_act();
+  main_screen = scr;
   lv_obj_set_style_bg_color(scr, lv_color_black(), 0);
   lv_obj_clear_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
 
@@ -146,7 +153,24 @@ void ui_init() {
   lv_obj_align(unit_label, LV_ALIGN_CENTER, 0, 30);
 
   create_status_box(scr);
+  create_standby_screen();
   ui_set_target_rpm(config.fan.minRpm);
+}
+
+static void create_standby_screen() {
+  standby_screen = lv_obj_create(nullptr);
+  lv_obj_set_style_bg_color(standby_screen, lv_color_black(), 0);
+  lv_obj_clear_flag(standby_screen, LV_OBJ_FLAG_SCROLLABLE);
+
+  standby_clock = lv_label_create(standby_screen);
+  lv_obj_set_style_text_font(standby_clock, &lv_font_montserrat_48, 0);
+  lv_obj_set_style_text_color(standby_clock, lv_color_hex(0x606060), 0);
+  lv_label_set_text(standby_clock, "--:--");
+  lv_obj_center(standby_clock);
+}
+
+void ui_set_standby(bool standby) {
+  lv_scr_load(standby ? standby_screen : main_screen);
 }
 
 void ui_update() {

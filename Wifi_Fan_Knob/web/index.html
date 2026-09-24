@@ -483,7 +483,7 @@
             </div>
 
             <button class="btn-primary" onclick="applySpeed()">Apply Speed</button>
-            <button class="btn-secondary" style="margin-left: 10px;" onclick="standbyMode()">Standby</button>
+            <button class="btn-secondary" style="margin-left: 10px;" id="standby-btn" onclick="standbyMode()">Standby</button>
         </div>
 
         <!-- WiFi TAB -->
@@ -762,8 +762,15 @@
             }
         }
 
-        function standbyMode() {
-            alert('Standby is not implemented yet.');
+        // Toggle standby (dimmed LCD, standby screen; fan keeps its target)
+        let inStandby = false;
+        async function standbyMode() {
+            try {
+                await postForm('/api/standby', { on: inStandby ? '0' : '1' });
+                setTimeout(loadStatus, 300);  // Device applies it on its next loop pass
+            } catch (e) {
+                alert('Standby failed: ' + e.message);
+            }
         }
 
         function updateBrightnessLabel(value) {
@@ -931,6 +938,8 @@
                 set('fan-status', !s.fan_controller ? 'No fan controller'
                                   : (s.target_rpm > 0 ? 'Running' : 'Stopped'));
                 set('power-mode', s.power_mode);
+                inStandby = s.power_mode === 'Standby';
+                set('standby-btn', inStandby ? 'Wake' : 'Standby');
                 set('mqtt-status', s.mqtt_connected ? 'Yes' : 'No');
                 set('speed-range', s.min_rpm + '-' + s.max_rpm);
                 const slider = document.getElementById('speed-slider');
