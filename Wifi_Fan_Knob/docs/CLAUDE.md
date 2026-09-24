@@ -167,7 +167,12 @@ See `platformio.ini`. Libraries:
   IP/SSID/MQTT info. Page dots in the arc's bottom gap. Knob turns and wake return to Main.
   Pages come from the `PAGES` table in `ui.cpp` (name + builder); tiles, dots and the knob
   menu follow it, so adding a page = one builder + one table row (Main stays first).
-  On every page after Main, a tap on empty space slides back to Main (not yet verified on hardware).
+  On every page after Main, a tap on empty space slides back to Main (verified).
+- Main quick segments (verified): Off + Low/Med/High/Max drawn as 5 ring slices inside the
+  RPM arc (non-clickable `lv_arc`s, `SEG_*` constants in `ui.cpp`); taps on the Main tile are
+  mapped to a segment by angle/radius (`seg_at`). A segment is cyan while pressed and while
+  its speed is the current target. RPM arc ends are derived from the band (152° to 28°) to
+  clear the status box. RPM number uses Montserrat 40. How-to: `docs/DISPLAY_GUIDE.md`.
 - Knob menu (verified): short press shows the page names (current one
   highlighted); turn to choose, press again or tap a name to go; tap outside closes. While
   open, knob turns don't change RPM. Standby closes it.

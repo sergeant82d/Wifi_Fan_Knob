@@ -7,7 +7,8 @@
 #include <time.h>
 
 // Main screen (240x240 round) is a horizontal tileview built from PAGES (below); swipe left from Main:
-//   Main:     clock (top) · RPM number (centre) · status box · 270° RPM arc
+//   Main:     RPM arc · band of Off + preset segments inside it (top) · RPM number
+//             (centre) · clock · status box (bottom gap)
 //   Presets:  config presets + OFF (tap sets target, slides back to Main)
 //   Settings: brightness slider (live; saved on release) + network/MQTT info
 // Page dots sit in the arc's bottom gap. Knob turns and wake return to Main.
@@ -75,7 +76,7 @@ static void status_flash_cb(lv_timer_t *) {
 static void create_status_box(lv_obj_t *parent) {
   status_box = lv_obj_create(parent);
   lv_obj_set_size(status_box, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-  lv_obj_align(status_box, LV_ALIGN_CENTER, 0, 72);
+  lv_obj_align(status_box, LV_ALIGN_CENTER, 0, 82);  // In the arc's bottom gap, above the page dots
   lv_obj_clear_flag(status_box, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_set_style_border_width(status_box, 0, 0);
   lv_obj_set_style_radius(status_box, 6, 0);
@@ -177,6 +178,91 @@ void ui_init() {
 }
 
 // ============================================================================
+// QUICK SEGMENTS ON MAIN: Off + presets as ring slices inside the RPM arc
+// ============================================================================
+// Drawn with non-clickable lv_arc slices; taps on the Main tile are matched to a segment
+// by angle and radius (seg_at). Angles are LVGL's: 0 = 3 o'clock, clockwise.
+
+static const int SEG_COUNT = 5;
+static const int SEG_START = 150;   // Left end, just below 9 o'clock
+static const int SEG_SPAN = 48;     // Per segment incl. gap: 5 x 48 = 240°, open at the bottom
+static const int SEG_GAP = 4;
+static const int SEG_R_OUT = 94;    // Inside the RPM ring (inner edge ~102) and its knob
+static const int SEG_R_IN = 60;
+static const char *const seg_text[SEG_COUNT] = {LV_SYMBOL_POWER "\nOff", "Low", "Med", "High", "Max"};
+static lv_obj_t *segs[SEG_COUNT];
+static int seg_pressed = -1;
+static uint16_t seg_target = 0;   // Current target RPM; the matching segment stays lit
+
+static uint16_t seg_rpm(int i) {  // Read at tap time, so Config changes apply
+  const uint16_t rpm[SEG_COUNT] = {0, config.fan.presets.low, config.fan.presets.medium,
+                                   config.fan.presets.high, config.fan.presets.max};
+  return rpm[i];
+}
+
+// Cyan while pressed, and while its speed is the current target (Off when stopped)
+static void seg_highlight() {
+  for (int i = 0; i < SEG_COUNT; i++) {
+    bool lit = i == seg_pressed || seg_rpm(i) == seg_target;
+    lv_color_t c = lit         ? lv_palette_main(LV_PALETTE_CYAN)
+                 : i == 0      ? lv_color_hex(0x8B1E1E)   // Off: dark red
+                               : lv_color_hex(0x4A5058);  // Presets: steel grey
+    lv_obj_set_style_arc_color(segs[i], c, LV_PART_MAIN);
+  }
+}
+
+// Segment under the current touch point, or -1 (6 px slack at the band edges)
+static int seg_at() {
+  lv_point_t p;
+  lv_indev_get_point(lv_indev_get_act(), &p);
+  int dx = p.x - lv_disp_get_hor_res(nullptr) / 2;
+  int dy = p.y - lv_disp_get_ver_res(nullptr) / 2;
+  float r = sqrtf(dx * dx + dy * dy);
+  if (r < SEG_R_IN - 6 || r > SEG_R_OUT + 6) return -1;
+  int a = ((int)lroundf(atan2f(dy, dx) * RAD_TO_DEG) + 360) % 360;
+  int rel = (a - SEG_START + 360) % 360;
+  return rel < SEG_COUNT * SEG_SPAN ? rel / SEG_SPAN : -1;
+}
+
+// Pressed segment lights up; a swipe (PRESS_LOST) or release clears it
+static void seg_press_cb(lv_event_t *e) {
+  seg_pressed = lv_event_get_code(e) == LV_EVENT_PRESSED ? seg_at() : -1;
+  seg_highlight();
+}
+
+static void create_segments(lv_obj_t *tile) {
+  const int label_r = (SEG_R_IN + SEG_R_OUT) / 2;
+  for (int i = 0; i < SEG_COUNT; i++) {
+    int a0 = SEG_START + i * SEG_SPAN + SEG_GAP / 2;
+    int a1 = a0 + SEG_SPAN - SEG_GAP;
+    lv_obj_t *arc = lv_arc_create(tile);
+    lv_obj_set_size(arc, SEG_R_OUT * 2, SEG_R_OUT * 2);
+    lv_obj_center(arc);
+    lv_obj_clear_flag(arc, LV_OBJ_FLAG_CLICKABLE);  // Taps go to the tile (seg_at)
+    lv_obj_set_style_pad_all(arc, 0, 0);
+    lv_arc_set_rotation(arc, 0);
+    lv_arc_set_bg_angles(arc, a0 % 360, a1 % 360);   // Wraps past 360 for the last slice
+    lv_obj_set_style_arc_width(arc, SEG_R_OUT - SEG_R_IN, LV_PART_MAIN);
+    lv_obj_set_style_arc_rounded(arc, false, LV_PART_MAIN);
+    lv_obj_set_style_arc_opa(arc, LV_OPA_TRANSP, LV_PART_INDICATOR);
+    lv_obj_set_style_bg_opa(arc, LV_OPA_TRANSP, LV_PART_KNOB);
+    segs[i] = arc;
+
+    float mid = (a0 + a1) / 2.0f * DEG_TO_RAD;
+    lv_obj_t *label = lv_label_create(tile);
+    lv_obj_set_style_text_font(label, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_color(label, lv_color_white(), 0);
+    lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);  // Off: icon above word
+    lv_label_set_text(label, seg_text[i]);
+    lv_obj_align(label, LV_ALIGN_CENTER, lroundf(label_r * cosf(mid)), lroundf(label_r * sinf(mid)));
+  }
+  seg_highlight();
+  lv_obj_add_event_cb(tile, seg_press_cb, LV_EVENT_PRESSED, nullptr);
+  lv_obj_add_event_cb(tile, seg_press_cb, LV_EVENT_RELEASED, nullptr);
+  lv_obj_add_event_cb(tile, seg_press_cb, LV_EVENT_PRESS_LOST, nullptr);
+}
+
+// ============================================================================
 // DOUBLE-TAP ON MAIN: stop the fan, or say it isn't running
 // ============================================================================
 
@@ -213,6 +299,12 @@ static void show_popup(const char *text, lv_color_t bg) {
 // the arc handles its own touches.
 static void main_tap_cb(lv_event_t *) {
   static unsigned long last_tap = 0;
+  int seg = seg_at();
+  if (seg >= 0) {  // Quick segment: set its speed (not part of a double-tap)
+    last_tap = 0;
+    fan_set_target(seg_rpm(seg));
+    return;
+  }
   unsigned long now = millis();
   if (last_tap != 0 && now - last_tap < 400) {
     last_tap = 0;
@@ -231,13 +323,14 @@ static void main_tap_cb(lv_event_t *) {
 static void create_main_page(lv_obj_t *scr) {
   lv_obj_add_event_cb(scr, main_tap_cb, LV_EVENT_CLICKED, nullptr);
 
-  // RPM arc: 270° sweep with the gap at the bottom. Drag along the ring to set speed
+  // RPM arc: ends level with the bottom edges of the outer segments (Off, Max), leaving
+  // the gap at the bottom clear of the status box. Drag along the ring to set speed
   // (arc only hit-tests on the ring, so swipes in the middle still change pages).
   rpm_arc = lv_arc_create(scr);
   lv_obj_set_size(rpm_arc, 228, 228);
   lv_obj_center(rpm_arc);
-  lv_arc_set_rotation(rpm_arc, 135);
-  lv_arc_set_bg_angles(rpm_arc, 0, 270);
+  lv_arc_set_rotation(rpm_arc, SEG_START + SEG_GAP / 2);                  // 152°
+  lv_arc_set_bg_angles(rpm_arc, 0, SEG_COUNT * SEG_SPAN - SEG_GAP);        // 236° sweep
   lv_arc_set_range(rpm_arc, config.fan.minRpm, config.fan.maxRpm);
   lv_arc_set_value(rpm_arc, config.fan.minRpm);
   // Ring-only touch: ADV_HITTEST makes LVGL use the arc's ring hit test (off by default,
@@ -256,20 +349,22 @@ static void create_main_page(lv_obj_t *scr) {
   lv_obj_set_style_text_font(clock_label, &lv_font_montserrat_20, 0);
   lv_obj_set_style_text_color(clock_label, lv_color_hex(0xB0B0B0), 0);
   lv_label_set_text(clock_label, "--:--");
-  lv_obj_align(clock_label, LV_ALIGN_CENTER, 0, -58);
+  lv_obj_align(clock_label, LV_ALIGN_CENTER, 0, 50);
 
   rpm_label = lv_label_create(scr);
-  lv_obj_set_style_text_font(rpm_label, &lv_font_montserrat_48, 0);
+  lv_obj_set_style_text_font(rpm_label, &lv_font_montserrat_40, 0);  // 48 crowded the Off/Max segments
   lv_obj_set_style_text_color(rpm_label, lv_color_white(), 0);
   lv_obj_align(rpm_label, LV_ALIGN_CENTER, 0, -4);
 
   lv_obj_t *unit_label = lv_label_create(scr);
   lv_obj_set_style_text_font(unit_label, &lv_font_montserrat_14, 0);
   lv_obj_set_style_text_color(unit_label, lv_color_hex(0x808080), 0);
-  lv_label_set_text(unit_label, "RPM target");
-  lv_obj_align(unit_label, LV_ALIGN_CENTER, 0, 30);
+  lv_label_set_text(unit_label, "RPM");
+  lv_obj_align(unit_label, LV_ALIGN_CENTER, 0, 28);
 
   create_status_box(scr);
+
+  create_segments(scr);
 }
 
 // ============================================================================
@@ -514,6 +609,8 @@ void ui_update() {
 }
 
 void ui_set_target_rpm(uint16_t rpm) {
+  seg_target = rpm;
+  seg_highlight();
   lv_arc_set_value(rpm_arc, rpm);
   lv_label_set_text_fmt(rpm_label, "%u", rpm);
 }
