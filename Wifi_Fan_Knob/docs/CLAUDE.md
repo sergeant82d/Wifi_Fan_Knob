@@ -148,7 +148,7 @@ See `platformio.ini`. Libraries:
 - WiFi: hotspot (`WiFi-Fan-Knob-xxxxxx`) turns off once the saved network is joined; comes back if
   that network is lost for 60 s. Hotspot password (`config.wifi.apPassword`, default 12345678,
   8-63 chars) set on WiFi tab; applies next time hotspot starts. `/api/status` reports `hotspot_on`.
-- Time zones (worldwide): page embeds posix_tz_db (MIT, 461 IANA zones -> POSIX rules) with a
+- Time zones (worldwide, verified on hardware): page embeds posix_tz_db (MIT, 461 IANA zones -> POSIX rules) with a
   search box and "Use this browser's time zone". Config stores `display.timezone` (IANA name,
   for the UI) and `display.posixTz` (applied via setenv/tzset and `configTzTime`). Old US codes
   ("CST" etc.) are migrated on load (`migrateLegacyTimezone()` in config.cpp). Server checks
