@@ -359,6 +359,9 @@ STANDBY (1)
   GC9A01 example and how to adapt it to other boards.
 - **GitHub link on the web page** — add a link to the project's GitHub repository at the
   bottom of the Home tab (`web/index.html`).
+- **FAN OFF button icon on Android** — the power button icon (⏻) does not render on Android
+  phones. Check browser compatibility for the Unicode character and consider a fallback text
+  label or SVG icon.
 
 ---
 
