@@ -24,6 +24,7 @@ Some things need no code at all. They're on the web page:
 | Setting | Web page tab |
 |---|---|
 | LCD brightness | Home |
+| Fan max RPM (top of the arc, knob and all speed controls) | Config → Fan Presets |
 | Preset speeds (Low / Med / High / Max) | Config → Fan Presets |
 | 12 / 24-hour clock, time zone | Config |
 | Screensaver delay (0 = off) | Config → Display & Interface |

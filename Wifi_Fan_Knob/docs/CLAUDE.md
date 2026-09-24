@@ -180,6 +180,10 @@ See `platformio.ini`. Libraries:
   fan (target 0, red "Fan stopped" popup) or show "Fan is not running"; popup 1.5 s.
   Status box bubbles its taps to the page; the arc keeps its own touches.
 - LCD pages are now Main + Settings (the Presets page was dropped: Main's segments replace it).
+- Fan max RPM editable on the web (Config -> Fan Presets, `fan_max_rpm`, rpmStep..20000;
+  `config.fan.maxRpm`, default 2500): limits knob, LCD arc (range synced in ui_update), web
+  slider, presets and HA (discovery republished on the post-save MQTT reconnect). A running
+  target above the new max is re-clamped.
 - Preset speeds editable on the web (Config -> Fan Presets): `preset_low/medium/high/max` in
   `POST /api/config`, each within minRpm..maxRpm and in order Low <= Med <= High <= Max;
   `/api/config` returns `fan.presets`. Home tab preset buttons are filled from them. The LCD

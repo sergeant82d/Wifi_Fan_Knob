@@ -93,12 +93,17 @@ static String apply_config_form(AsyncWebServerRequest *request) {
   if (min_pwm > max_pwm) return "Min PWM must not exceed Max PWM";
   if (!form_int(request, "mqtt_port", 1, 65535, mqtt_port)) return "MQTT port must be 1-65535";
   if (!form_int(request, "screensaver_sec", 0, 3600, saver_sec)) return "Screensaver delay must be 0-3600 seconds";
+  // Fan's rated top speed; everything else (presets, knob, arc, web, HA) is limited to it
+  long max_rpm;
+  if (!form_int(request, "fan_max_rpm", config.fan.minRpm + config.fan.rpmStep, 20000, max_rpm)) {
+    return "Fan max RPM must be " + String(config.fan.minRpm + config.fan.rpmStep) + "-20000";
+  }
   // Preset speeds: within the fan's range and in order (they sit in order along the LCD arc)
   long presets[4];
   const char *preset_fields[4] = {"preset_low", "preset_medium", "preset_high", "preset_max"};
   for (int i = 0; i < 4; i++) {
-    if (!form_int(request, preset_fields[i], config.fan.minRpm, config.fan.maxRpm, presets[i])) {
-      return "Presets must be " + String(config.fan.minRpm) + "-" + String(config.fan.maxRpm) + " RPM";
+    if (!form_int(request, preset_fields[i], config.fan.minRpm, max_rpm, presets[i])) {
+      return "Presets must be " + String(config.fan.minRpm) + "-" + String(max_rpm) + " RPM";
     }
     if (i > 0 && presets[i] < presets[i - 1]) return "Presets must be in order: Low <= Med <= High <= Max";
   }
@@ -117,6 +122,8 @@ static String apply_config_form(AsyncWebServerRequest *request) {
   strlcpy(config.display.timeFormat, fmt.c_str(), sizeof(config.display.timeFormat));
   config.fan.calibration.minPwm = min_pwm;
   config.fan.calibration.maxPwm = max_pwm;
+  config.fan.maxRpm = max_rpm;
+  fan_set_target(fan_get_target());  // Re-clamp a running speed to the new limit
   config.fan.presets.low = presets[0];
   config.fan.presets.medium = presets[1];
   config.fan.presets.high = presets[2];

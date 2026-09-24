@@ -652,9 +652,14 @@
                 <div class="status-card">
                     <h3>Fan Presets</h3>
                     <p style="color: #a0a0a0; margin-bottom: 15px; font-size: 0.9rem;">
-                        Speeds for the Low / Med / High / Max buttons here and on the LCD.
-                        Must be in order, within <span id="preset-range">the fan's range</span>.
+                        Fan max RPM is your fan's rated top speed: the knob, LCD arc, speed slider and
+                        Home Assistant are limited to it. Presets are the speeds for the Low / Med / High / Max
+                        buttons here and on the LCD; they must be in order and no higher than the max.
                     </p>
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label for="fan-max-rpm">Fan max RPM</label>
+                        <input type="number" id="fan-max-rpm" min="100" max="20000" required>
+                    </div>
                     <div class="form-grid">
                         <div class="form-group">
                             <label for="preset-low">Low (RPM)</label>
@@ -1048,6 +1053,7 @@
                 document.getElementById('time-format').value = c.display.timeFormat;
                 document.getElementById('fan-min-pwm').value = c.fan.calibration.minPwm;
                 document.getElementById('fan-max-pwm').value = c.fan.calibration.maxPwm;
+                document.getElementById('fan-max-rpm').value = c.fan.maxRpm;
                 ['low', 'medium', 'high', 'max'].forEach(k => {
                     const rpm = c.fan.presets[k];
                     document.getElementById('preset-' + k).value = rpm;
@@ -1103,11 +1109,8 @@
                 set('speed-range', s.min_rpm + '-' + s.max_rpm);
                 const slider = document.getElementById('speed-slider');
                 slider.min = s.min_rpm;
-                set('preset-range', s.min_rpm + '-' + s.max_rpm + ' RPM');
                 ['low', 'medium', 'high', 'max'].forEach(k => {
-                    const input = document.getElementById('preset-' + k);
-                    input.min = s.min_rpm;
-                    input.max = s.max_rpm;
+                    document.getElementById('preset-' + k).min = s.min_rpm;
                 });
                 slider.max = s.max_rpm;
                 slider.step = s.rpm_step;
@@ -1146,6 +1149,7 @@
                     time_format: v('time-format'),
                     min_pwm: v('fan-min-pwm'),
                     max_pwm: v('fan-max-pwm'),
+                    fan_max_rpm: v('fan-max-rpm'),
                     preset_low: v('preset-low'),
                     preset_medium: v('preset-medium'),
                     preset_high: v('preset-high'),

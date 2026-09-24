@@ -572,6 +572,9 @@ void ui_set_standby(bool standby) {
 
 void ui_update() {
   seg_highlight();  // Presets may have been changed on the web page
+  if (lv_arc_get_max_value(rpm_arc) != config.fan.maxRpm) {  // Fan max RPM changed on the web page
+    lv_arc_set_range(rpm_arc, config.fan.minRpm, config.fan.maxRpm);
+  }
   // Brightness may have been changed on the web page (leave it alone while dragged)
   if (lv_slider_get_value(brightness_slider) != config.display.brightness && !lv_slider_is_dragged(brightness_slider)) {
     lv_slider_set_value(brightness_slider, config.display.brightness, LV_ANIM_OFF);

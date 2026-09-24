@@ -445,6 +445,7 @@ String getConfigAsJson() {
   doc["fan"]["presets"]["medium"] = config.fan.presets.medium;
   doc["fan"]["presets"]["high"] = config.fan.presets.high;
   doc["fan"]["presets"]["max"] = config.fan.presets.max;
+  doc["fan"]["maxRpm"] = config.fan.maxRpm;
 
   doc["power"]["activeHigh"] = config.power.activeHigh;
 
