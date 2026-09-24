@@ -225,8 +225,8 @@ See `platformio.ini`. Libraries:
   Firmware 3.3 MB of the 6.5 MB OTA slot. In standby/screensaver `loop()` renders eye frames
   instead of running LVGL and polls touch directly.
   Sleeping eye (standby only, `eye_set_sleeping()` from `set_standby()`): lids close over 2 s,
-  stay shut 4-12 s, then a twitch (65%: opens 15-35% for 0.3-0.5 s) or a peek (opens 40-70%,
-  holds 1-3 s, closes slowly). While fully shut nothing is redrawn: measured 12-69 draws per
+  stay shut 3.5-10 s, then a twitch (50%: opens 20-45% for 0.4-0.7 s) or a peek (opens
+  50-85%, holds 1.5-4 s, closes slowly; tuned 2026-09-24 after hardware review). While fully shut nothing is redrawn: measured 12-69 draws per
   10 s in standby vs ~150 awake at 15 fps. Standby backlight = `config.display.standbyBrightness`
   (web Config -> Display & Interface, 0-100 %, default 10, 0 = off; replaced STANDBY_BRIGHTNESS). Touch wake only after the screen has read "no touch" once (`standby_touch_armed`):
   pressing the knob also touches the glass. Each wake logs its cause (`Wake: button/knob/touch/

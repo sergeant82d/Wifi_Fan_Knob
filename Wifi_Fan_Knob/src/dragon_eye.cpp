@@ -210,7 +210,7 @@ void eye_begin(lgfx::LGFX_Device *display) {
 }
 
 // ============================================================================
-// SLEEPING (standby): lids close slowly, stay shut 4-12 s, then twitch (brief flicker)
+// SLEEPING (standby): lids close slowly, stay shut 3.5-10 s, then twitch (brief flicker)
 // or peek (open part way, look around, close). Openness 0 = shut, 1 = normal.
 // ============================================================================
 
@@ -244,19 +244,19 @@ static float sleep_openness() {
       case SLEEP_CLOSING:
       case SLEEP_TWITCH:
       case SLEEP_PEEK_CLOSE:
-        sleep_phase_set(SLEEP_CLOSED, random(4000, 12000));
+        sleep_phase_set(SLEEP_CLOSED, random(3500, 10000));
         break;
       case SLEEP_CLOSED:
-        if (random(100) < 65) {
-          peek_open = random(15, 35) / 100.0f;
-          sleep_phase_set(SLEEP_TWITCH, random(300, 500));
+        if (random(100) < 50) {
+          peek_open = random(20, 45) / 100.0f;
+          sleep_phase_set(SLEEP_TWITCH, random(400, 700));
         } else {
-          peek_open = random(40, 70) / 100.0f;
+          peek_open = random(50, 85) / 100.0f;
           sleep_phase_set(SLEEP_PEEK_OPEN, random(900, 1500));
         }
         break;
       case SLEEP_PEEK_OPEN:
-        sleep_phase_set(SLEEP_PEEK_HOLD, random(1000, 3000));
+        sleep_phase_set(SLEEP_PEEK_HOLD, random(1500, 4000));
         break;
       case SLEEP_PEEK_HOLD:
         sleep_phase_set(SLEEP_PEEK_CLOSE, random(1200, 2000));
