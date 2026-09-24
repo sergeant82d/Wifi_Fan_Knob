@@ -453,6 +453,10 @@ static void note_activity() {
   last_activity = millis();
 }
 
+bool power_screensaver_on() {
+  return saver_on;
+}
+
 static bool eye_showing() {
   return saver_on || power_is_standby();
 }

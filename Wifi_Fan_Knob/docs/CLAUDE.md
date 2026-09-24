@@ -197,6 +197,7 @@ See `platformio.ini`. Libraries:
   unchanged. Touch, knob turn or short press only dismiss it; long press still -> standby;
   a web/MQTT speed change dismisses it. Standby clears it and shows the eye itself.
   Verified: starts 30 s after boot. Dismissal paths not yet verified on hardware.
+  `/api/status` power_mode is "Active (screensaver)" while it shows (`power_screensaver_on()`).
 - Standby (`power.h`, verified): knob button held 1 s (fires while held) or web Standby/Wake
   button (`POST /api/standby`, login). Dims backlight to 10% and loads a standby screen (large
   grey clock) and sets fan target to 0. Any touch, knob turn or button press wakes (fan stays 0);
@@ -396,6 +397,11 @@ STANDBY (1)
   extract as standalone project — break out all dragon eye code, display config, and setup steps
   into a semi-universal project that works with any LovyanGFX-compatible display. Document the
   GC9A01 example and how to adapt it to other boards.
+- **Screensaver on the web / Home Assistant** — the web Home tab now shows "Active
+  (screensaver)" in Power Mode while the eye is up (done, `/api/status` power_mode). Options
+  not taken yet: (2) a web "Screensaver" / "Wake display" button next to Standby (login), to
+  start or dismiss the eye remotely; (3) a Home Assistant "Screensaver" binary_sensor (or a
+  switch, if (2) is done) for automations, e.g. dim the bench lights when the knob goes idle.
 
 ---
 
