@@ -117,6 +117,8 @@ class LGFX : public lgfx::LGFX_Device {
 
 LGFX gfx;
 
+#include "dragon_eye.h"  // Standby animation, draws straight to gfx
+
 // ============================================================================
 // LVGL BUFFER & DISPLAY CALLBACK
 // ============================================================================
@@ -418,6 +420,7 @@ void applyPowerSettings() {
 // ============================================================================
 
 static volatile int8_t standby_request = -1;  // -1 none, 0 wake, 1 standby
+static bool standby_touch_armed = false;      // Set once no touch is seen in standby
 
 void power_request_standby(bool standby) {
   standby_request = standby ? 1 : 0;
@@ -432,6 +435,7 @@ static void set_standby(bool standby) {
   if (standby == power_is_standby()) return;
   current_state = standby ? STATE_STANDBY : STATE_ACTIVE;
   if (standby) {
+    standby_touch_armed = false;  // Ignore the touch that came with the knob press
     fan_set_target(0);  // Standby stops the fan; waking leaves it at 0
     set_peripheral_power(false);
     fan_power_lost();
@@ -500,6 +504,7 @@ void setup() {
   // Display & LVGL
   Serial.println("Initializing display...");
   gfx.init();
+  eye_begin(&gfx);
   gfx.setColorDepth(16);
   gfx.fillScreen(TFT_BLACK);
   gfx.setTextColor(TFT_WHITE);
@@ -597,6 +602,7 @@ void loop() {
   encoder_count = 0;
   portEXIT_CRITICAL(&encoder_mux);
   if (delta != 0 && power_is_standby()) {
+    Serial.printf("Wake: knob (%ld)\n", (long)delta);
     power_request_standby(false);  // Turning the knob wakes; this turn is discarded
   } else if (delta != 0) {
     // Knob sets target RPM (fan_control clamps to config range)
@@ -622,6 +628,7 @@ void loop() {
     press_start = millis();
     press_handled = false;
     if (power_is_standby()) {
+      Serial.println("Wake: button");
       power_request_standby(false);
       press_handled = true;  // Waking consumes this press
     }
@@ -653,10 +660,34 @@ void loop() {
     ui_update();
   }
 
-  // LVGL tick
-  lv_tick_inc(5);
-  lv_task_handler();
+  if (power_is_standby()) {
+    // Standby: dragon eye owns the display; LVGL (and its touch read) is paused,
+    // so poll touch directly to wake. LVGL redraws Main when the screen reloads.
+    eye_frame();
+    // Wake only on a NEW touch: pressing the knob puts a finger on the glass,
+    // so the touch that accompanied the long press must lift first.
+    uint16_t tx, ty;
+    bool touching = touch_ok && read_touch(tx, ty);
+    if (!touching) {
+      standby_touch_armed = true;
+    } else if (standby_touch_armed) {
+      Serial.printf("Wake: touch %u,%u\n", tx, ty);
+      power_request_standby(false);
+    }
 
-  delay(5);
+    static uint32_t eye_frames = 0, eye_fps_start = 0;
+    eye_frames++;
+    if (millis() - eye_fps_start >= 10000) {
+      if (eye_fps_start) Serial.printf("[EYE] %lu fps\n", eye_frames * 1000UL / (millis() - eye_fps_start));
+      eye_frames = 0;
+      eye_fps_start = millis();
+    }
+  } else {
+    // LVGL tick
+    lv_tick_inc(5);
+    lv_task_handler();
+
+    delay(5);
+  }
 }
 

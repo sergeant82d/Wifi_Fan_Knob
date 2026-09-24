@@ -24,7 +24,10 @@ void fan_power_lost() {
 void fan_set_target(int32_t rpm) {
   target_rpm = constrain(rpm, (int32_t)config.fan.minRpm, (int32_t)config.fan.maxRpm);
   // Fan only runs when awake: a non-zero target (web, MQTT) wakes from standby
-  if (target_rpm > 0 && power_is_standby()) power_request_standby(false);
+  if (target_rpm > 0 && power_is_standby()) {
+    Serial.println("Wake: fan target set (web/MQTT)");
+    power_request_standby(false);
+  }
 }
 
 uint16_t fan_get_target() {

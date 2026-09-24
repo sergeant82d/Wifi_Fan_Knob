@@ -157,6 +157,15 @@ See `platformio.ini`. Libraries:
   grey clock) and sets fan target to 0. Any touch, knob turn or button press wakes (fan stays 0);
   the waking input is discarded. A web fan speed > 0 while in standby also wakes.
   Requests from web/touch are flags applied in `loop()` (LVGL not thread-safe). No light sleep yet.
+- Dragon eye standby screen (verified, ~62 fps): `dragon_eye.cpp` ports Adafruit "Uncanny Eyes"
+  (MIT, Phil Burgess; via Bodmer's TFT_eSPI example) to LovyanGFX. Data: `include/eyes/
+  dragonEye.h` (unmodified tables, ~260 KB flash). Single eye, symmetrical lids, 128x128 drawn
+  at 2x and cropped to 240x240; one frame per `eye_frame()` call (original's blocking iris loop
+  replaced). In standby `loop()` renders eye frames instead of running LVGL and polls touch
+  directly. Touch wake only after the screen has read "no touch" once (`standby_touch_armed`):
+  pressing the knob also touches the glass. Each wake logs its cause (`Wake: button/knob/touch/
+  fan target`).
+- `include/ui.h` standby LVGL screen (grey clock) still exists but is no longer shown.
 - Peripheral power switch (verified): GPIO 4 drives a transistor that powers everything except
   MCU/LCD (fan, lights, sensors, EMC2101). ON while awake, OFF in standby; Fan Off only sets
   target/PWM 0. ON level configurable (`config.power.activeHigh`, Config tab, default HIGH;
@@ -326,13 +335,19 @@ STANDBY (1)
 ## Next Steps
 
 1. `fan_control.cpp`: EMC2101 PWM + tach once the module arrives (target RPM already wired)
-2. Dragon-eye animation on the standby screen; light sleep in standby
+2. Light sleep / throttling in standby (see dragon eye upgrades)
 3. Knob short press → menu (currently only logged)
 4. MQTT: add actual RPM sensor once the EMC2101 reads tach
 5. Calibration UI, audio, field testing
 6. GPIO 2 role on non-USB power (see Hardware Reference)
 
 ### Later (user notes)
+- **Dragon eye upgrades (re-look after project is complete)** — current version works as
+  agreed. Candidates: full 240x240 graphics (regenerate tables with Adafruit's tablegen from the
+  source images) instead of 2x pixel doubling; "sleeping" behaviour (mostly closed / twitching /
+  peeking, opening on approach); own standby brightness (currently 10%, dim for the eye);
+  throttled frame rate or light sleep between frames (renders flat out at ~62 fps now);
+  other eye styles (Uncanny Eyes has several); revisit wake gestures (knob press = glass touch).
 - **Worldwide time zones** (Config tab): currently US zones + UTC only (`posix_tz()` in
   `main.cpp`, validated list in `webserver.cpp`). Non-US users need a full list. Likely approach:
   page offers IANA zone names (e.g. a searchable list) and sends the matching POSIX TZ string;
