@@ -31,9 +31,7 @@ For the technical details of each feature, see `CLAUDE.md`. For changing the scr
 - **Browser kept running an old copy of the page after a firmware update:** the board now tells browsers not to keep a stored copy.
 - **One-off WiFi driver crash** on the first boot after a flash (inside Espressif's precompiled WiFi code). Not seen again in 6 restarts or during testing; watching for it.
 
-## In progress
-
-- **Startup crash (knob interrupts):** the knob now uses the chip's hardware encoder counter instead of pin interrupts, which removes the code path every recorded crash came from. Flashed; a 60-restart test is running. Before the change, 60 restarts gave 0 crashes (yesterday: 4 in 40), so the test can confirm reliability but not the rate. **Needs a hand check of the knob:** direction, one step per click, short and long press.
+- **Startup crash (fixed):** about 1 boot in 10 yesterday crashed while the knob's interrupts were set up. The knob now uses the chip's hardware encoder counter instead of pin interrupts, which removes the code path every recorded crash came from. 60 of 60 restarts clean, and the knob checked by hand (direction, one step per click, short and long press, fast spinning). The "before" test today was also 0 of 60, so this shows reliability rather than a measured improvement.
 
 ## Decisions made
 

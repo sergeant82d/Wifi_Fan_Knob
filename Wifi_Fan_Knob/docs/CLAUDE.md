@@ -104,7 +104,7 @@ https://github.com/Elecrow-RD/CrowPanel-1.28inch-HMI-ESP32-Rotary-Display-240-24
 | Touch SDA / SCL | 6 / 7 | |
 | Touch INT / RST | 5 / 13 | |
 | Main I2C SDA / SCL | 38 / 39 | EMC2101 (0x4C) + optional OLED |
-| Encoder A / B / SW | 45 / 42 / 41 | Interrupts on A and B; SW active-low |
+| Encoder A / B / SW | 45 / 42 / 41 | A/B decoded by PCNT hardware (no interrupts); SW polled, active-low |
 | Power Light | 40 | Elecrow drives it LOW |
 | RGB LED Data | 48 | |
 
@@ -289,14 +289,24 @@ See `platformio.ini`. Libraries:
 - **First boot `task_wdt: esp_task_wdt_reset(763): task not found` spam**: expected once.
   `SPIFFS.begin(true)` formats an empty partition, and `SPIFFS::format()` removes the
   core-0 idle task from the WDT during the format. Stops when format completes.
-- **Boot panic in `attachInterrupt()` (KNOWN ISSUE, parked 2026-09-23)** — see
-  "Known issue: ipc1 boot panic" section below for evidence, repro and candidate fixes.
+- **Boot panic in `attachInterrupt()` (FIXED 2026-09-24)** — the firmware no longer uses GPIO
+  interrupts; see "Resolved: ipc1 boot panic" below. Don't reintroduce `attachInterrupt()`
+  (or anything that installs the GPIO ISR service) without reading it.
 - `config.system.deepSleepEnabled` name predates the light-sleep decision; not renamed
   (would change the config JSON format).
 
 ---
 
-## Known issue: ipc1 boot panic (parked)
+## Resolved: ipc1 boot panic (fixed 2026-09-24)
+
+**Fix**: the knob no longer uses GPIO interrupts. A/B are decoded by the PCNT hardware counter
+(`init_encoder()` / `encoder_read_detents()` in `main.cpp`: x4 quadrature, 4 counts per detent,
+1 us glitch filter, no event callbacks so no interrupt is allocated); the button is polled with
+a 20 ms debounce (`poll_button()`). Nothing installs the GPIO ISR service now, so the ipc1 call
+that overflowed never runs. Verified: 60 of 60 boots clean; knob direction, one step per click,
+short/long press and fast spinning checked by hand. Caveat: the "before" run on the same day was
+also 0 of 60 (the 4 of 40 were during flash-and-reset testing), so the evidence for the fix is
+that the only crash path is gone, not a measured rate. The original analysis follows.
 
 **Symptom**: `Guru Meditation Error: Core 1 panic'ed (Unhandled debug exception)` early in boot,
 then an automatic reboot that succeeds. Never seen after boot completes.
@@ -326,7 +336,7 @@ python -m esp_coredump --chip esp32s3 info_corefile --core coredump.bin --core-f
 ```
 The ELF must be the exact build that crashed.
 
-**Candidate fixes** (cheapest first; measure each with the repro loop, e.g. 0 in 100 boots):
+**Candidate fixes considered** (the PCNT change above replaced all of them):
 1. Attach encoder/button interrupts first in `setup()`, before USB CDC output, display SPI DMA,
    WiFi and I2C are active (fewer interrupt sources during the IPC call).
 2. Call `gpio_install_isr_service()` ourselves at the very top of `setup()` so the IPC

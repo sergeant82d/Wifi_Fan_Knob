@@ -119,6 +119,7 @@ LGFX gfx;
 
 #include "dragon_eye.h"  // Standby/screensaver eye, draws straight to gfx
 #include "eye_styles.h"
+#include <driver/pulse_cnt.h>
 
 // ============================================================================
 // LVGL BUFFER & DISPLAY CALLBACK
@@ -210,53 +211,83 @@ void touchpad_read(lv_indev_drv_t *indev_drv, lv_indev_data_t *data) {
 // ENCODER & BUTTON HANDLING
 // ============================================================================
 
-// Quadrature decoding adapted from Elecrow's RotaryScreen_1_28 example.
-// encoder_count holds whole detents (4 valid transitions each).
-volatile int32_t encoder_count = 0;
-volatile int8_t encoder_quarter_steps = 0;
-volatile uint8_t encoder_last_state = 0;
-volatile bool encoder_button_pressed = false;
-portMUX_TYPE encoder_mux = portMUX_INITIALIZER_UNLOCKED;
-
-// Index = (last_state << 2) | current_state, with A = bit1, B = bit0.
-// Invalid (skipped) transitions and no-change map to 0.
-DRAM_ATTR static const int8_t encoder_transition_table[16] = {
-   0, -1,  1,  0,
-   1,  0,  0, -1,
-  -1,  0,  0,  1,
-   0,  1, -1,  0
-};
+// Knob: quadrature decoded by the PCNT hardware counter, not GPIO interrupts. Every A/B
+// edge counts (4 per detent); direction as in Elecrow's example (A leading = +1).
+// Why no interrupts: attachInterrupt() installs the SDK's GPIO ISR service from the ipc1
+// task, whose 1 KB stack (fixed in the prebuilt SDK) overflowed on ~1 in 10 boots when
+// another interrupt landed mid-install. PCNT needs no interrupt (no event callbacks).
+// The button is polled in loop() with a debounce.
+static pcnt_unit_handle_t encoder_unit = nullptr;
+static const int ENCODER_PCNT_LIMIT = 30000;  // Counter returns to 0 here; unwrapped below
+static bool encoder_button_pressed = false;   // Debounced press latched by poll_button()
 
 const unsigned long BUTTON_DEBOUNCE_MS = 20;
 
-void IRAM_ATTR encoder_isr() {
-  uint8_t current_state = ((uint8_t)digitalRead(ENCODER_A_PIN) << 1) |
-                          (uint8_t)digitalRead(ENCODER_B_PIN);
-  int8_t movement = encoder_transition_table[(encoder_last_state << 2) | current_state];
-
-  portENTER_CRITICAL_ISR(&encoder_mux);
-  encoder_last_state = current_state;
-  if (movement != 0) {
-    encoder_quarter_steps += movement;
-    if (encoder_quarter_steps >= 4) {
-      encoder_count++;
-      encoder_quarter_steps -= 4;
-    } else if (encoder_quarter_steps <= -4) {
-      encoder_count--;
-      encoder_quarter_steps += 4;
-    }
-  }
-  portEXIT_CRITICAL_ISR(&encoder_mux);
+static bool pcnt_ok(esp_err_t err, const char *what) {
+  if (err != ESP_OK) Serial.printf("ERROR: encoder %s: %s\n", what, esp_err_to_name(err));
+  return err == ESP_OK;
 }
 
-// Latches a press on a debounced falling edge; loop() clears it
-void IRAM_ATTR button_isr() {
-  static unsigned long last_interrupt_time = 0;
-  unsigned long now = millis();
-  if (now - last_interrupt_time > BUTTON_DEBOUNCE_MS && !digitalRead(ENCODER_SW_PIN)) {
-    encoder_button_pressed = true;
+static void init_encoder() {
+  pcnt_unit_config_t unit_cfg = {};
+  unit_cfg.low_limit = -ENCODER_PCNT_LIMIT;
+  unit_cfg.high_limit = ENCODER_PCNT_LIMIT;
+  if (!pcnt_ok(pcnt_new_unit(&unit_cfg, &encoder_unit), "unit")) {
+    encoder_unit = nullptr;
+    return;
   }
-  last_interrupt_time = now;
+  pcnt_glitch_filter_config_t filter = {};
+  filter.max_glitch_ns = 1000;  // Ignore contact bounce shorter than 1 us
+  pcnt_ok(pcnt_unit_set_glitch_filter(encoder_unit, &filter), "filter");
+
+  // Standard x4 quadrature (as ESP-IDF's rotary encoder example): each channel counts
+  // one pin's edges, direction set by the other pin's level
+  pcnt_chan_config_t a_cfg = {};
+  a_cfg.edge_gpio_num = ENCODER_A_PIN;
+  a_cfg.level_gpio_num = ENCODER_B_PIN;
+  pcnt_chan_config_t b_cfg = {};
+  b_cfg.edge_gpio_num = ENCODER_B_PIN;
+  b_cfg.level_gpio_num = ENCODER_A_PIN;
+  pcnt_channel_handle_t chan_a = nullptr, chan_b = nullptr;
+  pcnt_ok(pcnt_new_channel(encoder_unit, &a_cfg, &chan_a), "channel A");
+  pcnt_ok(pcnt_new_channel(encoder_unit, &b_cfg, &chan_b), "channel B");
+  pcnt_channel_set_edge_action(chan_a, PCNT_CHANNEL_EDGE_ACTION_DECREASE, PCNT_CHANNEL_EDGE_ACTION_INCREASE);
+  pcnt_channel_set_level_action(chan_a, PCNT_CHANNEL_LEVEL_ACTION_KEEP, PCNT_CHANNEL_LEVEL_ACTION_INVERSE);
+  pcnt_channel_set_edge_action(chan_b, PCNT_CHANNEL_EDGE_ACTION_INCREASE, PCNT_CHANNEL_EDGE_ACTION_DECREASE);
+  pcnt_channel_set_level_action(chan_b, PCNT_CHANNEL_LEVEL_ACTION_KEEP, PCNT_CHANNEL_LEVEL_ACTION_INVERSE);
+
+  pcnt_ok(pcnt_unit_enable(encoder_unit), "enable");
+  pcnt_ok(pcnt_unit_clear_count(encoder_unit), "clear");
+  pcnt_ok(pcnt_unit_start(encoder_unit), "start");
+}
+
+// Whole detents turned since the last call (part-turns carry over)
+static int32_t encoder_read_detents() {
+  static int last = 0, quarters = 0;
+  int count = 0;
+  if (!encoder_unit || pcnt_unit_get_count(encoder_unit, &count) != ESP_OK) return 0;
+  int diff = count - last;
+  last = count;
+  if (diff > ENCODER_PCNT_LIMIT / 2) diff -= ENCODER_PCNT_LIMIT;       // Wrapped at a limit
+  else if (diff < -ENCODER_PCNT_LIMIT / 2) diff += ENCODER_PCNT_LIMIT;
+  quarters += diff;
+  int32_t detents = quarters / 4;
+  quarters -= detents * 4;
+  return detents;
+}
+
+// Latches a press once the button has read low for BUTTON_DEBOUNCE_MS; loop() clears it
+static void poll_button() {
+  static bool raw_last = false, stable = false;
+  static unsigned long changed_at = 0;
+  bool raw = digitalRead(ENCODER_SW_PIN) == LOW;
+  if (raw != raw_last) {
+    raw_last = raw;
+    changed_at = millis();
+  } else if (raw != stable && millis() - changed_at >= BUTTON_DEBOUNCE_MS) {
+    stable = raw;
+    if (stable) encoder_button_pressed = true;
+  }
 }
 
 // ============================================================================
@@ -583,11 +614,7 @@ void setup() {
 
   // Encoder Input
   Serial.println("Initializing encoder...");
-  encoder_last_state = ((uint8_t)digitalRead(ENCODER_A_PIN) << 1) |
-                       (uint8_t)digitalRead(ENCODER_B_PIN);
-  attachInterrupt(ENCODER_A_PIN, encoder_isr, CHANGE);
-  attachInterrupt(ENCODER_B_PIN, encoder_isr, CHANGE);
-  attachInterrupt(ENCODER_SW_PIN, button_isr, CHANGE);
+  init_encoder();  // PCNT hardware counter; button is polled (no GPIO interrupts)
 
 // ============================================================================
 // CONFIGURATION & SPIFFS
@@ -644,10 +671,8 @@ void loop() {
   }
 
   // Handle encoder rotation
-  portENTER_CRITICAL(&encoder_mux);
-  int32_t delta = encoder_count;
-  encoder_count = 0;
-  portEXIT_CRITICAL(&encoder_mux);
+  int32_t delta = encoder_read_detents();
+  poll_button();
   if (delta != 0) note_activity();
   if (delta != 0 && power_is_standby()) {
     Serial.printf("Wake: knob (%ld)\n", (long)delta);
