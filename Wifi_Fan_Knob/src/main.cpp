@@ -361,15 +361,6 @@ void init_wifi() {
 
 // Starts the background SNTP client; it re-syncs every NTP_SYNC_INTERVAL
 // on its own, so nothing here blocks.
-// POSIX TZ string for the web UI's time zone choices (US zones observe DST)
-static const char *posix_tz(const char *tz) {
-  if (!strcmp(tz, "EST")) return "EST5EDT,M3.2.0,M11.1.0";
-  if (!strcmp(tz, "CST")) return "CST6CDT,M3.2.0,M11.1.0";
-  if (!strcmp(tz, "MST")) return "MST7MDT,M3.2.0,M11.1.0";
-  if (!strcmp(tz, "PST")) return "PST8PDT,M3.2.0,M11.1.0";
-  return "UTC0";
-}
-
 // Apply saved brightness and time zone (boot, and after Config tab save)
 const uint8_t STANDBY_BRIGHTNESS = 10;  // % backlight in standby
 
@@ -381,7 +372,7 @@ static void set_backlight(uint8_t percent) {
 
 void applyDisplaySettings() {
   set_backlight(current_state == STATE_STANDBY ? STANDBY_BRIGHTNESS : config.display.brightness);
-  setenv("TZ", posix_tz(config.display.timezone), 1);
+  setenv("TZ", config.display.posixTz, 1);  // POSIX rule chosen on the web UI
   tzset();
 }
 
@@ -450,7 +441,7 @@ static void set_standby(bool standby) {
 void start_ntp() {
   esp_sntp_set_sync_interval(NTP_SYNC_INTERVAL);
   // configTzTime, not configTime: configTime would reset TZ to UTC
-  configTzTime(posix_tz(config.display.timezone), "pool.ntp.org", "time.nist.gov");
+  configTzTime(config.display.posixTz, "pool.ntp.org", "time.nist.gov");
   Serial.println("NTP started");
 }
 

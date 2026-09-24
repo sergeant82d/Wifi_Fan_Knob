@@ -49,7 +49,8 @@ typedef struct {
 
   // Display Settings
   struct {
-    char timezone[8];               // "EST", "CST", "MST", "PST", "UTC"
+    char timezone[48];              // IANA zone name, e.g. "America/Chicago" (for the web UI)
+    char posixTz[64];               // POSIX TZ rule applied to the clock, e.g. "CST6CDT,M3.2.0,M11.1.0"
     char timeFormat[4];             // "12h" or "24h"
     uint8_t brightness;             // 0-100%
     uint16_t screenTimeout;         // Minutes (0 = never)
@@ -121,7 +122,7 @@ String getConfigAsJson();           // Return JSON string of current config
 void setWiFiCredentials(const char* ssid, const char* password);
 void setMqttBroker(const char* broker, uint16_t port);
 void setFanCalibration(uint8_t minPwm, uint8_t maxPwm);
-void setTimezone(const char* tz);
+void setTimezone(const char* name, const char* posix);
 
 // Apply brightness + time zone to hardware/clock (defined in main.cpp)
 void applyDisplaySettings();

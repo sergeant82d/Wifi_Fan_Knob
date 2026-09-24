@@ -58,6 +58,27 @@ void initConfig() {
 // LOAD CONFIG FROM SPIFFS
 // ============================================================================
 
+// Configs saved before worldwide zones stored a US code ("CST") and no POSIX rule
+static void migrateLegacyTimezone() {
+  static const struct { const char *code, *name, *posix; } legacy[] = {
+    {"EST", "America/New_York", "EST5EDT,M3.2.0,M11.1.0"},
+    {"CST", "America/Chicago", "CST6CDT,M3.2.0,M11.1.0"},
+    {"MST", "America/Denver", "MST7MDT,M3.2.0,M11.1.0"},
+    {"PST", "America/Los_Angeles", "PST8PDT,M3.2.0,M11.1.0"},
+    {"UTC", "Etc/UTC", "UTC0"},
+  };
+  for (auto &z : legacy) {
+    if (strcmp(config.display.timezone, z.code) == 0 || strcmp(config.display.timezone, z.name) == 0) {
+      strlcpy(config.display.timezone, z.name, sizeof(config.display.timezone));
+      strlcpy(config.display.posixTz, z.posix, sizeof(config.display.posixTz));
+      Serial.printf("[CONFIG] Time zone migrated to %s\n", z.name);
+      return;
+    }
+  }
+  strlcpy(config.display.timezone, "Etc/UTC", sizeof(config.display.timezone));
+  strlcpy(config.display.posixTz, "UTC0", sizeof(config.display.posixTz));
+}
+
 bool loadConfig() {
   const char* CONFIG_PATH = "/config.json";
 
@@ -118,7 +139,9 @@ bool loadConfig() {
   config.ntp.syncInterval = doc["network"]["ntp"]["syncInterval"] | 3600000;  // 60 minutes
 
   // Display
-  strlcpy(config.display.timezone, doc["display"]["timezone"] | "CST", sizeof(config.display.timezone));
+  strlcpy(config.display.timezone, doc["display"]["timezone"] | "America/Chicago", sizeof(config.display.timezone));
+  strlcpy(config.display.posixTz, doc["display"]["posixTz"] | "", sizeof(config.display.posixTz));
+  if (config.display.posixTz[0] == '\0') migrateLegacyTimezone();
   strlcpy(config.display.timeFormat, doc["display"]["timeFormat"] | "12h", sizeof(config.display.timeFormat));
   config.display.brightness = doc["display"]["brightness"] | 80;
   config.display.screenTimeout = doc["display"]["screenTimeout"] | 0;
@@ -194,6 +217,7 @@ bool saveConfig() {
 
   // Display
   doc["display"]["timezone"] = config.display.timezone;
+  doc["display"]["posixTz"] = config.display.posixTz;
   doc["display"]["timeFormat"] = config.display.timeFormat;
   doc["display"]["brightness"] = config.display.brightness;
   doc["display"]["screenTimeout"] = config.display.screenTimeout;
@@ -286,7 +310,8 @@ void setDefaultConfig() {
   config.ntp.syncInterval = 3600000;  // 60 minutes
 
   // Display
-  strlcpy(config.display.timezone, "CST", sizeof(config.display.timezone));
+  strlcpy(config.display.timezone, "America/Chicago", sizeof(config.display.timezone));
+  strlcpy(config.display.posixTz, "CST6CDT,M3.2.0,M11.1.0", sizeof(config.display.posixTz));
   strlcpy(config.display.timeFormat, "12h", sizeof(config.display.timeFormat));
   config.display.brightness = 80;
   config.display.screenTimeout = 0;
@@ -435,8 +460,9 @@ void setFanCalibration(uint8_t minPwm, uint8_t maxPwm) {
   Serial.println(maxPwm);
 }
 
-void setTimezone(const char* tz) {
-  strlcpy(config.display.timezone, tz, sizeof(config.display.timezone));
+void setTimezone(const char* name, const char* posix) {
+  strlcpy(config.display.timezone, name, sizeof(config.display.timezone));
+  strlcpy(config.display.posixTz, posix, sizeof(config.display.posixTz));
   saveConfig();
   Serial.print("[CONFIG] Timezone: ");
   Serial.println(config.display.timezone);

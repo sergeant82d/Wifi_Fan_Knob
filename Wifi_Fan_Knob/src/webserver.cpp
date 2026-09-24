@@ -66,10 +66,24 @@ static bool form_int(AsyncWebServerRequest *request, const char *name, long min,
   return *end == '\0' && out >= min && out <= max;
 }
 
+// Non-empty and only letters, digits and the given extra characters
+static bool valid_chars(const String &v, const char *extra) {
+  if (v.length() == 0) return false;
+  for (char c : v) {
+    if (!isalnum((unsigned char)c) && !strchr(extra, c)) return false;
+  }
+  return true;
+}
+
 // Apply Config-tab form to config; returns error text, or "" on success
 static String apply_config_form(AsyncWebServerRequest *request) {
+  // Zone name (IANA) + POSIX rule, both chosen from the page's zone table
   String tz = form_value(request, "tz");
-  if (tz != "EST" && tz != "CST" && tz != "MST" && tz != "PST" && tz != "UTC") return "Invalid time zone";
+  String tz_posix = form_value(request, "tz_posix");
+  if (!valid_chars(tz, "_/+-") || tz.length() >= sizeof(config.display.timezone)) return "Invalid time zone name";
+  if (!valid_chars(tz_posix, "<>+-,.:/") || tz_posix.length() < 4 || tz_posix.length() >= sizeof(config.display.posixTz)) {
+    return "Invalid time zone rule";
+  }
   String fmt = form_value(request, "time_format");
   if (fmt != "12h" && fmt != "24h") return "Invalid time format";
 
@@ -90,6 +104,7 @@ static String apply_config_form(AsyncWebServerRequest *request) {
   if (level != "high" && level != "low") return "Invalid power switch level";
 
   strlcpy(config.display.timezone, tz.c_str(), sizeof(config.display.timezone));
+  strlcpy(config.display.posixTz, tz_posix.c_str(), sizeof(config.display.posixTz));
   strlcpy(config.display.timeFormat, fmt.c_str(), sizeof(config.display.timeFormat));
   config.fan.calibration.minPwm = min_pwm;
   config.fan.calibration.maxPwm = max_pwm;

@@ -147,6 +147,11 @@ See `platformio.ini`. Libraries:
 - WiFi: hotspot (`WiFi-Fan-Knob-xxxxxx`) turns off once the saved network is joined; comes back if
   that network is lost for 60 s. Hotspot password (`config.wifi.apPassword`, default 12345678,
   8-63 chars) set on WiFi tab; applies next time hotspot starts. `/api/status` reports `hotspot_on`.
+- Time zones (worldwide): page embeds posix_tz_db (MIT, 461 IANA zones -> POSIX rules) with a
+  search box and "Use this browser's time zone". Config stores `display.timezone` (IANA name,
+  for the UI) and `display.posixTz` (applied via setenv/tzset and `configTzTime`). Old US codes
+  ("CST" etc.) are migrated on load (`migrateLegacyTimezone()` in config.cpp). Server checks
+  both fields' characters/lengths only; the page supplies the rule from its table.
 - LCD pages (verified): horizontal LVGL tileview, swipe left from Main. Main: RPM arc (drag
   along the ring to set speed, snaps to rpmStep; ring-only hit test + 15 px ext click area so
   mid-screen swipes still page), clock, status box. Presets: config presets + red OFF (tap sets
@@ -205,7 +210,7 @@ See `platformio.ini`. Libraries:
 - WiFi AP mode (`WiFi-Fan-Knob-XXXXXX` / `12345678`)
 - Webserver serves `index.html` at `http://192.168.4.1:8080`
 - Config tab: loads current settings, validates, saves (MQTT password never sent to browser;
-  blank = keep). Brightness (PWM backlight) and time zone (POSIX TZ, US zones with DST) apply
+  blank = keep). Brightness (PWM backlight) and time zone apply
   at boot and immediately on save via `applyDisplaySettings()` (verified on hardware).
 
 ### 🔧 Implemented, not yet verified
@@ -348,11 +353,6 @@ STANDBY (1)
   peeking, opening on approach); own standby brightness (currently 10%, dim for the eye);
   throttled frame rate or light sleep between frames (renders flat out at ~62 fps now);
   other eye styles (Uncanny Eyes has several); revisit wake gestures (knob press = glass touch).
-- **Worldwide time zones** (Config tab): currently US zones + UTC only (`posix_tz()` in
-  `main.cpp`, validated list in `webserver.cpp`). Non-US users need a full list. Likely approach:
-  page offers IANA zone names (e.g. a searchable list) and sends the matching POSIX TZ string;
-  firmware stores/applies it directly. Needs `config.display.timezone` widened from `char[8]`
-  (POSIX strings run ~50 chars) and validation relaxed to a POSIX-TZ syntax check.
 
 ---
 
