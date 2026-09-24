@@ -601,6 +601,7 @@ void loop() {
   } else if (delta != 0) {
     // Knob sets target RPM (fan_control clamps to config range)
     fan_set_target((int32_t)fan_get_target() + delta * config.fan.rpmStep);
+    ui_show_main();  // Show the RPM being changed
     Serial.printf("Encoder: %ld -> target %u RPM\n", (long)delta, fan_get_target());
   }
 

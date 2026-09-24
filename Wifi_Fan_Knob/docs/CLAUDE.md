@@ -55,7 +55,7 @@ cd Wifi_Fan_Knob/Wifi_Fan_Knob     # PlatformIO project is nested
 | `include/mqtt.h` / `src/mqtt.cpp` | ✅ Working | MQTT (PubSubClient) + Home Assistant discovery in own task |
 | `include/fan_control.h` / `src/fan_control.cpp` | 🟡 Partial | Target RPM (knob + web, clamped to config) and EMC2101 probe; PWM/tach TODO |
 | `lib/Adafruit_EMC2101/` | Vendored | Adafruit EMC2101 driver (local copy, not from registry) |
-| `include/ui.h` / `src/ui.cpp` | ✅ Working | LVGL main screen: RPM arc, target RPM, clock, status box |
+| `include/ui.h` / `src/ui.cpp` | ✅ Working | LVGL tileview pages (Main / Presets / Settings) + standby screen |
 
 ### Documentation (`docs/`)
 
@@ -147,6 +147,11 @@ See `platformio.ini`. Libraries:
 - WiFi: hotspot (`WiFi-Fan-Knob-xxxxxx`) turns off once the saved network is joined; comes back if
   that network is lost for 60 s. Hotspot password (`config.wifi.apPassword`, default 12345678,
   8-63 chars) set on WiFi tab; applies next time hotspot starts. `/api/status` reports `hotspot_on`.
+- LCD pages (verified): horizontal LVGL tileview, swipe left from Main. Main: RPM arc (drag
+  along the ring to set speed, snaps to rpmStep; ring-only hit test + 15 px ext click area so
+  mid-screen swipes still page), clock, status box. Presets: config presets + red OFF (tap sets
+  target, slides back to Main). Settings: brightness slider (live; saveConfig on release) +
+  IP/SSID/MQTT info. Page dots in the arc's bottom gap. Knob turns and wake return to Main.
 - Standby (`power.h`, verified): knob button held 1 s (fires while held) or web Standby/Wake
   button (`POST /api/standby`, login). Dims backlight to 10% and loads a standby screen (large
   grey clock) and sets fan target to 0. Any touch, knob turn or button press wakes (fan stays 0);

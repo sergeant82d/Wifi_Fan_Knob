@@ -8,5 +8,6 @@ void ui_update();                        // Refresh clock + network status (call
 void ui_set_target_rpm(uint16_t rpm);    // Update arc + RPM number
 void ui_set_attention(bool attention);   // Flash status box red/white while true
 void ui_set_standby(bool standby);       // Switch between main and standby screens
+void ui_show_main();                     // Slide back to the Main page
 
 #endif
