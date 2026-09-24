@@ -337,6 +337,44 @@ void init_webserver() {
     request->send(200, "text/plain", "Hotspot password saved. It applies the next time the hotspot starts.");
   });
 
+  // DHCP or static IP; validated before anything changes, applied at next restart
+  server->on(AsyncURIMatcher::exact("/api/wifi/config"), HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (!require_login(request)) return;
+    bool use_static = form_value(request, "use_static_ip") == "true";
+    String ip = form_value(request, "static_ip");
+    String gw = form_value(request, "static_gateway");
+    String mask = form_value(request, "static_subnet");
+    String dns = form_value(request, "static_dns");
+
+    if (use_static) {
+      IPAddress a_ip, a_gw, a_mask, a_dns;
+      if (!a_ip.fromString(ip) || !a_gw.fromString(gw) || !a_mask.fromString(mask) ||
+          (dns.length() > 0 && !a_dns.fromString(dns))) {
+        request->send(400, "text/plain", "Invalid address (use the form 192.168.1.100)");
+        return;
+      }
+      // Gateway must be on the same subnet, or the board can't reach the network
+      if (((uint32_t)a_ip & (uint32_t)a_mask) != ((uint32_t)a_gw & (uint32_t)a_mask)) {
+        request->send(400, "text/plain", "IP address and gateway are not on the same subnet");
+        return;
+      }
+    }
+
+    config.wifi.useStaticIp = use_static;
+    strlcpy(config.wifi.staticIp, use_static ? ip.c_str() : "", sizeof(config.wifi.staticIp));
+    strlcpy(config.wifi.staticGateway, use_static ? gw.c_str() : "", sizeof(config.wifi.staticGateway));
+    strlcpy(config.wifi.staticSubnet, use_static ? mask.c_str() : "", sizeof(config.wifi.staticSubnet));
+    strlcpy(config.wifi.staticDns, use_static ? dns.c_str() : "", sizeof(config.wifi.staticDns));
+    if (!saveConfig()) {
+      request->send(500, "text/plain", "Failed to write config to SPIFFS");
+      return;
+    }
+    Serial.printf("[WEB] Network config: %s\n", use_static ? config.wifi.staticIp : "DHCP");
+    request->send(200, "text/plain", use_static
+      ? "Saved. Applies after the board restarts; then open http://" + ip + ":8080"
+      : String("Saved. DHCP applies after the board restarts."));
+  });
+
   // Current settings for the Config tab (no passwords)
   server->on(AsyncURIMatcher::exact("/api/config"), HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(200, "application/json", getConfigAsJson());

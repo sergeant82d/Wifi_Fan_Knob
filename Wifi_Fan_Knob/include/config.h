@@ -21,6 +21,12 @@ typedef struct {
     char password[64];              // 0-63 chars
     bool saveCredentials;           // Auto-reconnect on boot
     char apPassword[64];            // Hotspot WPA2 password, 8-63 chars (default 12345678)
+    // Static IP (optional)
+    bool useStaticIp;               // Enable static IP config
+    char staticIp[16];              // e.g. "192.168.1.100"
+    char staticGateway[16];         // e.g. "192.168.1.1"
+    char staticSubnet[16];          // e.g. "255.255.255.0"
+    char staticDns[16];             // Optional DNS, e.g. "8.8.8.8"
   } wifi;
 
   // Webserver Settings

@@ -288,6 +288,19 @@ void startAPMode() {
   Serial.println(apIP);
 }
 
+// Static IP from the WiFi tab, or DHCP; call before WiFi.begin().
+// Addresses were validated when saved. DNS defaults to the gateway.
+static void apply_ip_config() {
+  IPAddress ip, gw, mask, dns;
+  if (config.wifi.useStaticIp && ip.fromString(config.wifi.staticIp) &&
+      gw.fromString(config.wifi.staticGateway) && mask.fromString(config.wifi.staticSubnet)) {
+    if (!dns.fromString(config.wifi.staticDns)) dns = gw;
+    WiFi.config(ip, gw, mask, dns);
+  } else {
+    WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE);  // DHCP
+  }
+}
+
 // Called once a second: hotspot off once the saved network is connected;
 // back on if that network has been lost for 60 s (so the board stays reachable)
 void maintain_wifi() {
@@ -308,6 +321,7 @@ void maintain_wifi() {
     if (millis() - last_retry > 20000) {
       last_retry = millis();
       Serial.println("Retrying saved WiFi...");
+      apply_ip_config();
       WiFi.begin(config.wifi.ssid, config.wifi.password);
     }
   } else if (config.wifi.ssid[0] != '\0' && !ap_on) {
@@ -333,6 +347,7 @@ void init_wifi() {
     Serial.println(config.wifi.ssid);
     
     WiFi.mode(WIFI_STA);
+    apply_ip_config();
     WiFi.begin(config.wifi.ssid, config.wifi.password);
     
     int attempts = 0;

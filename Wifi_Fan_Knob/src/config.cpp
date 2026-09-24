@@ -119,6 +119,12 @@ bool loadConfig() {
   if (strlen(config.wifi.apPassword) < 8) {  // WPA2 minimum; softAP rejects shorter
     strlcpy(config.wifi.apPassword, "12345678", sizeof(config.wifi.apPassword));
   }
+  // Static IP configuration
+  config.wifi.useStaticIp = doc["network"]["wifi"]["useStaticIp"] | false;
+  strlcpy(config.wifi.staticIp, doc["network"]["wifi"]["staticIp"] | "", sizeof(config.wifi.staticIp));
+  strlcpy(config.wifi.staticGateway, doc["network"]["wifi"]["staticGateway"] | "", sizeof(config.wifi.staticGateway));
+  strlcpy(config.wifi.staticSubnet, doc["network"]["wifi"]["staticSubnet"] | "", sizeof(config.wifi.staticSubnet));
+  strlcpy(config.wifi.staticDns, doc["network"]["wifi"]["staticDns"] | "", sizeof(config.wifi.staticDns));
 
   // Webserver
   config.webserver.port = doc["network"]["webserver"]["port"] | 8080;
@@ -196,6 +202,11 @@ bool saveConfig() {
   doc["network"]["wifi"]["password"] = config.wifi.password;
   doc["network"]["wifi"]["saveCredentials"] = config.wifi.saveCredentials;
   doc["network"]["wifi"]["apPassword"] = config.wifi.apPassword;
+  doc["network"]["wifi"]["useStaticIp"] = config.wifi.useStaticIp;
+  doc["network"]["wifi"]["staticIp"] = config.wifi.staticIp;
+  doc["network"]["wifi"]["staticGateway"] = config.wifi.staticGateway;
+  doc["network"]["wifi"]["staticSubnet"] = config.wifi.staticSubnet;
+  doc["network"]["wifi"]["staticDns"] = config.wifi.staticDns;
 
   // Webserver
   doc["network"]["webserver"]["port"] = config.webserver.port;
@@ -289,6 +300,11 @@ void setDefaultConfig() {
   config.wifi.password[0] = '\0';
   config.wifi.saveCredentials = true;
   strlcpy(config.wifi.apPassword, "12345678", sizeof(config.wifi.apPassword));
+  config.wifi.useStaticIp = false;
+  config.wifi.staticIp[0] = '\0';
+  config.wifi.staticGateway[0] = '\0';
+  config.wifi.staticSubnet[0] = '\0';
+  config.wifi.staticDns[0] = '\0';
   config.power.activeHigh = true;
 
   // Webserver
@@ -404,6 +420,11 @@ String getConfigAsJson() {
   doc["device"]["buildDate"] = config.buildDate;
 
   doc["network"]["wifi"]["ssid"] = config.wifi.ssid;
+  doc["network"]["wifi"]["useStaticIp"] = config.wifi.useStaticIp;
+  doc["network"]["wifi"]["staticIp"] = config.wifi.staticIp;
+  doc["network"]["wifi"]["staticGateway"] = config.wifi.staticGateway;
+  doc["network"]["wifi"]["staticSubnet"] = config.wifi.staticSubnet;
+  doc["network"]["wifi"]["staticDns"] = config.wifi.staticDns;
   doc["network"]["webserver"]["port"] = config.webserver.port;
   doc["network"]["mqtt"]["broker"] = config.mqtt.broker;
   doc["network"]["mqtt"]["port"] = config.mqtt.port;

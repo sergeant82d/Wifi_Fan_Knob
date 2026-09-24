@@ -90,6 +90,14 @@ static void publish_discovery() {
     doc["entity_category"] = "diagnostic";
     publish_config("sensor", "uptime", doc);
   }
+  {
+    StaticJsonDocument<768> doc;
+    doc["name"] = "IP Address";
+    doc["state_topic"] = topic("ip");
+    doc["icon"] = "mdi:ip-network";
+    doc["entity_category"] = "diagnostic";
+    publish_config("sensor", "ip", doc);
+  }
   Serial.println("[MQTT] Home Assistant discovery published");
 }
 
@@ -116,6 +124,7 @@ static void publish_state(bool force) {
   if (force || millis() - last_diag > 60000) {
     client.publish(topic("rssi").c_str(), String(WiFi.RSSI()).c_str(), true);
     client.publish(topic("uptime").c_str(), String(millis() / 1000).c_str(), true);
+    client.publish(topic("ip").c_str(), WiFi.localIP().toString().c_str(), true);
     last_diag = millis();
   }
 }

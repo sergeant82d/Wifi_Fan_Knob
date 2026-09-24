@@ -148,6 +148,13 @@ See `platformio.ini`. Libraries:
 - WiFi: hotspot (`WiFi-Fan-Knob-xxxxxx`) turns off once the saved network is joined; comes back if
   that network is lost for 60 s. Hotspot password (`config.wifi.apPassword`, default 12345678,
   8-63 chars) set on WiFi tab; applies next time hotspot starts. `/api/status` reports `hotspot_on`.
+- Static IP / DHCP (WiFi tab "Network Configuration", `POST /api/wifi/config`, login): stored in
+  `config.wifi.useStaticIp/staticIp/staticGateway/staticSubnet/staticDns`; server checks each is
+  a valid address and that IP and gateway share the subnet before changing anything. Applied by
+  `apply_ip_config()` before every `WiFi.begin()`, so it takes effect at the next restart; DNS
+  defaults to the gateway. DHCP path verified on hardware; static save/apply not yet verified.
+  A wrong static IP can leave the board unreachable while WiFi still reports connected (so
+  the fallback hotspot never starts): recover over USB with the SPIFFS erase below.
 - Time zones (worldwide, verified on hardware): page embeds posix_tz_db (MIT, 461 IANA zones -> POSIX rules) with a
   search box and "Use this browser's time zone". Config stores `display.timezone` (IANA name,
   for the UI) and `display.posixTz` (applied via setenv/tzset and `configTzTime`). Old US codes
@@ -183,9 +190,10 @@ See `platformio.ini`. Libraries:
   `mqtt.cpp` runs PubSubClient in its own task (core 0) so blocking connects never stall loop();
   retries every 15 s; reconnects after Config save. Topics `<topicPrefix>/<chipId>/...`
   (`wifi_fan_knob/24C55D/`): `speed`, `speed/set`, `standby`, `standby/set`, `running`, `rssi`,
-  `uptime`, `status` (LWT online/offline, retained). Discovery (retained, `homeassistant/<comp>/
+  `uptime`, `ip`, `status` (LWT online/offline, retained). Discovery (retained, `homeassistant/<comp>/
   wifi_fan_knob_<chipId>/<obj>/config`): number Fan Speed, switch Standby, binary_sensor Fan
-  Running, sensors WiFi Signal + Uptime (diagnostic). State retained, on change; rssi/uptime 60 s.
+  Running, sensors WiFi Signal + Uptime + IP Address (diagnostic). State retained, on change;
+  rssi/uptime/ip every 60 s.
   Commands go through `fan_set_target()` / `power_request_standby()`. Deviations from
   MQTT_SCHEMA.md: chip ID in ids/topics, LWT instead of "MQTT Connected" sensor, Standby switch
   instead of Power Mode sensor, no RPM sensor until EMC2101.
@@ -357,15 +365,6 @@ STANDBY (1)
   extract as standalone project — break out all dragon eye code, display config, and setup steps
   into a semi-universal project that works with any LovyanGFX-compatible display. Document the
   GC9A01 example and how to adapt it to other boards.
-- **GitHub link on the web page** — add a link to the project's GitHub repository at the
-  bottom of the Home tab (`web/index.html`).
-- **FAN OFF button icon on Android** — the power button icon (⏻) does not render on Android
-  phones. Check browser compatibility for the Unicode character and consider a fallback text
-  label or SVG icon.
-- **Network config: static/DHCP settings** — add static IP and gateway configuration to the
-  WiFi tab (`web/index.html`). Currently only uses DHCP. Store in `config.wifi` and apply via
-  `WiFi.config()` before `WiFi.begin()`. Also publish the IP address to Home Assistant as a
-  diagnostic attribute or separate entity.
 
 ---
 
