@@ -362,6 +362,9 @@ STANDBY (1)
 - **FAN OFF button icon on Android** — the power button icon (⏻) does not render on Android
   phones. Check browser compatibility for the Unicode character and consider a fallback text
   label or SVG icon.
+- **Network config: static/DHCP settings** — add static IP and gateway configuration to the
+  WiFi tab (`web/index.html`). Currently only uses DHCP. Store in `config.wifi` and apply via
+  `WiFi.config()` before `WiFi.begin()`.
 
 ---
 
