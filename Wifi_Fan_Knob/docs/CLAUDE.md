@@ -5,7 +5,7 @@
 **Repo root**: `D:\GitHub\VSCodeProjects\Wifi_Bench_Fan\Wifi_Fan_Knob`  
 **PlatformIO project**: `<repo root>\Wifi_Fan_Knob` (nested one level down)  
 **Status**: Hardware bring-up in progress — display, WiFi AP, SPIFFS and webserver verified on the board  
-**Last updated**: 2026-09-23
+**Last updated**: 2026-09-24
 
 
 1. Don’t assume. Don’t hide confusion. Surface tradeoffs.
@@ -66,7 +66,7 @@ cd Wifi_Fan_Knob/Wifi_Fan_Knob     # PlatformIO project is nested
 | `STATUS_REPORT_01.md` | End-of-day report from the pre-hardware sessions |
 | `DISPLAY_GUIDE.md` | How to change the LCD: colours, fonts, segments, pages (human-readable) |
 | `STATUS_REPORT_02.md` | End-of-day report, 2026-09-23 (first hardware session) |
-| `STATUS_REPORT_03.md` | Report for 2026-09-24 (second hardware session; in progress) |
+| `STATUS_REPORT_03.md` | End-of-day report, 2026-09-24 (second hardware session) |
 | `MQTT_SCHEMA.md` | Original HA discovery design (superseded; see MQTT below) |
 | `SPIFFS_CONFIG_SCHEMA.md` | JSON config structure |
 | `CrowPanel1.28inchRotary-11.jpg` | Board photo |

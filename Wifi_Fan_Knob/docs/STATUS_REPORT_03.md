@@ -1,7 +1,7 @@
 # WiFi Fan Knob - Project Status Report 03
 **Date**: September 24, 2026
 **Session**: Second hardware session (EMC2101 still in transit)
-**Status**: **In progress — not final for the day.** Everything below is built, flashed and pushed unless marked otherwise.
+**Status**: Final for the day. Everything below is built, flashed, verified on the board and pushed unless marked otherwise. 25 commits, all pushed.
 
 For the technical details of each feature, see `CLAUDE.md`. For changing the screen's look, see `DISPLAY_GUIDE.md`.
 
@@ -16,13 +16,13 @@ For the technical details of each feature, see `CLAUDE.md`. For changing the scr
 | **Double-tap** | Double-tap on Main stops the fan, or pops up "Fan is not running" |
 | **Screensaver** | The eye appears after a set idle time (web Config, default 30 s, 0 = off). The fan keeps running. Touch, knob or a short press dismisses it; a long press still goes to standby. The web Home tab shows "Active (screensaver)" |
 | **Eye** | Drawn at the screen's full 240 × 240 (no more 2 × 2 pixel blocks). 10 styles to pick from on the web page: Dragon, Human, Cat, Goat, Owl, Doe, Newt, Nauga, No sclera, Terminator. 37–52 frames per second |
-| **Standby** | External power off. The eye sleeps: it closes, stays shut, and now and then twitches or peeks; while shut the screen isn't redrawn. Standby brightness is a web setting (0 = screen off) |
+| **Standby** | External power off. The eye sleeps: it closes, stays shut, and now and then twitches or peeks (timing tuned after review); while shut the screen isn't redrawn. Standby brightness is a web setting (0 = screen off) |
 | **Web: presets and fan max** | Preset speeds and the fan's max RPM are editable on the Config tab. Presets set their exact value everywhere (web and LCD) |
 | **Web: brightness** | The LCD brightness slider is on the Home tab |
 | **Web: screensaver button** | Home tab button starts the screensaver, or wakes the display from it |
 | **Web: network** | Static IP or DHCP on the WiFi tab. Saving restarts the board, with a notice beside the button |
 | **Web: other** | GitHub link on Home, power icon on the FAN OFF button now shows on Android, the page no longer goes stale after a firmware update |
-| **Home Assistant** | New IP Address sensor, LCD Brightness slider and Screensaver switch |
+| **Home Assistant** | New IP Address sensor and LCD Brightness slider. Screensaver is a switch (start or dismiss the eye): the board sends it to Home Assistant; not yet checked on the Home Assistant side |
 | **Docs** | `DISPLAY_GUIDE.md`: how to change colours, fonts, segments, pages and eye styles |
 
 ## Problems found and fixed today
@@ -44,9 +44,19 @@ For the technical details of each feature, see `CLAUDE.md`. For changing the scr
 ## Housekeeping
 
 - Removed the unused NTPClient library.
+- Removed `.claude/settings.json` from the repository (personal tool permissions, committed by mistake); those rules now live in the git-ignored `settings.local.json`.
+- Committed the reference image for the arc segment buttons (`docs/dial-arc-buttons-image_8f62a034.jpeg`).
+
+## Waiting on you
+
+- **Eyelid images:** closed-dragon-eye pictures to use as the eyelids (options written up in `CLAUDE.md`, with the standalone eye project).
+- **Wake gestures:** to be designed together with the sleeping eye.
+- **GPIO 2:** test on the board's normal power supply (not USB).
+- **GPIO 4 pull resistor:** keeps external power off at boot before the firmware takes control.
+- **Home Assistant:** check the new Screensaver switch.
 
 ## Next steps
 
 1. **EMC2101 arrives:** fan drive and tachometer, then measured RPM on the LCD, web page and Home Assistant.
 2. Fan calibration and bench testing.
-3. Later list (`CLAUDE.md`): eye upgrades, M4 Eyes.
+3. Later list (`CLAUDE.md`): eyelid images, wake gestures, Adafruit M4 Eyes, standalone eye project.
