@@ -140,14 +140,18 @@ See `platformio.ini`. Libraries:
   to the spare slot (app0/app1), validated by `Update.end(true)` before switching. Rejects
   non-images (first byte != 0xE9) and truncated images; running firmware untouched on error.
   OTA tab shows Build ID (ELF SHA-256 prefix, changes every build) and running slot.
-  Requires OTA login (HTTP Basic; config.webserver.username/password, set on OTA tab; first set
-  needs no auth, changes need current login; no login = OTA refused with 403).
+  Requires the web login (see below).
   CLI: `curl -u user:pass -F "firmware=@.pio/build/esp32-s3-devkitc-1/firmware.bin" http://<ip>:8080/api/ota`.
   USB upload still works after OTA (it rewrites otadata, booting app0 again).
 - WiFi: hotspot (`WiFi-Fan-Knob-xxxxxx`) turns off once the saved network is joined; comes back if
   that network is lost for 60 s. Hotspot password (`config.wifi.apPassword`, default 12345678,
   8-63 chars) set on WiFi tab; applies next time hotspot starts. `/api/status` reports `hotspot_on`.
 - Home tab has a large FAN OFF button (target 0, no confirmation).
+- Web login (HTTP Basic; `config.webserver.username/password`): required by every POST (fan, config,
+  WiFi, hotspot password, OTA, factory reset) via `require_login()`; GETs stay open. No login set =
+  all changes refused (403) until one is set on the Config tab (first set needs no auth; changes
+  need current login). Page keeps the login in sessionStorage and sends it on every POST.
+  Factory reset additionally requires re-typing the password; it also clears the login.
 - Home tab: target RPM shared with knob (page polls /api/status every 2 s; LCD redrawn only
   from loop() since LVGL isn't thread-safe). Presets hard-coded in page (match config defaults).
 - Touch: own minimal CST816D driver in `main.cpp` (init sequence from Elecrow; single-attempt
@@ -176,8 +180,9 @@ See `platformio.ini`. Libraries:
 - Light-sleep standby
 
 ### Known quirks
-- **Only OTA is login-protected**: settings, WiFi and fan endpoints are open to anyone on the LAN
-  (or on the hotspot). Factory reset clears the OTA login too.
+- **Forgotten web login**: every change needs it, so recovery is over USB — erase the SPIFFS
+  partition (config lives only there; defaults are recreated on next boot):
+  `~/.platformio/penv/Scripts/python.exe ~/.platformio/packages/tool-esptoolpy/esptool.py --chip esp32s3 --port COM13 erase_region 0xC90000 0x360000`
 - **Boot WiFi connect often exceeds 10 s** (weak signal, ~-74 dBm): board falls back to hotspot,
   then `maintain_wifi()` retries every 20 s and turns the hotspot off once joined.
 - **Routes must use `AsyncURIMatcher::exact()`**: a plain `server->on("/api/wifi", ...)` also

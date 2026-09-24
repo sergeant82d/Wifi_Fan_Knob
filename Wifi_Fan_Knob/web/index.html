@@ -413,6 +413,15 @@
         <header>
             <h1>⚡ WiFi Fan Knob</h1>
             <div class="status-line">Control Panel • IP: <span id="device-ip">192.168.1.100</span> • Status: <span id="device-status">Online</span></div>
+            <div id="login-bar" style="margin-top: 10px; font-size: 0.9rem;">
+                <span id="login-state" style="color: #a0a0a0;">Checking login...</span>
+                <button id="logout-btn" class="btn-secondary" onclick="logOut()" style="display: none; padding: 4px 12px; margin-left: 8px;">Log out</button>
+                <form id="login-form" onsubmit="logIn(event)" style="display: none; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 8px;">
+                    <input type="text" id="login-user" placeholder="Username" autocomplete="username" required style="width: auto;">
+                    <input type="password" id="login-pass" placeholder="Password" autocomplete="current-password" required style="width: auto;">
+                    <button type="submit" class="btn-secondary">Log in</button>
+                </form>
+            </div>
         </header>
 
         <div class="tabs">
@@ -621,7 +630,41 @@
                 <button type="submit" class="btn-primary" style="margin-top: 15px;">Save Configuration</button>
             </form>
 
-            <button class="btn-danger" style="margin-top: 10px;" onclick="resetConfig()">Reset to Defaults</button>
+            <div class="status-card" style="margin-top: 20px;">
+                <h3>Web Login</h3>
+                <p style="color: #a0a0a0; margin-bottom: 15px; font-size: 0.9rem;">
+                    Required for every change on this page (fan, settings, WiFi, OTA).
+                    Changing an existing login requires being logged in.
+                </p>
+                <form onsubmit="saveLogin(event)">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="login-new-user">New Username</label>
+                            <input type="text" id="login-new-user" maxlength="31" autocomplete="username" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="login-new-pass">New Password</label>
+                            <input type="password" id="login-new-pass" minlength="8" maxlength="31" placeholder="8-31 characters" autocomplete="new-password" required>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn-secondary" style="margin-top: 15px;">Save Login</button>
+                </form>
+            </div>
+
+            <div class="status-card">
+                <h3>Factory Reset</h3>
+                <p style="color: #a0a0a0; margin-bottom: 15px; font-size: 0.9rem;">
+                    Erases ALL settings, including saved WiFi, the web login and the hotspot password,
+                    then reboots into hotspot mode.
+                </p>
+                <form onsubmit="resetConfig(event)">
+                    <div class="form-group">
+                        <label for="reset-pass">Confirm with your password</label>
+                        <input type="password" id="reset-pass" autocomplete="current-password" required>
+                    </div>
+                    <button type="submit" class="btn-danger" style="margin-top: 15px;">Reset to Defaults</button>
+                </form>
+            </div>
         </div>
 
         <!-- OTA TAB -->
@@ -644,40 +687,6 @@
                     <span class="status-label">Chip ID:</span>
                     <span class="status-value" id="chip-id" style="font-family: monospace; font-size: 0.9rem;">--</span>
                 </div>
-            </div>
-
-            <div class="status-card">
-                <h3>OTA Login</h3>
-                <p style="color: #a0a0a0; margin-bottom: 15px; font-size: 0.9rem;" id="ota-login-state">
-                    Checking...
-                </p>
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label for="ota-user">Username</label>
-                        <input type="text" id="ota-user" autocomplete="username">
-                    </div>
-                    <div class="form-group">
-                        <label for="ota-pass">Password</label>
-                        <input type="password" id="ota-pass" autocomplete="current-password">
-                    </div>
-                </div>
-                <details style="margin-top: 15px;">
-                    <summary style="color: #ffd700; cursor: pointer;">Set / change OTA login</summary>
-                    <form onsubmit="saveOtaLogin(event)" style="margin-top: 10px;">
-                        <div class="form-grid">
-                            <div class="form-group">
-                                <label for="ota-new-user">New Username</label>
-                                <input type="text" id="ota-new-user" maxlength="31" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="ota-new-pass">New Password</label>
-                                <input type="password" id="ota-new-pass" minlength="8" maxlength="31" placeholder="8-31 characters" autocomplete="new-password" required>
-                            </div>
-                        </div>
-                        <small style="color: #606060; display: block; margin-top: 8px;">Changing an existing login requires the current username/password above.</small>
-                        <button type="submit" class="btn-secondary" style="margin-top: 10px;">Save OTA Login</button>
-                    </form>
-                </details>
             </div>
 
             <form onsubmit="uploadFirmware(event)">
@@ -761,7 +770,59 @@
             document.getElementById('brightness-label').textContent = value;
         }
 
-        async function postForm(url, fields, headers = {}) {
+        // Web login, kept for this browser tab (survives reloads; cleared when the tab closes)
+        let login = null;
+        try { login = JSON.parse(sessionStorage.getItem('login')); } catch (e) {}
+        let loginSetOnDevice = null;
+
+        function setLogin(value) {
+            login = value;
+            try {
+                if (value) sessionStorage.setItem('login', JSON.stringify(value));
+                else sessionStorage.removeItem('login');
+            } catch (e) {}
+            updateLoginBar();
+        }
+
+        function authHeader(user = login && login.user, pass = login && login.pass) {
+            return user ? { 'Authorization': 'Basic ' + btoa(user + ':' + pass) } : {};
+        }
+
+        function updateLoginBar() {
+            const state = document.getElementById('login-state');
+            const form = document.getElementById('login-form');
+            const out = document.getElementById('logout-btn');
+            form.style.display = 'none';
+            out.style.display = 'none';
+            if (loginSetOnDevice === false) {
+                state.textContent = 'No login set. Changes are disabled until you set one on the Config tab.';
+            } else if (login) {
+                state.textContent = 'Logged in as ' + login.user;
+                out.style.display = 'inline-block';
+            } else {
+                state.textContent = 'Log in to make changes:';
+                form.style.display = 'flex';
+            }
+        }
+
+        async function logIn(event) {
+            event.preventDefault();
+            const user = document.getElementById('login-user').value;
+            const pass = document.getElementById('login-pass').value;
+            try {
+                await postForm('/api/login', {}, authHeader(user, pass));
+                document.getElementById('login-pass').value = '';
+                setLogin({ user, pass });
+            } catch (e) {
+                alert('Login failed: ' + e.message);
+            }
+        }
+
+        function logOut() {
+            setLogin(null);
+        }
+
+        async function postForm(url, fields, headers = authHeader()) {
             const res = await fetch(url, { method: 'POST', body: new URLSearchParams(fields), headers });
             const text = await res.text();
             if (!res.ok) throw new Error(text);
@@ -881,12 +942,13 @@
                     set('speed-display', s.target_rpm);
                 }
 
-                // WiFi tab hotspot name; OTA login state
+                // WiFi tab hotspot state; login bar
                 set('ap-ssid', s.ap_ssid);
                 set('hotspot-state', s.hotspot_on ? 'On' : 'Off');
-                set('ota-login-state', s.ota_login_set
-                    ? 'Enter the OTA username and password to upload firmware.'
-                    : 'No OTA login set. Uploads are disabled until you set one below.');
+                if (s.login_set !== loginSetOnDevice) {
+                    loginSetOnDevice = s.login_set;
+                    updateLoginBar();
+                }
 
                 // OTA tab
                 set('fw-version', s.fw_version);
@@ -922,13 +984,22 @@
             }
         }
 
-        async function resetConfig() {
-            if (!confirm('Reset ALL settings to factory defaults, including saved WiFi? The device will reboot into AP mode.')) return;
+        // Factory reset: re-enter the password even when logged in
+        async function resetConfig(event) {
+            event.preventDefault();
+            if (!login) {
+                alert('Log in first (top of the page).');
+                return;
+            }
+            if (!confirm('Reset ALL settings to factory defaults, including saved WiFi and the web login? The device will reboot into hotspot mode.')) return;
+            const field = document.getElementById('reset-pass');
             try {
-                alert(await postForm('/api/config/reset', {}));
+                alert(await postForm('/api/config/reset', {}, authHeader(login.user, field.value)));
+                setLogin(null);  // Reset clears the login on the device
             } catch (e) {
                 alert('Reset failed: ' + e.message);
             }
+            field.value = '';
         }
 
         function selectFile(input) {
@@ -938,24 +1009,15 @@
             }
         }
 
-        // HTTP Basic auth header from the OTA tab's username/password fields
-        function otaAuthHeader() {
-            const user = document.getElementById('ota-user').value;
-            const pass = document.getElementById('ota-pass').value;
-            return { 'Authorization': 'Basic ' + btoa(user + ':' + pass) };
-        }
-
-        async function saveOtaLogin(event) {
+        async function saveLogin(event) {
             event.preventDefault();
-            const newUser = document.getElementById('ota-new-user').value;
-            const newPass = document.getElementById('ota-new-pass').value;
+            const user = document.getElementById('login-new-user').value;
+            const pass = document.getElementById('login-new-pass').value;
             try {
-                alert(await postForm('/api/ota/login', { new_user: newUser, new_pass: newPass }, otaAuthHeader()));
-                // New login becomes the one used for uploads
-                document.getElementById('ota-user').value = newUser;
-                document.getElementById('ota-pass').value = newPass;
-                document.getElementById('ota-new-pass').value = '';
-                loadStatus();
+                alert(await postForm('/api/login/set', { new_user: user, new_pass: pass }));
+                document.getElementById('login-new-pass').value = '';
+                loginSetOnDevice = true;
+                setLogin({ user, pass });  // Stay logged in with the new login
             } catch (e) {
                 alert('Save failed: ' + e.message);
             }
@@ -987,7 +1049,12 @@
             form.append('firmware', file, file.name);
             const xhr = new XMLHttpRequest();
             xhr.open('POST', '/api/ota');
-            xhr.setRequestHeader('Authorization', otaAuthHeader().Authorization);
+            if (!login) {
+                alert('Log in first (top of the page).');
+                button.disabled = false;
+                return;
+            }
+            xhr.setRequestHeader('Authorization', authHeader().Authorization);
             xhr.upload.onprogress = e => {
                 if (e.lengthComputable) status.textContent = 'Uploading... ' + Math.round(e.loaded * 100 / e.total) + '%';
             };
