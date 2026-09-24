@@ -20,13 +20,14 @@ typedef struct {
     char ssid[33];                  // 0-32 chars
     char password[64];              // 0-63 chars
     bool saveCredentials;           // Auto-reconnect on boot
+    char apPassword[64];            // Hotspot WPA2 password, 8-63 chars (default 12345678)
   } wifi;
 
   // Webserver Settings
   struct {
     uint16_t port;                  // Default 8080
-    char username[32];              // Empty = no auth
-    char password[32];              // Empty = no auth
+    char username[32];              // OTA login (empty password = OTA disabled)
+    char password[32];              // OTA login, 8-31 chars
   } webserver;
 
   // MQTT Settings

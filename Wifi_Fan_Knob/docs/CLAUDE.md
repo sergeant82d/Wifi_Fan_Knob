@@ -140,8 +140,14 @@ See `platformio.ini`. Libraries:
   to the spare slot (app0/app1), validated by `Update.end(true)` before switching. Rejects
   non-images (first byte != 0xE9) and truncated images; running firmware untouched on error.
   OTA tab shows Build ID (ELF SHA-256 prefix, changes every build) and running slot.
-  CLI: `curl -F "firmware=@.pio/build/esp32-s3-devkitc-1/firmware.bin" http://<ip>:8080/api/ota`.
+  Requires OTA login (HTTP Basic; config.webserver.username/password, set on OTA tab; first set
+  needs no auth, changes need current login; no login = OTA refused with 403).
+  CLI: `curl -u user:pass -F "firmware=@.pio/build/esp32-s3-devkitc-1/firmware.bin" http://<ip>:8080/api/ota`.
   USB upload still works after OTA (it rewrites otadata, booting app0 again).
+- WiFi: hotspot (`WiFi-Fan-Knob-xxxxxx`) turns off once the saved network is joined; comes back if
+  that network is lost for 60 s. Hotspot password (`config.wifi.apPassword`, default 12345678,
+  8-63 chars) set on WiFi tab; applies next time hotspot starts. `/api/status` reports `hotspot_on`.
+- Home tab has a large FAN OFF button (target 0, no confirmation).
 - Home tab: target RPM shared with knob (page polls /api/status every 2 s; LCD redrawn only
   from loop() since LVGL isn't thread-safe). Presets hard-coded in page (match config defaults).
 - Touch: own minimal CST816D driver in `main.cpp` (init sequence from Elecrow; single-attempt
@@ -170,10 +176,12 @@ See `platformio.ini`. Libraries:
 - Light-sleep standby
 
 ### Known quirks
-- **No web auth yet**: anyone on the LAN (or on the AP, default password `12345678`) can change
-  settings or flash firmware via OTA. `config.webserver.username/password` exist but aren't enforced.
-- **AP can stay up after STA connects**: if the 10 s boot connect times out, AP_STA fallback starts
-  the AP, but the STA keeps retrying and may join later — board is then on both networks.
+- **Only OTA is login-protected**: settings, WiFi and fan endpoints are open to anyone on the LAN
+  (or on the hotspot). Factory reset clears the OTA login too.
+- **Boot WiFi connect often exceeds 10 s** (weak signal, ~-74 dBm): board falls back to hotspot,
+  then `maintain_wifi()` retries every 20 s and turns the hotspot off once joined.
+- **Routes must use `AsyncURIMatcher::exact()`**: a plain `server->on("/api/wifi", ...)` also
+  matches `/api/wifi/*`, and the first-registered handler wins (this broke Forget and Reset).
 - **First boot `task_wdt: esp_task_wdt_reset(763): task not found` spam**: expected once.
   `SPIFFS.begin(true)` formats an empty partition, and `SPIFFS::format()` removes the
   core-0 idle task from the WDT during the format. Stops when format completes.

@@ -429,6 +429,11 @@
                 <div class="rpm-label">Target RPM</div>
             </div>
 
+            <button class="btn-danger" onclick="fanOff()"
+                    style="width: 100%; padding: 18px; margin-bottom: 20px; font-size: 1.4rem; font-weight: 700; background: #d32f2f; color: #fff;">
+                ⏻ FAN OFF
+            </button>
+
             <div class="status-card">
                 <h3>System Status</h3>
                 <div class="status-item">
@@ -513,6 +518,25 @@
                 <button class="btn-danger" onclick="forgetWiFi()">Forget Saved Network</button>
             </div>
             <div id="wifi-networks" style="margin-top: 15px; display: grid; gap: 8px;"></div>
+
+            <div class="status-card" style="margin-top: 20px;">
+                <h3>Hotspot Password</h3>
+                <p style="color: #a0a0a0; margin-bottom: 15px; font-size: 0.9rem;">
+                    Password for the <span id="ap-ssid">WiFi-Fan-Knob</span> hotspot, used when the
+                    board can't reach your WiFi. Applies the next time the hotspot starts.
+                </p>
+                <div class="status-item">
+                    <span class="status-label">Hotspot:</span>
+                    <span class="status-value" id="hotspot-state">--</span>
+                </div>
+                <form onsubmit="saveApPassword(event)">
+                    <div class="form-group">
+                        <label for="ap-pass">New Hotspot Password</label>
+                        <input type="password" id="ap-pass" minlength="8" maxlength="63" placeholder="8-63 characters" required>
+                    </div>
+                    <button type="submit" class="btn-primary" style="margin-top: 15px;">Save Hotspot Password</button>
+                </form>
+            </div>
         </div>
 
         <!-- CONFIG TAB -->
@@ -622,6 +646,40 @@
                 </div>
             </div>
 
+            <div class="status-card">
+                <h3>OTA Login</h3>
+                <p style="color: #a0a0a0; margin-bottom: 15px; font-size: 0.9rem;" id="ota-login-state">
+                    Checking...
+                </p>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="ota-user">Username</label>
+                        <input type="text" id="ota-user" autocomplete="username">
+                    </div>
+                    <div class="form-group">
+                        <label for="ota-pass">Password</label>
+                        <input type="password" id="ota-pass" autocomplete="current-password">
+                    </div>
+                </div>
+                <details style="margin-top: 15px;">
+                    <summary style="color: #ffd700; cursor: pointer;">Set / change OTA login</summary>
+                    <form onsubmit="saveOtaLogin(event)" style="margin-top: 10px;">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="ota-new-user">New Username</label>
+                                <input type="text" id="ota-new-user" maxlength="31" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="ota-new-pass">New Password</label>
+                                <input type="password" id="ota-new-pass" minlength="8" maxlength="31" placeholder="8-31 characters" autocomplete="new-password" required>
+                            </div>
+                        </div>
+                        <small style="color: #606060; display: block; margin-top: 8px;">Changing an existing login requires the current username/password above.</small>
+                        <button type="submit" class="btn-secondary" style="margin-top: 10px;">Save OTA Login</button>
+                    </form>
+                </details>
+            </div>
+
             <form onsubmit="uploadFirmware(event)">
                 <div class="file-upload" onclick="document.getElementById('firmware-file').click()">
                     <input type="file" id="firmware-file" accept=".bin" onchange="selectFile(this)">
@@ -684,6 +742,17 @@
             applySpeed();
         }
 
+        // Immediate stop: target 0, no confirmation
+        async function fanOff() {
+            try {
+                await postForm('/api/fan', { rpm: 0 });
+                sliderDirty = false;
+                loadStatus();
+            } catch (e) {
+                alert('Fan off failed: ' + e.message);
+            }
+        }
+
         function standbyMode() {
             alert('Standby is not implemented yet.');
         }
@@ -692,8 +761,8 @@
             document.getElementById('brightness-label').textContent = value;
         }
 
-        async function postForm(url, fields) {
-            const res = await fetch(url, { method: 'POST', body: new URLSearchParams(fields) });
+        async function postForm(url, fields, headers = {}) {
+            const res = await fetch(url, { method: 'POST', body: new URLSearchParams(fields), headers });
             const text = await res.text();
             if (!res.ok) throw new Error(text);
             return text;
@@ -812,6 +881,13 @@
                     set('speed-display', s.target_rpm);
                 }
 
+                // WiFi tab hotspot name; OTA login state
+                set('ap-ssid', s.ap_ssid);
+                set('hotspot-state', s.hotspot_on ? 'On' : 'Off');
+                set('ota-login-state', s.ota_login_set
+                    ? 'Enter the OTA username and password to upload firmware.'
+                    : 'No OTA login set. Uploads are disabled until you set one below.');
+
                 // OTA tab
                 set('fw-version', s.fw_version);
                 set('fw-build', s.fw_build);
@@ -862,6 +938,40 @@
             }
         }
 
+        // HTTP Basic auth header from the OTA tab's username/password fields
+        function otaAuthHeader() {
+            const user = document.getElementById('ota-user').value;
+            const pass = document.getElementById('ota-pass').value;
+            return { 'Authorization': 'Basic ' + btoa(user + ':' + pass) };
+        }
+
+        async function saveOtaLogin(event) {
+            event.preventDefault();
+            const newUser = document.getElementById('ota-new-user').value;
+            const newPass = document.getElementById('ota-new-pass').value;
+            try {
+                alert(await postForm('/api/ota/login', { new_user: newUser, new_pass: newPass }, otaAuthHeader()));
+                // New login becomes the one used for uploads
+                document.getElementById('ota-user').value = newUser;
+                document.getElementById('ota-pass').value = newPass;
+                document.getElementById('ota-new-pass').value = '';
+                loadStatus();
+            } catch (e) {
+                alert('Save failed: ' + e.message);
+            }
+        }
+
+        async function saveApPassword(event) {
+            event.preventDefault();
+            const field = document.getElementById('ap-pass');
+            try {
+                alert(await postForm('/api/wifi/ap', { ap_pass: field.value }));
+                field.value = '';
+            } catch (e) {
+                alert('Save failed: ' + e.message);
+            }
+        }
+
         // Upload .bin with progress (XHR: fetch has no upload progress)
         function uploadFirmware(event) {
             event.preventDefault();
@@ -877,6 +987,7 @@
             form.append('firmware', file, file.name);
             const xhr = new XMLHttpRequest();
             xhr.open('POST', '/api/ota');
+            xhr.setRequestHeader('Authorization', otaAuthHeader().Authorization);
             xhr.upload.onprogress = e => {
                 if (e.lengthComputable) status.textContent = 'Uploading... ' + Math.round(e.loaded * 100 / e.total) + '%';
             };

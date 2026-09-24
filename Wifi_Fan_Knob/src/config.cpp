@@ -72,8 +72,8 @@ bool loadConfig() {
     return false;
   }
 
-  // Deserialize JSON (1536 bytes should be enough for full config)
-  StaticJsonDocument<1536> doc;
+  // Deserialize JSON (heap; full config is ~1.5 KB of JSON with copied strings)
+  DynamicJsonDocument doc(4096);
   DeserializationError error = deserializeJson(doc, file);
 
   file.close();
@@ -94,6 +94,10 @@ bool loadConfig() {
   strlcpy(config.wifi.ssid, doc["network"]["wifi"]["ssid"] | "", sizeof(config.wifi.ssid));
   strlcpy(config.wifi.password, doc["network"]["wifi"]["password"] | "", sizeof(config.wifi.password));
   config.wifi.saveCredentials = doc["network"]["wifi"]["saveCredentials"] | true;
+  strlcpy(config.wifi.apPassword, doc["network"]["wifi"]["apPassword"] | "12345678", sizeof(config.wifi.apPassword));
+  if (strlen(config.wifi.apPassword) < 8) {  // WPA2 minimum; softAP rejects shorter
+    strlcpy(config.wifi.apPassword, "12345678", sizeof(config.wifi.apPassword));
+  }
 
   // Webserver
   config.webserver.port = doc["network"]["webserver"]["port"] | 8080;
@@ -152,8 +156,8 @@ bool loadConfig() {
 bool saveConfig() {
   const char* CONFIG_PATH = "/config.json";
 
-  // Create JSON document
-  StaticJsonDocument<1536> doc;
+  // Create JSON document (heap; see loadConfig)
+  DynamicJsonDocument doc(4096);
 
   // Device Info
   doc["device"]["name"] = config.name;
@@ -165,6 +169,7 @@ bool saveConfig() {
   doc["network"]["wifi"]["ssid"] = config.wifi.ssid;
   doc["network"]["wifi"]["password"] = config.wifi.password;
   doc["network"]["wifi"]["saveCredentials"] = config.wifi.saveCredentials;
+  doc["network"]["wifi"]["apPassword"] = config.wifi.apPassword;
 
   // Webserver
   doc["network"]["webserver"]["port"] = config.webserver.port;
@@ -212,6 +217,12 @@ bool saveConfig() {
   doc["advanced"]["debugMode"] = config.advanced.debugMode;
   doc["advanced"]["logLevel"] = config.advanced.logLevel;
 
+  // Refuse to write a truncated config
+  if (doc.overflowed()) {
+    Serial.println("[CONFIG] JSON document overflowed; not saving");
+    return false;
+  }
+
   // Write to SPIFFS
   File file = SPIFFS.open(CONFIG_PATH, "w");
   if (!file) {
@@ -247,6 +258,7 @@ void setDefaultConfig() {
   config.wifi.ssid[0] = '\0';
   config.wifi.password[0] = '\0';
   config.wifi.saveCredentials = true;
+  strlcpy(config.wifi.apPassword, "12345678", sizeof(config.wifi.apPassword));
 
   // Webserver
   config.webserver.port = 8080;

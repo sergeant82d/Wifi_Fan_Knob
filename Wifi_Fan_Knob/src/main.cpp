@@ -268,19 +268,47 @@ void startAPMode() {
   WiFi.mode(WIFI_AP_STA);  // STA side needed for network scans from the web UI
   
   String apName = "WiFi-Fan-Knob-" + String((uint32_t)(ESP.getEfuseMac() >> 24), HEX);
-  String apPass = "12345678";  // User can change in webserver
-  
-  WiFi.softAP(apName.c_str(), apPass.c_str());
+  // Password set on the web UI WiFi tab (default 12345678); not logged
+  WiFi.softAP(apName.c_str(), config.wifi.apPassword);
   IPAddress apIP = WiFi.softAPIP();
-  
+
   Serial.print("AP started: ");
   Serial.println(apName);
   Serial.print("IP: ");
   Serial.println(apIP);
-  Serial.print("Password: ");
-  Serial.println(apPass);
-  
-  // Display AP info on screen (TODO: show on LVGL)
+}
+
+// Called once a second: hotspot off once the saved network is connected;
+// back on if that network has been lost for 60 s (so the board stays reachable)
+void maintain_wifi() {
+  static unsigned long sta_lost_since = 0;
+  bool connected = WiFi.status() == WL_CONNECTED;
+  bool ap_on = WiFi.getMode() & WIFI_AP;
+
+  if (connected) {
+    sta_lost_since = 0;
+    if (ap_on) {
+      WiFi.softAPdisconnect(true);  // true = disable AP interface (mode → STA)
+      Serial.println("WiFi connected, hotspot off");
+    }
+  } else if (config.wifi.ssid[0] != '\0' && ap_on) {
+    // Hotspot up but saved network not joined: switching to AP_STA stops the
+    // pending STA attempt, so retry every 20 s
+    static unsigned long last_retry = 0;
+    if (millis() - last_retry > 20000) {
+      last_retry = millis();
+      Serial.println("Retrying saved WiFi...");
+      WiFi.begin(config.wifi.ssid, config.wifi.password);
+    }
+  } else if (config.wifi.ssid[0] != '\0' && !ap_on) {
+    if (sta_lost_since == 0) {
+      sta_lost_since = millis();
+    } else if (millis() - sta_lost_since > 60000) {
+      Serial.println("WiFi lost for 60 s, starting hotspot");
+      startAPMode();  // STA keeps retrying; hotspot goes off again on reconnect
+      sta_lost_since = 0;
+    }
+  }
 }
 
 void init_wifi() {
@@ -515,6 +543,7 @@ void loop() {
   static unsigned long last_status_update = 0;
   if (millis() - last_status_update >= 1000) {
     last_status_update = millis();
+    maintain_wifi();
     ui_update();
   }
 

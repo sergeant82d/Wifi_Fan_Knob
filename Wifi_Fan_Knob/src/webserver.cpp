@@ -15,8 +15,19 @@ static AsyncWebServer *server = nullptr;
 extern const uint8_t index_html_start[] asm("_binary_web_index_html_start");
 extern const uint8_t index_html_end[] asm("_binary_web_index_html_end");
 
-// Error from the current/last OTA upload ("" = OK)
+// Error from the current/last OTA upload ("" = OK), and its HTTP status
 static String ota_error;
+static int ota_error_code = 500;
+
+// OTA requires HTTP Basic credentials matching config.webserver (sent by the page's
+// OTA tab). No password set = OTA disabled until one is set.
+static bool ota_login_set() {
+  return config.webserver.password[0] != '\0';
+}
+
+static bool ota_authorized(AsyncWebServerRequest *request) {
+  return ota_login_set() && request->authenticate(config.webserver.username, config.webserver.password);
+}
 
 // Reboot once the response has been delivered to the browser
 static void restart_after_response(AsyncWebServerRequest *request) {
@@ -79,13 +90,15 @@ static String apply_config_form(AsyncWebServerRequest *request) {
 void init_webserver() {
   server = new AsyncWebServer(config.webserver.port);
 
+  // Routes use exact matching: a plain "/api/wifi" would also swallow "/api/wifi/forget" etc.
+
   // UI page from flash (excluding the appended NUL)
-  server->on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
+  server->on(AsyncURIMatcher::exact("/"), HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(200, "text/html", index_html_start, index_html_end - index_html_start - 1);
   });
 
   // Save WiFi credentials, then reboot to connect
-  server->on("/api/wifi", HTTP_POST, [](AsyncWebServerRequest *request) {
+  server->on(AsyncURIMatcher::exact("/api/wifi"), HTTP_POST, [](AsyncWebServerRequest *request) {
     if (!request->hasParam("ssid", true)) {
       request->send(400, "text/plain", "Missing ssid");
       return;
@@ -103,14 +116,14 @@ void init_webserver() {
   });
 
   // Clear saved credentials, then reboot into AP mode
-  server->on("/api/wifi/forget", HTTP_POST, [](AsyncWebServerRequest *request) {
+  server->on(AsyncURIMatcher::exact("/api/wifi/forget"), HTTP_POST, [](AsyncWebServerRequest *request) {
     setWiFiCredentials("", "");
     restart_after_response(request);
     request->send(200, "text/plain", "Forgotten. Rebooting into AP mode...");
   });
 
   // Non-blocking scan: 202 while scanning (client polls), 200 + JSON when done
-  server->on("/api/wifi/scan", HTTP_GET, [](AsyncWebServerRequest *request) {
+  server->on(AsyncURIMatcher::exact("/api/wifi/scan"), HTTP_GET, [](AsyncWebServerRequest *request) {
     int n = WiFi.scanComplete();
     if (n == WIFI_SCAN_FAILED) {
       WiFi.scanNetworks(true);
@@ -137,8 +150,8 @@ void init_webserver() {
   });
 
   // Live network status for the page header and WiFi tab
-  server->on("/api/status", HTTP_GET, [](AsyncWebServerRequest *request) {
-    StaticJsonDocument<512> doc;
+  server->on(AsyncURIMatcher::exact("/api/status"), HTTP_GET, [](AsyncWebServerRequest *request) {
+    StaticJsonDocument<1024> doc;
     if (WiFi.status() == WL_CONNECTED) {
       doc["mode"] = "WiFi";
       doc["ip"] = WiFi.localIP().toString();
@@ -165,13 +178,16 @@ void init_webserver() {
     doc["fw_build"] = build_id;
     doc["chip_id"] = config.chipId;
     doc["app_slot"] = esp_ota_get_running_partition()->label;
+    doc["ota_login_set"] = ota_login_set();
+    doc["ap_ssid"] = "WiFi-Fan-Knob-" + String((uint32_t)(ESP.getEfuseMac() >> 24), HEX);
+    doc["hotspot_on"] = (WiFi.getMode() & WIFI_AP) != 0;
     String body;
     serializeJson(doc, body);
     request->send(200, "application/json", body);
   });
 
   // Set target RPM from the Home tab (same target the knob adjusts)
-  server->on("/api/fan", HTTP_POST, [](AsyncWebServerRequest *request) {
+  server->on(AsyncURIMatcher::exact("/api/fan"), HTTP_POST, [](AsyncWebServerRequest *request) {
     long rpm;
     if (!form_int(request, "rpm", config.fan.minRpm, config.fan.maxRpm, rpm)) {
       request->send(400, "text/plain", "rpm must be " + String(config.fan.minRpm) + "-" + String(config.fan.maxRpm));
@@ -183,12 +199,12 @@ void init_webserver() {
 
   // OTA firmware upload: stream .bin into the spare app slot, validate, reboot.
   // On any error the running firmware is untouched.
-  server->on("/api/ota", HTTP_POST,
+  server->on(AsyncURIMatcher::exact("/api/ota"), HTTP_POST,
     [](AsyncWebServerRequest *request) {
       if (ota_error.length() > 0 || !Update.isFinished()) {
         String msg = ota_error.length() > 0 ? ota_error : String("Upload incomplete");
         Serial.printf("[OTA] Failed: %s\n", msg.c_str());
-        request->send(500, "text/plain", "Update failed: " + msg);
+        request->send(ota_error_code, "text/plain", "Update failed: " + msg);
         return;
       }
       Serial.println("[OTA] Success, rebooting");
@@ -199,8 +215,15 @@ void init_webserver() {
       if (index == 0) {
         Serial.printf("[OTA] Receiving %s\n", filename.c_str());
         ota_error = "";
+        ota_error_code = 500;
         if (Update.isRunning()) Update.abort();  // Leftover from an interrupted upload
-        if (len == 0 || data[0] != 0xE9) {
+        if (!ota_login_set()) {
+          ota_error = "No OTA login set. Set one on the OTA tab first.";
+          ota_error_code = 403;
+        } else if (!ota_authorized(request)) {
+          ota_error = "Wrong OTA username or password";
+          ota_error_code = 401;
+        } else if (len == 0 || data[0] != 0xE9) {
           // Update lib would report this as "Decryption error"
           ota_error = "Not an ESP32 firmware image (expected firmware.bin)";
         } else if (!Update.begin(UPDATE_SIZE_UNKNOWN, U_FLASH)) {
@@ -220,13 +243,55 @@ void init_webserver() {
       }
     });
 
+  // Set/change the OTA login. First login needs no auth; changing it needs the current one.
+  server->on(AsyncURIMatcher::exact("/api/ota/login"), HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (ota_login_set() && !ota_authorized(request)) {
+      request->send(401, "text/plain", "Current OTA username/password required (enter them above)");
+      return;
+    }
+    String user = form_value(request, "new_user");
+    String pass = form_value(request, "new_pass");
+    if (user.length() == 0 || user.length() >= sizeof(config.webserver.username)) {
+      request->send(400, "text/plain", "Username must be 1-31 chars");
+      return;
+    }
+    if (pass.length() < 8 || pass.length() >= sizeof(config.webserver.password)) {
+      request->send(400, "text/plain", "Password must be 8-31 chars");
+      return;
+    }
+    strlcpy(config.webserver.username, user.c_str(), sizeof(config.webserver.username));
+    strlcpy(config.webserver.password, pass.c_str(), sizeof(config.webserver.password));
+    if (!saveConfig()) {
+      request->send(500, "text/plain", "Failed to write config to SPIFFS");
+      return;
+    }
+    Serial.println("[WEB] OTA login updated");
+    request->send(200, "text/plain", "OTA login saved.");
+  });
+
+  // Hotspot (AP) password; takes effect next time the hotspot starts
+  server->on(AsyncURIMatcher::exact("/api/wifi/ap"), HTTP_POST, [](AsyncWebServerRequest *request) {
+    String pass = form_value(request, "ap_pass");
+    if (pass.length() < 8 || pass.length() >= sizeof(config.wifi.apPassword)) {
+      request->send(400, "text/plain", "Hotspot password must be 8-63 chars");
+      return;
+    }
+    strlcpy(config.wifi.apPassword, pass.c_str(), sizeof(config.wifi.apPassword));
+    if (!saveConfig()) {
+      request->send(500, "text/plain", "Failed to write config to SPIFFS");
+      return;
+    }
+    Serial.println("[WEB] Hotspot password updated");
+    request->send(200, "text/plain", "Hotspot password saved. It applies the next time the hotspot starts.");
+  });
+
   // Current settings for the Config tab (no passwords)
-  server->on("/api/config", HTTP_GET, [](AsyncWebServerRequest *request) {
+  server->on(AsyncURIMatcher::exact("/api/config"), HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(200, "application/json", getConfigAsJson());
   });
 
   // Save Config tab; all fields validated before anything is changed
-  server->on("/api/config", HTTP_POST, [](AsyncWebServerRequest *request) {
+  server->on(AsyncURIMatcher::exact("/api/config"), HTTP_POST, [](AsyncWebServerRequest *request) {
     String error = apply_config_form(request);
     if (error.length() > 0) {
       request->send(400, "text/plain", error);
@@ -241,7 +306,7 @@ void init_webserver() {
   });
 
   // Factory reset (includes WiFi credentials), then reboot
-  server->on("/api/config/reset", HTTP_POST, [](AsyncWebServerRequest *request) {
+  server->on(AsyncURIMatcher::exact("/api/config/reset"), HTTP_POST, [](AsyncWebServerRequest *request) {
     setDefaultConfig();
     saveConfig();
     restart_after_response(request);
