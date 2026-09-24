@@ -1,7 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(git commit -m 'Docs: add HA IP address publishing to network config note *)"
-    ]
-  }
-}
