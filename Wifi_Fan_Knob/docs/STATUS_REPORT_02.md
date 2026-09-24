@@ -57,6 +57,6 @@ For the technical details of each feature, see `CLAUDE.md`. This report covers w
 ## Next steps
 
 1. **EMC2101 arrives:** in `fan_control.cpp`, add PWM output and tachometer reading, then an actual-RPM reading on the screen, web page and Home Assistant.
-2. Fan calibration (min/max PWM), audio, and testing on the bench with real fumes.
+2. Fan calibration (min/max PWM) and testing on the bench with real fumes.
 3. Menu on a short press of the knob (currently only logged).
 4. Test GPIO 2 on non-USB power, and fit the hardware pull resistor on the GPIO 4 power switch.

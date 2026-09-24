@@ -170,7 +170,6 @@ bool loadConfig() {
   // System
   config.system.deepSleepEnabled = doc["system"]["deepSleepEnabled"] | true;
   config.system.standbyTimeout = doc["system"]["standbyTimeout"] | 0;
-  config.system.audioEnabled = doc["system"]["audioEnabled"] | true;
   config.system.autoUpdate = doc["system"]["autoUpdate"] | false;
 
   // Peripheral power switch
@@ -253,7 +252,6 @@ bool saveConfig() {
   // System
   doc["system"]["deepSleepEnabled"] = config.system.deepSleepEnabled;
   doc["system"]["standbyTimeout"] = config.system.standbyTimeout;
-  doc["system"]["audioEnabled"] = config.system.audioEnabled;
   doc["system"]["autoUpdate"] = config.system.autoUpdate;
 
   // Peripheral power switch
@@ -354,7 +352,6 @@ void setDefaultConfig() {
   // System
   config.system.deepSleepEnabled = true;
   config.system.standbyTimeout = 0;
-  config.system.audioEnabled = true;
   config.system.autoUpdate = false;
 
   // Advanced

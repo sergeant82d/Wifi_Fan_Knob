@@ -68,7 +68,6 @@ Device stores configuration in `/spiffs/config.json` on the ESP32.
   "system": {
     "deepSleepEnabled": true,
     "standbyTimeout": 0,
-    "audioEnabled": true,
     "autoUpdate": false
   },
   
@@ -228,7 +227,6 @@ General system settings.
 "system": {
   "deepSleepEnabled": true,           // Allow deep sleep in standby mode
   "standbyTimeout": 0,                // Auto-standby timeout (0 = disabled, minutes)
-  "audioEnabled": true,               // Speaker audio (warning sounds, wake chime)
   "autoUpdate": false                 // Check for OTA updates automatically
 }
 ```
@@ -236,7 +234,6 @@ General system settings.
 **Notes:**
 - deepSleepEnabled: Reduces power consumption during standby
 - standbyTimeout: 0 = manual only; 30 = auto standby after 30 min idle
-- audioEnabled: Disable to silence Dragon eye wake sound + warnings
 - autoUpdate: Future feature (manual OTA for now)
 
 ---
@@ -347,7 +344,6 @@ void setDefaultConfig() {
   doc["fan"]["presets"]["max"] = 2000;
   
   doc["system"]["deepSleepEnabled"] = true;
-  doc["system"]["audioEnabled"] = true;
   
   // Save to SPIFFS
   File file = SPIFFS.open("/config.json", "w");

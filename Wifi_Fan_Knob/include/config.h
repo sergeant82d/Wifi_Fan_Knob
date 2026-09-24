@@ -88,7 +88,6 @@ typedef struct {
   struct {
     bool deepSleepEnabled;          // Allow deep sleep in standby
     uint16_t standbyTimeout;        // Minutes (0 = disabled)
-    bool audioEnabled;              // Speaker audio (sounds, chimes)
     bool autoUpdate;                // Auto check for OTA updates
   } system;
 

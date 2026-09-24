@@ -66,6 +66,7 @@ cd Wifi_Fan_Knob/Wifi_Fan_Knob     # PlatformIO project is nested
 | `STATUS_REPORT_01.md` | End-of-day report from the pre-hardware sessions |
 | `DISPLAY_GUIDE.md` | How to change the LCD: colours, fonts, segments, pages (human-readable) |
 | `STATUS_REPORT_02.md` | End-of-day report, 2026-09-23 (first hardware session) |
+| `STATUS_REPORT_03.md` | Report for 2026-09-24 (second hardware session; in progress) |
 | `MQTT_SCHEMA.md` | Original HA discovery design (superseded; see MQTT below) |
 | `SPIFFS_CONFIG_SCHEMA.md` | JSON config structure |
 | `CrowPanel1.28inchRotary-11.jpg` | Board photo |
@@ -84,7 +85,7 @@ Pin reference lives in this file and at the top of `src/main.cpp`; there is no s
 - **Touch**: CST816D at 0x15 on Wire1 (6/7); raw coords map directly to screen (verified)
 - **Encoder**: rotary knob with push button
 - **RGB LED**: 5× WS2812
-- **Audio / BLE**: present, unused
+- **Bluetooth LE**: present, unused
 
 Elecrow's example code is the source of truth for board specifics:
 https://github.com/Elecrow-RD/CrowPanel-1.28inch-HMI-ESP32-Rotary-Display-240-240-IPS-Round-Touch-Knob-Screen
@@ -132,7 +133,6 @@ See `platformio.ini`. Libraries:
 | `adafruit/Adafruit BusIO` | Required by vendored EMC2101 driver |
 | `bblanchon/ArduinoJson@^6.21.0` | Config JSON |
 | `esp32async/ESPAsyncWebServer@^3.7.0` | Webserver (pulls AsyncTCP) |
-| `arduino-libraries/NTPClient` | Listed but unused — NTP uses `configTime()` |
 
 ---
 
@@ -276,7 +276,7 @@ See `platformio.ini`. Libraries:
 - Fan PWM output and tachometer reading (EMC2101 not delivered yet; `fan_control.cpp` only
   holds the target RPM and probes for the chip)
 - Measured RPM: on the LCD, web page and Home Assistant (MQTT sensor), once the tach reads
-- Fan calibration (min/max PWM are stored but not used yet), audio
+- Fan calibration (min/max PWM are stored but not used yet)
 
 ### Known quirks
 - **Forgotten web login**: every change needs it, so recovery is over USB — erase the SPIFFS
@@ -397,7 +397,7 @@ STANDBY (1)
 1. `fan_control.cpp`: EMC2101 PWM + tach once the module arrives (target RPM already wired)
 2. Measured RPM from the tach: Home Assistant sensor (MQTT, "Fan RPM", state class
    measurement), plus the LCD and the web Home tab
-3. Calibration UI, audio, field testing
+3. Calibration UI, field testing
 4. GPIO 2 role on non-USB power (see Hardware Reference)
 
 ### Later (user notes)
@@ -424,11 +424,12 @@ STANDBY (1)
 
 ## Open Questions
 
-1. Fan speed units in Home Assistant: RPM (0-2500) or % (0-100)?
-2. Audio format for warnings: WAV, MP3, or other?
-3. Dragon eye animation: pre-rendered frames or procedural LVGL drawing?
-4. Noctua fan min/max PWM: initial guess 50-200 (calibrate)
-5. GPIO 2: no effect on USB power — does it matter on battery/other supply?
+1. Noctua fan min/max PWM: initial guess 50-200. Decided 2026-09-24: leave until the fan is
+   connected, then calibrate.
+2. GPIO 2: no effect on USB power — does it matter on battery/other supply?
+
+Decided: Home Assistant fan speed stays in RPM (2026-09-24). The eye is drawn procedurally
+with LovyanGFX (Uncanny Eyes), not pre-rendered frames or LVGL.
 
 ---
 

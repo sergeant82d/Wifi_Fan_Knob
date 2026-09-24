@@ -104,7 +104,7 @@ The WiFi Fan Knob project has progressed from concept to a fully architected, de
 - **NTP**: Server (pool.ntp.org), sync interval (60 min default)
 - **Display**: Timezone, 12/24h format, brightness (0-100%), screen timeout
 - **Fan**: Min/max RPM, step size (100 RPM), calibration (min/max PWM), presets (low/med/high/max)
-- **System**: Deep sleep enable, standby timeout, audio enable, auto-update flag
+- **System**: Deep sleep enable, standby timeout, auto-update flag
 - **Advanced**: Debug mode, log level
 
 **Implementation** (config.cpp):
@@ -179,10 +179,9 @@ All dependencies resolve cleanly.
 
 **Still To Decide**:
 1. Fan speed control units in HA: PWM value (0-255) or % (0-100)? *(Recommend 0-100%)*
-2. Audio format for warnings/sounds: WAV, MP3, or other?
-3. Dragon eye animation: Pre-rendered frames or procedural LVGL drawing?
-4. Expected min/max PWM for Noctua 140mm fan: Initial guess 50-200; adjust after calibration
-5. ROM/RAM budget trade-off: Display gets priority, fan control is minimal
+2. Dragon eye animation: Pre-rendered frames or procedural LVGL drawing?
+3. Expected min/max PWM for Noctua 140mm fan: Initial guess 50-200; adjust after calibration
+4. ROM/RAM budget trade-off: Display gets priority, fan control is minimal
 
 **These don't block development**; will finalize after hardware testing.
 
