@@ -353,7 +353,10 @@ STANDBY (1)
   source images) instead of 2x pixel doubling; "sleeping" behaviour (mostly closed / twitching /
   peeking, opening on approach); own standby brightness (currently 10%, dim for the eye);
   throttled frame rate or light sleep between frames (renders flat out at ~62 fps now);
-  other eye styles (Uncanny Eyes has several); revisit wake gestures (knob press = glass touch).
+  other eye styles (Uncanny Eyes has several); revisit wake gestures (knob press = glass touch);
+  extract as standalone project — break out all dragon eye code, display config, and setup steps
+  into a semi-universal project that works with any LovyanGFX-compatible display. Document the
+  GC9A01 example and how to adapt it to other boards.
 - **GitHub link on the web page** — add a link to the project's GitHub repository at the
   bottom of the Home tab (`web/index.html`).
 
