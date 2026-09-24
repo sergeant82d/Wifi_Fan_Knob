@@ -220,15 +220,52 @@ See `platformio.ini`. Libraries:
 - **First boot `task_wdt: esp_task_wdt_reset(763): task not found` spam**: expected once.
   `SPIFFS.begin(true)` formats an empty partition, and `SPIFFS::format()` removes the
   core-0 idle task from the WDT during the format. Stops when format completes.
-- **Rare boot panic (~1 in 9 boots), accepted for now**: `Guru Meditation ... Unhandled debug
-  exception` during `attachInterrupt()`. Coredump showed the `ipc1` task (1024-byte stack, fixed
-  in precompiled SDK) overflowing when an interrupt frame lands while it installs the GPIO ISR
-  service; the end-of-stack watchpoint fires and the board reboots cleanly. Not caused by our
-  code. Revisit if frequency rises (newer core may have larger IPC stack).
-  Coredump is saved to the `coredump` partition (0xFF0000); decode with `esp-coredump
-  info_corefile` against `.pio/build/esp32-s3-devkitc-1/firmware.elf`.
+- **Boot panic in `attachInterrupt()` (KNOWN ISSUE, parked 2026-09-23)** — see
+  "Known issue: ipc1 boot panic" section below for evidence, repro and candidate fixes.
 - `config.system.deepSleepEnabled` name predates the light-sleep decision; not renamed
   (would change the config JSON format).
+
+---
+
+## Known issue: ipc1 boot panic (parked)
+
+**Symptom**: `Guru Meditation Error: Core 1 panic'ed (Unhandled debug exception)` early in boot,
+then an automatic reboot that succeeds. Never seen after boot completes.
+
+**Frequency**: ~4 in ~40 boots observed (2026-09-23), all during USB/OTA flash-and-reset testing.
+
+**Evidence** (3 coredumps, identical): crashed task `ipc1`; backtrace
+`gpio_isr_register_on_core_static → esp_intr_alloc → heap_caps_malloc → multi_heap_malloc`,
+faulting at `_xt_lowint1+15` with the stack pointer ~8 bytes from the end of ipc1's stack.
+Cause: `attachInterrupt()` installs the GPIO ISR service via an IPC call; ipc1's stack is
+1024 bytes (`CONFIG_ESP_IPC_TASK_STACK_SIZE`, fixed in the precompiled Arduino SDK). If a
+level-1 interrupt arrives while ipc1 is deep in `malloc` (heap poisoning on), the interrupt
+frame overflows the stack and the FreeRTOS end-of-stack watchpoint fires. Not our code.
+
+**Reproduce / measure** (board on COM13, serial monitor closed):
+```bash
+PY=~/.platformio/penv/Scripts/python.exe; ET=~/.platformio/packages/tool-esptoolpy/esptool.py
+for i in $(seq 1 50); do $PY $ET --chip esp32s3 --port COM13 --after hard_reset chip_id >/dev/null 2>&1
+  $PY readser.py | grep -c Guru; done   # readser.py: open COM13 (retry until present), read ~15 s
+```
+
+**Decode a crash** (dump persists in the `coredump` partition until the next crash):
+```bash
+$PY $ET --chip esp32s3 --port COM13 read_flash 0xFF0000 0x10000 coredump.bin
+pip install esp-coredump   # in a scratch venv
+python -m esp_coredump --chip esp32s3 info_corefile --core coredump.bin --core-format raw   --gdb ~/.platformio/packages/tool-xtensa-esp-elf-gdb/bin/xtensa-esp32s3-elf-gdb.exe   .pio/build/esp32-s3-devkitc-1/firmware.elf
+```
+The ELF must be the exact build that crashed.
+
+**Candidate fixes** (cheapest first; measure each with the repro loop, e.g. 0 in 100 boots):
+1. Attach encoder/button interrupts first in `setup()`, before USB CDC output, display SPI DMA,
+   WiFi and I2C are active (fewer interrupt sources during the IPC call).
+2. Call `gpio_install_isr_service()` ourselves at the very top of `setup()` so the IPC
+   allocation happens while the system is quiet; later `attachInterrupt()` calls reuse it.
+3. Update the pioarduino platform / Arduino core and check whether its sdkconfig raises
+   `CONFIG_ESP_IPC_TASK_STACK_SIZE`.
+4. Build the Arduino SDK libs ourselves (pioarduino `custom_sdkconfig`) with a larger IPC
+   stack — most effective, slowest builds.
 
 ---
 
