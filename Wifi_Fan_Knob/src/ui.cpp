@@ -333,9 +333,11 @@ static void create_main_page(lv_obj_t *scr) {
   lv_arc_set_range(rpm_arc, config.fan.minRpm, config.fan.maxRpm);
   lv_arc_set_value(rpm_arc, config.fan.minRpm);
   // Ring-only touch: ADV_HITTEST makes LVGL use the arc's ring hit test (off by default,
-  // in which case the whole 228 px square grabs every swipe). Ext area widens the ring.
+  // in which case the whole 228 px square grabs every swipe). Ext area widens the ring,
+  // but only down to the segments' outer edge: 114 - 12 - 8 = 94 = SEG_R_OUT. Wider, and
+  // taps on a segment's outer part set the arc (a stepped speed) instead of the preset.
   lv_obj_add_flag(rpm_arc, LV_OBJ_FLAG_ADV_HITTEST);
-  lv_obj_set_ext_click_area(rpm_arc, 15);  // 12 px ring is a small finger target
+  lv_obj_set_ext_click_area(rpm_arc, 114 - 12 - SEG_R_OUT);
   lv_obj_set_style_arc_width(rpm_arc, 12, LV_PART_MAIN);
   lv_obj_set_style_arc_width(rpm_arc, 12, LV_PART_INDICATOR);
   lv_obj_set_style_arc_color(rpm_arc, lv_color_hex(0x303030), LV_PART_MAIN);

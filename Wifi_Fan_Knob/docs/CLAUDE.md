@@ -162,7 +162,7 @@ See `platformio.ini`. Libraries:
   ("CST" etc.) are migrated on load (`migrateLegacyTimezone()` in config.cpp). Server checks
   both fields' characters/lengths only; the page supplies the rule from its table.
 - LCD pages (verified): horizontal LVGL tileview, swipe left from Main. Main: RPM arc (drag
-  along the ring to set speed, snaps to rpmStep; ring-only hit test (needs LV_OBJ_FLAG_ADV_HITTEST, off by default) + 15 px ext area so
+  along the ring to set speed, snaps to rpmStep; ring-only hit test (needs LV_OBJ_FLAG_ADV_HITTEST, off by default) + 8 px ext area (stops at the segments' outer edge, SEG_R_OUT) so
   mid-screen swipes still page), clock, status box. Settings: brightness slider (live; saveConfig on release) +
   IP/SSID/MQTT info. Page dots in the arc's bottom gap. Knob turns and wake return to Main.
   Pages come from the `PAGES` table in `ui.cpp` (name + builder); tiles, dots and the knob

@@ -841,8 +841,8 @@
             document.getElementById('speed-display').textContent = value;
         }
 
-        async function applySpeed() {
-            const rpm = document.getElementById('speed-slider').value;
+        // Presets pass their exact RPM; the slider snaps to the knob step, so it isn't used for them
+        async function applySpeed(rpm = document.getElementById('speed-slider').value) {
             try {
                 await postForm('/api/fan', { rpm });
                 sliderDirty = false;
@@ -853,9 +853,8 @@
         }
 
         function setPreset(rpm) {
-            document.getElementById('speed-slider').value = rpm;
             document.getElementById('speed-display').textContent = rpm;
-            applySpeed();
+            applySpeed(rpm);
         }
 
         // Immediate stop: target 0, no confirmation
