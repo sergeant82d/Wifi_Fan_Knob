@@ -88,12 +88,13 @@ static String apply_config_form(AsyncWebServerRequest *request) {
   String fmt = form_value(request, "time_format");
   if (fmt != "12h" && fmt != "24h") return "Invalid time format";
 
-  long min_pwm, max_pwm, mqtt_port, saver_sec;
+  long min_pwm, max_pwm, mqtt_port, saver_sec, standby_brightness;
   if (!form_int(request, "min_pwm", 0, 255, min_pwm)) return "Min PWM must be 0-255";
   if (!form_int(request, "max_pwm", 0, 255, max_pwm)) return "Max PWM must be 0-255";
   if (min_pwm > max_pwm) return "Min PWM must not exceed Max PWM";
   if (!form_int(request, "mqtt_port", 1, 65535, mqtt_port)) return "MQTT port must be 1-65535";
   if (!form_int(request, "screensaver_sec", 0, 3600, saver_sec)) return "Screensaver delay must be 0-3600 seconds";
+  if (!form_int(request, "standby_brightness", 0, 100, standby_brightness)) return "Standby brightness must be 0-100";
   String eye_style = form_value(request, "eye_style");
   if (!eye_style_find(eye_style.c_str())) return "Unknown eye style";
   // Fan's rated top speed; everything else (presets, knob, arc, web, HA) is limited to it
@@ -139,6 +140,7 @@ static String apply_config_form(AsyncWebServerRequest *request) {
   }
   config.mqtt.discoveryEnabled = form_value(request, "mqtt_discovery") == "1";
   config.display.screensaverSec = saver_sec;
+  config.display.standbyBrightness = standby_brightness;
   strlcpy(config.display.eyeStyle, eye_style.c_str(), sizeof(config.display.eyeStyle));  // loop() applies it
   config.power.activeHigh = level == "high";
   return "";

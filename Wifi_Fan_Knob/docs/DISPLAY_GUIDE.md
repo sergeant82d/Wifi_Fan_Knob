@@ -344,7 +344,8 @@ In `create_menu()` and `menu_highlight()`:
 |---|---|
 | Screensaver delay, or turn it off | Web page → Config → Display & Interface (seconds; 0 = off) |
 | Eye style | Web page → Config → Display & Interface |
-| Standby brightness (10 %) | `STANDBY_BRIGHTNESS` in `src/main.cpp` |
+| Standby brightness (0 = screen off) | Web page → Config → Display & Interface |
+| How the eye sleeps in standby (how long it stays shut, twitches, peeks) | `sleep_openness()` in `src/dragon_eye.cpp` |
 | Eye speed in standby (15 frames per second) | `STANDBY_EYE_FPS` in `src/main.cpp` |
 | What counts as "activity" | `note_activity()` calls in `src/main.cpp` (knob, button, touch, speed changes) |
 | The styles on offer, and their order | `EYE_STYLES` in `src/eye_styles.cpp` |
@@ -356,8 +357,9 @@ To remove a style from the web list, delete its line in `EYE_STYLES`. To add one
 block in `src/eye_styles.cpp` (the file explains how).
 
 The screensaver shows the eye while the fan keeps running. A touch, knob turn or
-short press only dismisses it. Standby shows the same eye, but also stops the fan and
-switches external power off.
+short press only dismisses it. In standby the eye goes to sleep: it closes, stays shut,
+and now and then twitches or peeks. Standby also stops the fan and switches external
+power off.
 
 ---
 

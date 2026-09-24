@@ -223,7 +223,12 @@ See `platformio.ini`. Libraries:
   limits are the original's (Bodmer's differed). Measured 37-52 fps (all 10 styles cycled twice,
   no leaks). Standby draws at most `STANDBY_EYE_FPS` (15; measured 14), screensaver flat out.
   Firmware 3.3 MB of the 6.5 MB OTA slot. In standby/screensaver `loop()` renders eye frames
-  instead of running LVGL and polls touch directly. Touch wake only after the screen has read "no touch" once (`standby_touch_armed`):
+  instead of running LVGL and polls touch directly.
+  Sleeping eye (standby only, `eye_set_sleeping()` from `set_standby()`): lids close over 2 s,
+  stay shut 4-12 s, then a twitch (65%: opens 15-35% for 0.3-0.5 s) or a peek (opens 40-70%,
+  holds 1-3 s, closes slowly). While fully shut nothing is redrawn: measured 12-69 draws per
+  10 s in standby vs ~150 awake at 15 fps. Standby backlight = `config.display.standbyBrightness`
+  (web Config -> Display & Interface, 0-100 %, default 10, 0 = off; replaced STANDBY_BRIGHTNESS). Touch wake only after the screen has read "no touch" once (`standby_touch_armed`):
   pressing the knob also touches the glass. Each wake logs its cause (`Wake: button/knob/touch/
   fan target`).
 - `include/ui.h` standby LVGL screen (grey clock) still exists but is no longer shown.
@@ -418,11 +423,13 @@ STANDBY (1)
 4. GPIO 2 role on non-USB power (see Hardware Reference)
 
 ### Later (user notes)
-- **Eye upgrades (re-look after project is complete)** — done: native 240x240, 10 styles
-  selectable on the web, 15 fps in standby. Candidates left: "sleeping" behaviour (mostly
-  closed / twitching / peeking, opening on approach); own standby brightness (currently 10%);
-  light sleep between frames; revisit wake gestures (knob press = glass touch);
-  extract as standalone project — break out all dragon eye code, display config, and setup steps
+- **Eye upgrades** — done: native 240x240, 10 styles selectable on the web, 15 fps in
+  standby, sleeping eye in standby, standby brightness setting. Declined: light sleep between
+  frames (small saving with WiFi on; revisit only for battery power). Left:
+  - **Wake gestures** — needs more thought before starting; design it together with the
+    sleeping eye (e.g. a touch makes the sleeping eye open/peek first, a second touch or hold
+    wakes). Today any new touch wakes; the touch from a knob press is ignored until lifted.
+  - **Standalone eye project** (later, after M4 Eyes) — break out all dragon eye code, display config, and setup steps
   into a semi-universal project that works with any LovyanGFX-compatible display. Document the
   GC9A01 example and how to adapt it to other boards.
 - **Adafruit "M4 Eyes" (user wants this, after the fan hardware is done)** — eyes with art

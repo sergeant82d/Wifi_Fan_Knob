@@ -732,6 +732,11 @@
                             <select id="eye-style" required></select>
                         </div>
                         <div class="form-group">
+                            <label for="standby-brightness">Standby brightness (%)</label>
+                            <input type="number" id="standby-brightness" min="0" max="100" value="10" required>
+                            <small style="color: #606060;">Screen brightness while the eye sleeps in standby. 0 = screen off</small>
+                        </div>
+                        <div class="form-group">
                             <label for="screensaver-sec">Screensaver (dragon eye) after</label>
                             <input type="number" id="screensaver-sec" min="0" max="3600" value="30" required>
                             <small style="color: #606060;">Seconds with no knob, touch or speed change. 0 = off</small>
@@ -1083,6 +1088,7 @@
                 document.getElementById('mqtt-discovery').checked = c.network.mqtt.discoveryEnabled;
                 document.getElementById('brightness').value = c.display.brightness;
                 document.getElementById('screensaver-sec').value = c.display.screensaverSec;
+                document.getElementById('standby-brightness').value = c.display.standbyBrightness;
                 const eyeSelect = document.getElementById('eye-style');
                 eyeSelect.innerHTML = '';
                 c.eyeStyles.forEach(st => {
@@ -1187,6 +1193,7 @@
                     mqtt_pass: v('mqtt-pass'),
                     mqtt_discovery: document.getElementById('mqtt-discovery').checked ? '1' : '0',
                     screensaver_sec: v('screensaver-sec'),
+                    standby_brightness: v('standby-brightness'),
                     eye_style: v('eye-style'),
                     power_level: v('power-level')
                 }));

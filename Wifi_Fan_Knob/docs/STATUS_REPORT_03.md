@@ -16,7 +16,7 @@ For the technical details of each feature, see `CLAUDE.md`. For changing the scr
 | **Double-tap** | Double-tap on Main stops the fan, or pops up "Fan is not running" |
 | **Screensaver** | The eye appears after a set idle time (web Config, default 30 s, 0 = off). The fan keeps running. Touch, knob or a short press dismisses it; a long press still goes to standby. The web Home tab shows "Active (screensaver)" |
 | **Eye** | Drawn at the screen's full 240 × 240 (no more 2 × 2 pixel blocks). 10 styles to pick from on the web page: Dragon, Human, Cat, Goat, Owl, Doe, Newt, Nauga, No sclera, Terminator. 37–52 frames per second |
-| **Standby** | External power off, eye slowed to 15 frames per second to save power |
+| **Standby** | External power off. The eye sleeps: it closes, stays shut, and now and then twitches or peeks; while shut the screen isn't redrawn. Standby brightness is a web setting (0 = screen off) |
 | **Web: presets and fan max** | Preset speeds and the fan's max RPM are editable on the Config tab. Presets set their exact value everywhere (web and LCD) |
 | **Web: brightness** | The LCD brightness slider is on the Home tab |
 | **Web: screensaver button** | Home tab button starts the screensaver, or wakes the display from it |
@@ -38,7 +38,8 @@ For the technical details of each feature, see `CLAUDE.md`. For changing the scr
 - Home Assistant fan speed stays in RPM.
 - Fan drive limits (min/max PWM) wait until the fan is connected.
 - The eye styles stay Adafruit's 128-pixel art, scaled up; Adafruit's "M4 Eyes" (drawn at 240 px) come after the fan hardware.
-- Presets are not needed in Home Assistant; an LCD brightness control is on the later list.
+- Presets are not needed in Home Assistant.
+- No light sleep in standby (small saving with WiFi on). Wake gestures wait, to be designed together with the sleeping eye.
 
 ## Housekeeping
 

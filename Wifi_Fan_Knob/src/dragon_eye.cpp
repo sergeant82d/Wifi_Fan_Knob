@@ -6,6 +6,7 @@
 // so there are no 2x2 pixel blocks; pixels outside the round screen are skipped; one
 // frame per call (the original's blocking iris loop is replaced by a non-blocking ramp).
 // Iris/pupil formula and per-style pupil limits are the original's.
+// Added: sleeping mode for standby (lids close, then an occasional twitch or peek).
 
 #include "dragon_eye.h"
 #include "eye_styles.h"
@@ -209,6 +210,71 @@ void eye_begin(lgfx::LGFX_Device *display) {
 }
 
 // ============================================================================
+// SLEEPING (standby): lids close slowly, stay shut 4-12 s, then twitch (brief flicker)
+// or peek (open part way, look around, close). Openness 0 = shut, 1 = normal.
+// ============================================================================
+
+enum SleepPhase { SLEEP_CLOSING, SLEEP_CLOSED, SLEEP_TWITCH, SLEEP_PEEK_OPEN, SLEEP_PEEK_HOLD, SLEEP_PEEK_CLOSE };
+static bool sleeping = false;
+static bool drawn_shut = false;    // Last frame drawn was fully shut: nothing to redraw
+static SleepPhase sleep_phase = SLEEP_CLOSED;
+static uint32_t phase_start = 0, phase_ms = 1;
+static float peek_open = 0;        // How far this twitch/peek opens (0-1)
+
+static void sleep_phase_set(SleepPhase p, uint32_t ms) {
+  sleep_phase = p;
+  phase_start = millis();
+  phase_ms = ms;
+}
+
+void eye_set_sleeping(bool on) {
+  sleeping = on;
+  drawn_shut = false;  // The screen was LVGL's (or awake eye) until now
+  if (on) sleep_phase_set(SLEEP_CLOSING, 2000);
+}
+
+static float smooth(float x) {  // Ease in/out, 0-1
+  return x * x * (3 - 2 * x);
+}
+
+static float sleep_openness() {
+  float x = (float)(millis() - phase_start) / phase_ms;
+  if (x >= 1) {  // Phase over: pick the next one
+    switch (sleep_phase) {
+      case SLEEP_CLOSING:
+      case SLEEP_TWITCH:
+      case SLEEP_PEEK_CLOSE:
+        sleep_phase_set(SLEEP_CLOSED, random(4000, 12000));
+        break;
+      case SLEEP_CLOSED:
+        if (random(100) < 65) {
+          peek_open = random(15, 35) / 100.0f;
+          sleep_phase_set(SLEEP_TWITCH, random(300, 500));
+        } else {
+          peek_open = random(40, 70) / 100.0f;
+          sleep_phase_set(SLEEP_PEEK_OPEN, random(900, 1500));
+        }
+        break;
+      case SLEEP_PEEK_OPEN:
+        sleep_phase_set(SLEEP_PEEK_HOLD, random(1000, 3000));
+        break;
+      case SLEEP_PEEK_HOLD:
+        sleep_phase_set(SLEEP_PEEK_CLOSE, random(1200, 2000));
+        break;
+    }
+    x = 0;
+  }
+  switch (sleep_phase) {
+    case SLEEP_CLOSING:    return 1 - smooth(x);
+    case SLEEP_TWITCH:     return peek_open * sinf((float)M_PI * x);
+    case SLEEP_PEEK_OPEN:  return peek_open * smooth(x);
+    case SLEEP_PEEK_HOLD:  return peek_open;
+    case SLEEP_PEEK_CLOSE: return peek_open * (1 - smooth(x));
+    default:               return 0;  // SLEEP_CLOSED
+  }
+}
+
+// ============================================================================
 // DRAWING
 // ============================================================================
 
@@ -359,6 +425,23 @@ void eye_frame() {
   }
   uThreshold = (uThreshold * 3 + n) / 4;
   lThreshold = 254 - uThreshold;
+
+  // Sleeping: lids follow the sleep openness instead of blinking. While fully shut the
+  // screen is already black, so skip drawing (standby does almost nothing then).
+  if (sleeping) {
+    float f = sleep_openness();
+    if (f <= 0.01f) {
+      if (drawn_shut) return;
+      drawn_shut = true;
+      f = 0;
+    } else {
+      drawn_shut = false;
+    }
+    n = 254 - (uint8_t)((254 - uThreshold) * f);
+    lThreshold = 254 - (uint8_t)((254 - lThreshold) * f);
+    draw_eye(next_iris(t), eyeX, eyeY, n, lThreshold);
+    return;
+  }
 
   // Blink scales both lids toward closed
   if (blink.state) {

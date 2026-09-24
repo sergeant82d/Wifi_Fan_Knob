@@ -412,7 +412,6 @@ void init_wifi() {
 // Starts the background SNTP client; it re-syncs every NTP_SYNC_INTERVAL
 // on its own, so nothing here blocks.
 // Apply saved brightness and time zone (boot, and after Config tab save)
-const uint8_t STANDBY_BRIGHTNESS = 10;  // % backlight in standby
 const int STANDBY_EYE_FPS = 15;         // Eye frame rate in standby (screensaver: as fast as it draws)
 
 static void set_backlight(uint8_t percent) {
@@ -422,7 +421,7 @@ static void set_backlight(uint8_t percent) {
 }
 
 void applyDisplaySettings() {
-  set_backlight(current_state == STATE_STANDBY ? STANDBY_BRIGHTNESS : config.display.brightness);
+  set_backlight(current_state == STATE_STANDBY ? config.display.standbyBrightness : config.display.brightness);
   setenv("TZ", config.display.posixTz, 1);  // POSIX rule chosen on the web UI
   tzset();
 }
@@ -525,7 +524,8 @@ static void set_standby(bool standby) {
     power_up_peripherals();
   }
   ui_set_standby(standby);
-  set_backlight(standby ? STANDBY_BRIGHTNESS : config.display.brightness);
+  eye_set_sleeping(standby);  // Standby: the eye sleeps; the screensaver's eye is awake
+  set_backlight(standby ? config.display.standbyBrightness : config.display.brightness);
   Serial.println(standby ? "Standby" : "Wake");
 }
 
