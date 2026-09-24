@@ -62,6 +62,7 @@ cd Wifi_Fan_Knob/Wifi_Fan_Knob     # PlatformIO project is nested
 | File | Purpose |
 |------|---------|
 | `STATUS_REPORT_01.md` | End-of-day report from the pre-hardware sessions |
+| `STATUS_REPORT_02.md` | End-of-day report, 2026-09-23 (first hardware session) |
 | `MQTT_SCHEMA.md` | Original HA discovery design (superseded; see MQTT below) |
 | `SPIFFS_CONFIG_SCHEMA.md` | JSON config structure |
 | `CrowPanel1.28inchRotary-11.jpg` | Board photo |
