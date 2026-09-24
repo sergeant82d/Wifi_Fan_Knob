@@ -32,6 +32,7 @@ For the technical details of each feature, see `CLAUDE.md`. This report covers w
 - **Web routes caught each other:** "Forget WiFi" and "Reset to Defaults" had never worked, because other routes were catching them. Now fixed.
 - **Hotspot stuck on:** once the board fell back to its hotspot, it never retried your WiFi. It now retries every 20 s.
 - **Knob button woke standby immediately:** pressing the knob also touches the glass, so the eye woke straight back up. Touch now only wakes after the finger lifts.
+- **Swipe pages stopped working:** once the RPM arc became draggable, the whole arc area caught every swipe. LVGL's ring-only touch detection is off by default; now turned on.
 - **GPIO 2:** it isn't the whole-board power latch the original notes described. Setting it LOW on USB power had no visible effect.
 
 ## Decisions made
