@@ -74,6 +74,9 @@ cd Wifi_Fan_Knob
 | `CrowPanel1.28inchRotary-11.jpg` | Board photo |
 | `Uncanny Eyes ... Instructables.pdf` | Reference for the dragon-eye animation |
 
+**Status reports** always go in `docs/Status_Reports/`, named `STATUS_REPORT_NN.md` with
+the next number (one per session day), and get a row in the table above.
+
 Pin reference lives in this file and at the top of `src/main.cpp`; there is no separate pin-mapping doc.
 
 ---
