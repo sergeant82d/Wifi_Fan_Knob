@@ -117,6 +117,11 @@ continued) and no visible display change. So on USB power GPIO 2 neither cuts MC
 blanks the display. Still possible it latches a battery/switch path that USB bypasses —
 untested. `shutdown_system()` must not be relied on to power off the board.
 
+Decided 2026-09-25: no further GPIO 2 test. The finished build runs from a fixed 12 V / 5 A
+supply (12 V for the fans, regulated 5 V for the level shifters' high side, 3.3 V for the
+rest), with no battery, so there is nothing for a latch to hold. Keep driving it HIGH as
+Elecrow does; the board cannot switch itself off in software.
+
 **Round screen**: corners of the 240×240 buffer are not visible — keep content inside the
 circle (e.g. `gfx.println` at (10,10) is off-screen).
 
@@ -415,11 +420,29 @@ STANDBY (1)
 
 ## Next Steps
 
-1. `fan_control.cpp`: EMC2101 PWM + tach once the module arrives (target RPM already wired)
+1. `fan_control.cpp`: EMC2101 PWM + tach once the module arrives (target RPM already wired).
+   **PWM frequency (decided 2026-09-25): PWM_F = 15 (0x0F), divider 1 → 12.0 kHz, 30 speed
+   steps of 3.3 % (~100 RPM each on the 3000 RPM fan).** Keep it one setting so it can be
+   changed after bench testing. Datasheet (rev 2.54, App. A): steps = 2 × PWM_F, frequency =
+   360 kHz / (2 × PWM_F × PWM_D); a Fan Setting above 2 × PWM_F gives 100 %. So usable Fan
+   Settings are 0-30, and the Adafruit `setDutyCycle()` (maps 0-100 % to 0-63) must not be
+   used; write the Fan Setting register directly. Trade-off: 12 kHz is below Noctua's 21-28
+   kHz spec (22.5 kHz would give only 16 steps, ~190 RPM each). User to check for whine and
+   smooth response; fallbacks are PWM_F 16 (11.25 kHz, 32 steps), PWM_F 8 (22.5 kHz, 16
+   steps) or PWM from an ESP32 pin (25 kHz, fine steps; EMC2101 reads the tach only).
+   Fan: Noctua 140 mm Chromax 3000 RPM, 4-wire; starts at about 6 % duty at 25 kHz.
 2. Measured RPM from the tach: Home Assistant sensor (MQTT, "Fan RPM", state class
    measurement), plus the LCD and the web Home tab
-3. Calibration UI, field testing
-4. GPIO 2 role on non-USB power (see Hardware Reference)
+3. Calibration (agreed design, 2026-09-25): a **Calibrate** button in the Config tab's fan
+   section. The LCD shows a calibration screen with the raw Fan Setting and the measured RPM
+   (also live on the web page). Standby, screensaver and double-tap are blocked meanwhile.
+   The knob moves one raw step per click. Min: start from stopped, raise until the fan
+   reliably starts, press to accept. Max: raise until the RPM stops climbing, press to
+   accept; the RPM there can fill in Fan max RPM. Long press or web Cancel keeps the old
+   values; leaving always restores the previous fan setting. Then a second button,
+   **Auto Sweep**: step through every setting, let it settle, record the RPM, and store the
+   table so a target RPM maps to the right setting. Build manual first, then the sweep.
+4. Field testing
 
 ### Later (user notes)
 - **Eye upgrades** — done: native 240x240, 10 styles selectable on the web, 15 fps in
@@ -456,8 +479,9 @@ STANDBY (1)
 ## Open Questions
 
 1. Noctua fan min/max PWM: initial guess 50-200. Decided 2026-09-24: leave until the fan is
-   connected, then calibrate.
-2. GPIO 2: no effect on USB power — does it matter on battery/other supply?
+   connected, then calibrate (see Next Steps 3). The stored 0-255 values will need to change
+   to Fan Setting units (0-30).
+2. Is 12 kHz PWM quiet and smooth on the Noctua? Check on the bench (see Next Steps 1).
 
 Decided: Home Assistant fan speed stays in RPM (2026-09-24). The eye is drawn procedurally
 with LovyanGFX (Uncanny Eyes), not pre-rendered frames or LVGL.
