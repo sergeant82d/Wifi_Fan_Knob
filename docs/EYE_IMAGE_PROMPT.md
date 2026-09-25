@@ -8,7 +8,7 @@ knob's round LCD as a test.
 
 ## Task
 
-> Cut the picture I name out of the sheet I name in `docs/`, fit it to the 240 × 240
+> Cut the picture I name out of the sheet I name in `assets/eye_art/`, fit it to the 240 × 240
 > round LCD, and show it on the board in place of the animated eye, as a **temporary
 > test build**. Show me the cropped picture before flashing. Don't commit the test code.
 > When I say I'm done, take the test code out and flash the normal firmware again.
@@ -34,7 +34,7 @@ The user names the sheet and the picture, for example "1.5_inch sheet, bottom le
 
 ## The sheets
 
-- The files are `docs/*_dragon-eyes-8.5x11.jpg`: US Letter at 300 dpi, 2550 × 3300 px.
+- The files are `assets/eye_art/*_dragon-eyes-8.5x11.jpg`: US Letter at 300 dpi, 2550 × 3300 px.
   Each holds round pictures in a grid on a white background, 4 across by 6 down on the
   1.5 inch sheet.
 - The file name gives the circle size. At 300 dpi, 1.5 inch is about 450 px across.
@@ -111,7 +111,7 @@ Check that `git status` is clean.
 
 ## Reference: the first picture done (2026-09-25)
 
-- **Sheet:** `docs/1.5_inch_dragon-eyes-8.5x11.jpg`, bottom-left picture (purple and
+- **Sheet:** `assets/eye_art/1.5_inch_dragon-eyes-8.5x11.jpg`, bottom-left picture (purple and
   orange fiery eye).
 - **Measured circle:** centre (502, 2898), diameter 451 px.
 - **Final, approved by the user:** `h = 214`, centre (497, 2893). That's 3 px right and

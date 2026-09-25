@@ -65,17 +65,20 @@ cd Wifi_Fan_Knob
 |------|---------|
 | `DISPLAY_GUIDE.md` | How to change the LCD: colours, fonts, segments, pages (human-readable) |
 | `EYE_IMAGE_PROMPT.md` | Prompt: cut a picture from a `*_dragon-eyes-8.5x11.jpg` sheet and show it on the LCD (test build); eyelid image spec for the artist |
-| `*_dragon-eyes-8.5x11.jpg` | Purchased dragon-eye picture sheets (300 dpi) |
 | `Status_Reports/STATUS_REPORT_01.md` | End-of-day report from the pre-hardware sessions |
 | `Status_Reports/STATUS_REPORT_02.md` | End-of-day report, 2026-09-23 (first hardware session) |
 | `Status_Reports/STATUS_REPORT_03.md` | End-of-day report, 2026-09-24 (second hardware session) |
 | `MQTT_SCHEMA.md` | Original HA discovery design (superseded; see MQTT below) |
 | `SPIFFS_CONFIG_SCHEMA.md` | JSON config structure |
-| `CrowPanel1.28inchRotary-11.jpg` | Board photo |
+| `images/` | Pictures used by the docs: board photo, display layout diagram, arc-button design reference |
 | `Uncanny Eyes ... Instructables.pdf` | Reference for the dragon-eye animation |
 
 **Status reports** always go in `docs/Status_Reports/`, named `STATUS_REPORT_NN.md` with
 the next number (one per session day), and get a row in the table above.
+
+**Eye artwork** (source art that ends up in the firmware) lives in `assets/eye_art/`, not
+`docs/`: the purchased `*_dragon-eyes-8.5x11.jpg` sheets (300 dpi), and the artist's eyelid
+images when they arrive.
 
 Pin reference lives in this file and at the top of `src/main.cpp`; there is no separate pin-mapping doc.
 

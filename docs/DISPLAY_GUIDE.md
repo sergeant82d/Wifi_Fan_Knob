@@ -4,7 +4,7 @@ This guide explains how to change the round LCD: colours, text, buttons, sizes a
 and how to add or remove swipe pages. It assumes you can open the project in VS Code with
 PlatformIO and press **Upload**. You don't need to know LVGL, the graphics library underneath.
 
-![Main page layout and the angle system](display_guide_layout.png)
+![Main page layout and the angle system](images/display_guide_layout.png)
 
 ---
 
