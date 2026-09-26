@@ -58,13 +58,15 @@ cd Wifi_Fan_Knob
 | `lib/Adafruit_EMC2101/` | Vendored | Adafruit EMC2101 driver (local copy, not from registry) |
 | `include/ui.h` / `src/ui.cpp` | ✅ Working | LVGL tileview pages (Main / Settings), segments, knob menu |
 | `include/dragon_eye.h` / `src/dragon_eye.cpp` | ✅ Working | Animated eye (standby + screensaver), native 240x240 |
-| `include/eye_styles.h` / `src/eye_styles.cpp` | ✅ Working | The 10 eye styles; `include/eyes/*.h` = Adafruit tables |
+| `include/eye_styles.h` / `src/eye_styles.cpp` | ✅ Working | The eye styles: 10 Uncanny Eyes (`include/eyes/*Eye.h` = Adafruit tables) + photo eyes |
+| `include/photo_eye.h` / `src/photo_eye.cpp` | 🧪 Untested on board | Photo eye renderer (artist open/shut pictures: moving iris, reactive slit pupil, lids); data `include/eyes/*Photo.h` from `tools/photo_eye.py` |
 
 ### Documentation (`docs/`)
 
 | File | Purpose |
 |------|---------|
 | `DISPLAY_GUIDE.md` | How to change the LCD: colours, fonts, segments, pages (human-readable) |
+| `PHOTO_EYES.md` | Photo eyes: how they animate, adding a new one (`tools/photo_eye.py`, `eye.json`), artist spec |
 | `EYE_IMAGE_PROMPT.md` | Prompt: cut a picture from a `*_dragon-eyes-8.5x11.jpg` sheet and show it on the LCD (test build); eyelid image spec for the artist |
 | `Status_Reports/STATUS_REPORT_01.md` | End-of-day report from the pre-hardware sessions |
 | `Status_Reports/STATUS_REPORT_02.md` | End-of-day report, 2026-09-23 (first hardware session) |
