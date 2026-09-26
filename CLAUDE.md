@@ -13,6 +13,9 @@ Read it before starting work.
 
 ## Essentials
 
+- **The user's to-do list is `docs/TODO.md`.** Check it at the start of a session. Work items
+  only when the user asks; when one is done, tick it (`- [x]`) and add the date and commit.
+  Questions there need an answer, not code.
 - Build and flash: `~/.platformio/penv/Scripts/pio.exe run -t upload` (board on COM13, native
   USB). Uploads often fail with "port busy / access denied" (UPS software grabs the port):
   retry a few times. Close any serial reader of your own before flashing.
