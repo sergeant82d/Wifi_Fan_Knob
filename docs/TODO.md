@@ -18,6 +18,9 @@
 
 - [x] Webserver - Config page - the Time Zone and Format settings got moved out of a card - please straighten that out. (done 2026-09-26, 1130099)
 
+- [ ] LCD - When we adjust the LCD buttons for the BME-688 sensor & auto-mode, see if we can't keep the four main speed buttons - LOW/MED/HIGH/MAX - above the horizontal. The bottom edge of the LOW button sitting at the 270* line, and the bottom of the MAX button sitting at 90*. Then the OFF and AUTO buttons extend lower from those points, each of them a further 45*, or whatever we restrict the drawing to in order to stay clear of the Clock.
+
+- [ ] 
 
 **Questions:**
 1. Will this present what I think is called 'mDNS'? Where it will provide a name to the LAN, so I can type, for example, "fanknob.local" in a browser when I'm on the network? If so, add a name block where I can set that name.
