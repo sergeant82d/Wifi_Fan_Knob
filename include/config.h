@@ -27,6 +27,7 @@ typedef struct {
     char staticGateway[16];         // e.g. "192.168.1.1"
     char staticSubnet[16];          // e.g. "255.255.255.0"
     char staticDns[16];             // Optional DNS, e.g. "8.8.8.8"
+    char hostname[32];              // mDNS / DHCP name: http://<hostname>.local:8080 (default "fanknob")
   } wifi;
 
   // Webserver Settings

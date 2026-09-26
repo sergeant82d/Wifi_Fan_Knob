@@ -3,6 +3,7 @@
 #include <WiFi.h>
 #include <time.h>
 #include <esp_sntp.h>
+#include <ESPmDNS.h>
 #include "lv_conf.h"
 
 #include "config.h"  // Add near top with other includes
@@ -327,6 +328,7 @@ void startAPMode() {
 // Static IP from the WiFi tab, or DHCP; call before WiFi.begin().
 // Addresses were validated when saved. DNS defaults to the gateway.
 static void apply_ip_config() {
+  WiFi.setHostname(config.wifi.hostname);  // Name shown in the router's device list
   IPAddress ip, gw, mask, dns;
   if (config.wifi.useStaticIp && ip.fromString(config.wifi.staticIp) &&
       gw.fromString(config.wifi.staticGateway) && mask.fromString(config.wifi.staticSubnet)) {
@@ -683,6 +685,14 @@ if (config.advanced.debugMode) {
   init_wifi();
   if (WiFi.status() == WL_CONNECTED) {
     start_ntp();
+  }
+  // mDNS: http://<hostname>.local:<port>. The responder follows the WiFi interfaces as they
+  // come up, so it also works when the network connects later.
+  if (MDNS.begin(config.wifi.hostname)) {
+    MDNS.addService("http", "tcp", config.webserver.port);
+    Serial.printf("mDNS: http://%s.local:%u\n", config.wifi.hostname, config.webserver.port);
+  } else {
+    Serial.println("mDNS start failed");
   }
   init_webserver();
   mqtt_init();  // Own task; connects once WiFi (STA) is up

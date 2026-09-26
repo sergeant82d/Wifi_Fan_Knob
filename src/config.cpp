@@ -126,6 +126,7 @@ bool loadConfig() {
   strlcpy(config.wifi.staticGateway, doc["network"]["wifi"]["staticGateway"] | "", sizeof(config.wifi.staticGateway));
   strlcpy(config.wifi.staticSubnet, doc["network"]["wifi"]["staticSubnet"] | "", sizeof(config.wifi.staticSubnet));
   strlcpy(config.wifi.staticDns, doc["network"]["wifi"]["staticDns"] | "", sizeof(config.wifi.staticDns));
+  strlcpy(config.wifi.hostname, doc["network"]["wifi"]["hostname"] | "fanknob", sizeof(config.wifi.hostname));
 
   // Webserver
   config.webserver.port = doc["network"]["webserver"]["port"] | 8080;
@@ -212,6 +213,7 @@ bool saveConfig() {
   doc["network"]["wifi"]["staticGateway"] = config.wifi.staticGateway;
   doc["network"]["wifi"]["staticSubnet"] = config.wifi.staticSubnet;
   doc["network"]["wifi"]["staticDns"] = config.wifi.staticDns;
+  doc["network"]["wifi"]["hostname"] = config.wifi.hostname;
 
   // Webserver
   doc["network"]["webserver"]["port"] = config.webserver.port;
@@ -314,6 +316,7 @@ void setDefaultConfig() {
   config.wifi.staticGateway[0] = '\0';
   config.wifi.staticSubnet[0] = '\0';
   config.wifi.staticDns[0] = '\0';
+  strlcpy(config.wifi.hostname, "fanknob", sizeof(config.wifi.hostname));
   config.power.activeHigh = true;
 
   // Webserver
@@ -438,6 +441,7 @@ String getConfigAsJson() {
   doc["network"]["wifi"]["staticGateway"] = config.wifi.staticGateway;
   doc["network"]["wifi"]["staticSubnet"] = config.wifi.staticSubnet;
   doc["network"]["wifi"]["staticDns"] = config.wifi.staticDns;
+  doc["network"]["wifi"]["hostname"] = config.wifi.hostname;
   doc["network"]["webserver"]["port"] = config.webserver.port;
   doc["network"]["mqtt"]["broker"] = config.mqtt.broker;
   doc["network"]["mqtt"]["port"] = config.mqtt.port;

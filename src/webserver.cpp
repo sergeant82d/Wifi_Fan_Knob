@@ -89,10 +89,7 @@ static String apply_config_form(AsyncWebServerRequest *request) {
   String fmt = form_value(request, "time_format");
   if (fmt != "12h" && fmt != "24h") return "Invalid time format";
 
-  long min_pwm, max_pwm, mqtt_port, saver_sec, standby_brightness;
-  if (!form_int(request, "min_pwm", 0, 255, min_pwm)) return "Min PWM must be 0-255";
-  if (!form_int(request, "max_pwm", 0, 255, max_pwm)) return "Max PWM must be 0-255";
-  if (min_pwm > max_pwm) return "Min PWM must not exceed Max PWM";
+  long mqtt_port, saver_sec, standby_brightness;
   if (!form_int(request, "mqtt_port", 1, 65535, mqtt_port)) return "MQTT port must be 1-65535";
   if (!form_int(request, "screensaver_sec", 0, 3600, saver_sec)) return "Screensaver delay must be 0-3600 seconds";
   if (!form_int(request, "standby_brightness", 0, 100, standby_brightness)) return "Standby brightness must be 0-100";
@@ -105,6 +102,40 @@ static String apply_config_form(AsyncWebServerRequest *request) {
   }
   String eye_style = form_value(request, "eye_style");
   if (!eye_style_find(eye_style.c_str())) return "Unknown eye style";
+  String broker = form_value(request, "mqtt_broker");
+  String user = form_value(request, "mqtt_user");
+  String pass = form_value(request, "mqtt_pass");
+  if (broker.length() == 0 || broker.length() >= sizeof(config.mqtt.broker)) return "MQTT broker required (max 63 chars)";
+  if (user.length() >= sizeof(config.mqtt.username)) return "MQTT username too long (max 31)";
+  if (pass.length() >= sizeof(config.mqtt.password)) return "MQTT password too long (max 31)";
+  String level = form_value(request, "power_level");
+  if (level != "high" && level != "low") return "Invalid power switch level";
+
+  strlcpy(config.display.timezone, tz.c_str(), sizeof(config.display.timezone));
+  strlcpy(config.display.posixTz, tz_posix.c_str(), sizeof(config.display.posixTz));
+  strlcpy(config.display.timeFormat, fmt.c_str(), sizeof(config.display.timeFormat));
+  strlcpy(config.mqtt.broker, broker.c_str(), sizeof(config.mqtt.broker));
+  config.mqtt.port = mqtt_port;
+  strlcpy(config.mqtt.username, user.c_str(), sizeof(config.mqtt.username));
+  if (pass.length() > 0) {  // Blank = keep existing password (it is never sent to the browser)
+    strlcpy(config.mqtt.password, pass.c_str(), sizeof(config.mqtt.password));
+  }
+  config.mqtt.discoveryEnabled = form_value(request, "mqtt_discovery") == "1";
+  config.display.screensaverSec = saver_sec;
+  config.display.standbyBrightness = standby_brightness;
+  config.display.standbyAfterMin = standby_after_min;
+  config.display.standbyPromptSec = standby_prompt_sec;
+  strlcpy(config.display.eyeStyle, eye_style.c_str(), sizeof(config.display.eyeStyle));  // loop() applies it
+  config.power.activeHigh = level == "high";
+  return "";
+}
+
+// Fan Settings tab. Returns "" on success, else an error message (nothing is changed on error).
+static String apply_fan_form(AsyncWebServerRequest *request) {
+  long min_pwm, max_pwm;
+  if (!form_int(request, "min_pwm", 0, 255, min_pwm)) return "Min PWM must be 0-255";
+  if (!form_int(request, "max_pwm", 0, 255, max_pwm)) return "Max PWM must be 0-255";
+  if (min_pwm > max_pwm) return "Min PWM must not exceed Max PWM";
   // Fan's rated top speed; everything else (presets, knob, arc, web, HA) is limited to it
   long max_rpm;
   if (!form_int(request, "fan_max_rpm", config.fan.minRpm + config.fan.rpmStep, 20000, max_rpm)) {
@@ -120,18 +151,6 @@ static String apply_config_form(AsyncWebServerRequest *request) {
     if (i > 0 && presets[i] < presets[i - 1]) return "Presets must be in order: Low <= Med <= High <= Max";
   }
 
-  String broker = form_value(request, "mqtt_broker");
-  String user = form_value(request, "mqtt_user");
-  String pass = form_value(request, "mqtt_pass");
-  if (broker.length() == 0 || broker.length() >= sizeof(config.mqtt.broker)) return "MQTT broker required (max 63 chars)";
-  if (user.length() >= sizeof(config.mqtt.username)) return "MQTT username too long (max 31)";
-  if (pass.length() >= sizeof(config.mqtt.password)) return "MQTT password too long (max 31)";
-  String level = form_value(request, "power_level");
-  if (level != "high" && level != "low") return "Invalid power switch level";
-
-  strlcpy(config.display.timezone, tz.c_str(), sizeof(config.display.timezone));
-  strlcpy(config.display.posixTz, tz_posix.c_str(), sizeof(config.display.posixTz));
-  strlcpy(config.display.timeFormat, fmt.c_str(), sizeof(config.display.timeFormat));
   config.fan.calibration.minPwm = min_pwm;
   config.fan.calibration.maxPwm = max_pwm;
   config.fan.maxRpm = max_rpm;
@@ -140,20 +159,17 @@ static String apply_config_form(AsyncWebServerRequest *request) {
   config.fan.presets.medium = presets[1];
   config.fan.presets.high = presets[2];
   config.fan.presets.max = presets[3];
-  strlcpy(config.mqtt.broker, broker.c_str(), sizeof(config.mqtt.broker));
-  config.mqtt.port = mqtt_port;
-  strlcpy(config.mqtt.username, user.c_str(), sizeof(config.mqtt.username));
-  if (pass.length() > 0) {  // Blank = keep existing password (it is never sent to the browser)
-    strlcpy(config.mqtt.password, pass.c_str(), sizeof(config.mqtt.password));
-  }
-  config.mqtt.discoveryEnabled = form_value(request, "mqtt_discovery") == "1";
-  config.display.screensaverSec = saver_sec;
-  config.display.standbyBrightness = standby_brightness;
-  config.display.standbyAfterMin = standby_after_min;
-  config.display.standbyPromptSec = standby_prompt_sec;
-  strlcpy(config.display.eyeStyle, eye_style.c_str(), sizeof(config.display.eyeStyle));  // loop() applies it
-  config.power.activeHigh = level == "high";
   return "";
+}
+
+// mDNS/DHCP name: 1-31 lowercase letters, digits and hyphens, not starting or ending with one
+static bool valid_hostname(const String &name) {
+  if (name.length() == 0 || name.length() >= sizeof(config.wifi.hostname)) return false;
+  if (name[0] == '-' || name[name.length() - 1] == '-') return false;
+  for (char c : name) {
+    if (!(islower((unsigned char)c) || isdigit((unsigned char)c) || c == '-')) return false;
+  }
+  return true;
 }
 
 void init_webserver() {
@@ -427,6 +443,12 @@ void init_webserver() {
   server->on(AsyncURIMatcher::exact("/api/wifi/config"), HTTP_POST, [](AsyncWebServerRequest *request) {
     if (!require_login(request)) return;
     bool use_static = form_value(request, "use_static_ip") == "true";
+    String hostname = form_value(request, "hostname");
+    hostname.toLowerCase();
+    if (!valid_hostname(hostname)) {
+      request->send(400, "text/plain", "Device name: 1-31 letters, digits or hyphens (not at the start or end)");
+      return;
+    }
     String ip = form_value(request, "static_ip");
     String gw = form_value(request, "static_gateway");
     String mask = form_value(request, "static_subnet");
@@ -451,6 +473,7 @@ void init_webserver() {
     strlcpy(config.wifi.staticGateway, use_static ? gw.c_str() : "", sizeof(config.wifi.staticGateway));
     strlcpy(config.wifi.staticSubnet, use_static ? mask.c_str() : "", sizeof(config.wifi.staticSubnet));
     strlcpy(config.wifi.staticDns, use_static ? dns.c_str() : "", sizeof(config.wifi.staticDns));
+    strlcpy(config.wifi.hostname, hostname.c_str(), sizeof(config.wifi.hostname));
     if (!saveConfig()) {
       request->send(500, "text/plain", "Failed to write config to SPIFFS");
       return;
@@ -480,8 +503,24 @@ void init_webserver() {
     applyDisplaySettings();
     applyPowerSettings();
     mqtt_reconfigure();  // Broker/credentials may have changed
-    fan_profiles_sync_from_config();  // Max RPM + presets belong to the active fan profile
     request->send(200, "text/plain", "Configuration saved.");
+  });
+
+  // Save the Fan Settings tab (Min/Max PWM, fan max RPM, presets)
+  server->on(AsyncURIMatcher::exact("/api/fan/settings"), HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (!require_login(request)) return;
+    String error = apply_fan_form(request);
+    if (error.length() > 0) {
+      request->send(400, "text/plain", error);
+      return;
+    }
+    if (!saveConfig()) {
+      request->send(500, "text/plain", "Failed to write config to SPIFFS");
+      return;
+    }
+    fan_profiles_sync_from_config();  // Max RPM + presets belong to the active fan profile
+    mqtt_reconfigure();               // Home Assistant's Fan Speed limit follows the max RPM
+    request->send(200, "text/plain", "Fan settings saved.");
   });
 
   // Fan profiles (Config tab): list + Auto Configure progress

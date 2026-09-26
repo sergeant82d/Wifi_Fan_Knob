@@ -281,10 +281,11 @@
             margin-bottom: 20px;
         }
 
+        /* Same colours as the Display Mode buttons; the preset at the current target is solid gold */
         .preset-btn {
             padding: 15px 10px;
             background: rgba(255, 215, 0, 0.1);
-            border: 2px solid rgba(255, 215, 0, 0.3);
+            border: 2px solid #ffd700;
             border-radius: 6px;
             color: #ffd700;
             font-weight: 600;
@@ -293,8 +294,12 @@
         }
 
         .preset-btn:hover {
-            background: rgba(255, 215, 0, 0.25);
-            border-color: #ffd700;
+            background: rgba(255, 215, 0, 0.2);
+        }
+
+        .preset-btn.selected {
+            background: #ffd700;
+            color: #1a1a2e;
         }
 
         .speed-control {
@@ -427,6 +432,7 @@
         <div class="tabs">
             <button class="tab-btn active" onclick="switchTab('home')">Home</button>
             <button class="tab-btn" onclick="switchTab('wifi')">WiFi</button>
+            <button class="tab-btn" onclick="switchTab('fan')">Fan Settings</button>
             <button class="tab-btn" onclick="switchTab('config')">Config</button>
             <button class="tab-btn" onclick="switchTab('ota')">OTA Update</button>
         </div>
@@ -485,10 +491,11 @@
             <div class="speed-control">
                 <h3>Manual Speed Control</h3>
                 <div class="speed-input-group">
-                    <input type="range" id="speed-slider" min="0" max="2500" value="1500" oninput="updateSpeed(this.value)">
+                    <input type="range" id="speed-slider" min="0" max="2500" value="1500"
+                           oninput="updateSpeed(this.value)" onchange="sendSlider(true)">
                     <span class="speed-value" id="speed-display">1500</span>
                 </div>
-                <small style="color: #606060; display: block; margin-top: 10px;">Set fan speed manually (<span id="speed-range">0-2500</span> RPM)</small>
+                <small style="color: #606060; display: block; margin-top: 10px;">The fan follows the slider as you move it (<span id="speed-range">0-2500</span> RPM)</small>
             </div>
 
             <div class="speed-control">
@@ -500,8 +507,6 @@
                 </div>
                 <small style="color: #606060; display: block; margin-top: 10px;">Saved when you let go of the slider</small>
             </div>
-
-            <button class="btn-primary" onclick="applySpeed()">Apply Speed</button>
 
             <div class="status-card" style="margin-top: 20px;">
                 <h3>Display Mode</h3>
@@ -573,6 +578,14 @@
                 </p>
                 <form onsubmit="saveNetworkConfig(event)">
                     <div class="form-group" style="margin-bottom: 20px;">
+                        <label for="hostname">Device name</label>
+                        <input type="text" id="hostname" maxlength="31" pattern="[A-Za-z0-9]([A-Za-z0-9\-]*[A-Za-z0-9])?"
+                               placeholder="fanknob" required>
+                        <small style="color: #606060;">Open this page at <b>http://<span id="hostname-example">fanknob</span>.local:8080</b>
+                            on your network (most computers and iPhones; some Android phones don't support .local names).
+                            Letters, digits and hyphens.</small>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 20px;">
                         <div class="checkbox-group">
                             <input type="checkbox" id="static-ip-enable" onchange="toggleStaticIP()">
                             <label for="static-ip-enable" style="margin: 0;">Use Static IP Address</label>
@@ -628,24 +641,9 @@
         </div>
 
         <!-- CONFIG TAB -->
-        <div id="config" class="tab-content">
-            <form onsubmit="saveConfig(event)">
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label for="time-zone">Time Zone</label>
-                        <input type="text" id="tz-filter" placeholder="Search, e.g. London, Tokyo, Chicago" oninput="fillTimeZones()">
-                        <select id="time-zone" required style="margin-top: 6px;"></select>
-                        <button type="button" class="btn-secondary" onclick="useBrowserTimeZone()" style="margin-top: 6px; padding: 6px 12px;">Use this browser's time zone</button>
-                    </div>
-                    <div class="form-group">
-                        <label for="time-format">Time Format</label>
-                        <select id="time-format" required>
-                            <option value="12h" selected>12-Hour</option>
-                            <option value="24h">24-Hour</option>
-                        </select>
-                    </div>
-                </div>
-
+        <!-- FAN SETTINGS TAB -->
+        <div id="fan" class="tab-content">
+            <form onsubmit="saveFanSettings(event)">
                 <div class="status-card" style="margin-top: 20px;">
                     <h3>Fan Profiles</h3>
                     <p style="color: #a0a0a0; margin-bottom: 15px; font-size: 0.9rem;">
@@ -727,6 +725,58 @@
                     </div>
                 </div>
 
+                <button type="submit" class="btn-primary" style="margin-top: 15px;">Save Fan Settings</button>
+            </form>
+        </div>
+
+        <div id="config" class="tab-content">
+            <form onsubmit="saveConfig(event)">
+                <div class="status-card">
+                    <h3>Display & Interface</h3>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="eye-style">Eye style (screensaver and standby)</label>
+                            <select id="eye-style" required></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="standby-brightness">Standby brightness (%)</label>
+                            <input type="number" id="standby-brightness" min="0" max="100" value="10" required>
+                            <small style="color: #606060;">Screen brightness while the eye sleeps in standby. 0 = screen off</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="screensaver-sec">Screensaver (dragon eye) after</label>
+                            <input type="number" id="screensaver-sec" min="0" max="3600" value="30" required>
+                            <small style="color: #606060;">Seconds with no knob, touch or speed change. 0 = off</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="standby-after-min">Standby after screensaver (minutes)</label>
+                            <input type="number" id="standby-after-min" min="0" max="1440" value="10" required>
+                            <small style="color: #606060;">Screensaver on this long: the LCD asks whether to keep the fan running (straight to standby if the fan is off). Up to 1440 (24 h). 0 = never</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="standby-prompt-sec">Standby prompt timeout (seconds)</label>
+                            <input type="number" id="standby-prompt-sec" min="5" max="300" value="30" required>
+                            <small style="color: #606060;">No answer on the LCD this long: standby. 5-300 (5 minutes)</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="time-zone">Time Zone</label>
+                        <input type="text" id="tz-filter" placeholder="Search, e.g. London, Tokyo, Chicago" oninput="fillTimeZones()">
+                        <select id="time-zone" required style="margin-top: 6px;"></select>
+                        <button type="button" class="btn-secondary" onclick="useBrowserTimeZone()" style="margin-top: 6px; padding: 6px 12px;">Use this browser's time zone</button>
+                    </div>
+                    <div class="form-group">
+                        <label for="time-format">Time Format</label>
+                        <select id="time-format" required>
+                            <option value="12h" selected>12-Hour</option>
+                            <option value="24h">24-Hour</option>
+                        </select>
+                    </div>
+                </div>
+
                 <div class="status-card">
                     <h3>MQTT Configuration</h3>
                     <div class="form-grid">
@@ -770,41 +820,11 @@
                     </div>
                 </div>
 
-                <div class="status-card">
-                    <h3>Display & Interface</h3>
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label for="eye-style">Eye style (screensaver and standby)</label>
-                            <select id="eye-style" required></select>
-                        </div>
-                        <div class="form-group">
-                            <label for="standby-brightness">Standby brightness (%)</label>
-                            <input type="number" id="standby-brightness" min="0" max="100" value="10" required>
-                            <small style="color: #606060;">Screen brightness while the eye sleeps in standby. 0 = screen off</small>
-                        </div>
-                        <div class="form-group">
-                            <label for="screensaver-sec">Screensaver (dragon eye) after</label>
-                            <input type="number" id="screensaver-sec" min="0" max="3600" value="30" required>
-                            <small style="color: #606060;">Seconds with no knob, touch or speed change. 0 = off</small>
-                        </div>
-                        <div class="form-group">
-                            <label for="standby-after-min">Standby after screensaver (minutes)</label>
-                            <input type="number" id="standby-after-min" min="0" max="1440" value="10" required>
-                            <small style="color: #606060;">Screensaver on this long: the LCD asks whether to keep the fan running (straight to standby if the fan is off). Up to 1440 (24 h). 0 = never</small>
-                        </div>
-                        <div class="form-group">
-                            <label for="standby-prompt-sec">Standby prompt timeout (seconds)</label>
-                            <input type="number" id="standby-prompt-sec" min="5" max="300" value="30" required>
-                            <small style="color: #606060;">No answer on the LCD this long: standby. 5-300 (5 minutes)</small>
-                        </div>
-                    </div>
-                </div>
-
                 <button type="submit" class="btn-primary" style="margin-top: 15px;">Save Configuration</button>
             </form>
 
             <div class="status-card" style="margin-top: 20px;">
-                <h3>Web Login</h3>
+                <h3>Web Login (protects all changes)</h3>
                 <p style="color: #a0a0a0; margin-bottom: 15px; font-size: 0.9rem;">
                     Required for every change on this page (fan, settings, WiFi, OTA).
                     Changing an existing login requires being logged in.
@@ -899,27 +919,51 @@
             event.target.classList.add('active');
         }
 
-        // Slider follows the device's target until the user moves it; Apply sends it
+        // Slider follows the device's target until the user moves it. While dragging, the speed is
+        // sent at most 4 times a second, and once more on release (errors shown only then).
         let sliderDirty = false;
+        let sliderTimer = null;
+        let sliderSent = null;
 
         function updateSpeed(value) {
             sliderDirty = true;
             document.getElementById('speed-display').textContent = value;
+            if (!sliderTimer) sliderTimer = setTimeout(() => sendSlider(false), 250);
+        }
+
+        function sendSlider(final) {
+            clearTimeout(sliderTimer);
+            sliderTimer = null;
+            const rpm = document.getElementById('speed-slider').value;
+            if (rpm === sliderSent && !final) return;
+            sliderSent = rpm;
+            applySpeed(rpm, !final);
         }
 
         // Presets pass their exact RPM; the slider snaps to the knob step, so it isn't used for them
-        async function applySpeed(rpm = document.getElementById('speed-slider').value) {
+        async function applySpeed(rpm, quiet = false) {
             try {
                 await postForm('/api/fan', { rpm });
-                sliderDirty = false;
-                loadStatus();
+                if (!quiet) {
+                    sliderDirty = false;
+                    loadStatus();
+                }
             } catch (e) {
-                alert('Set speed failed: ' + e.message);
+                if (!quiet) alert('Set speed failed: ' + e.message);
             }
+        }
+
+        // Preset buttons act like radio buttons: the one at the current target is lit
+        let presetRpm = {};
+        function showPresets(target) {
+            ['low', 'medium', 'high', 'max'].forEach(k => {
+                document.getElementById('preset-btn-' + k).classList.toggle('selected', presetRpm[k] === target);
+            });
         }
 
         function setPreset(rpm) {
             document.getElementById('speed-display').textContent = rpm;
+            showPresets(rpm);
             applySpeed(rpm);
         }
 
@@ -1136,6 +1180,7 @@
                     const btn = document.getElementById('preset-btn-' + k);
                     btn.textContent = btn.textContent.split(' ')[0] + ' (' + rpm + ')';
                     btn.onclick = () => setPreset(rpm);
+                    presetRpm[k] = rpm;
                 });
                 loadFanProfiles();
                 document.getElementById('mqtt-broker').value = c.network.mqtt.broker;
@@ -1160,6 +1205,8 @@
                 document.getElementById('power-level').value = c.power.activeHigh ? 'high' : 'low';
                 updateBrightnessLabel(c.display.brightness);
                 const w = c.network.wifi;
+                document.getElementById('hostname').value = w.hostname;
+                document.getElementById('hostname-example').textContent = w.hostname;
                 document.getElementById('static-ip-enable').checked = w.useStaticIp;
                 document.getElementById('static-ip').value = w.staticIp;
                 document.getElementById('static-gateway').value = w.staticGateway;
@@ -1179,7 +1226,8 @@
                 const s = await (await fetch('/api/status')).json();
                 const signal = s.rssi === null ? 'n/a (AP mode)' : s.rssi + ' dBm';
                 set('device-ip', s.ip);
-                set('device-status', s.mode);
+                set('device-status', s.mode === 'WiFi' ? 'WiFi connected to "' + s.ssid + '"'
+                                                       : 'Hotspot "' + s.ssid + '"');
                 set('wifi-signal', signal);
                 set('current-ssid', s.ssid);
                 set('current-ip', s.ip);
@@ -1188,6 +1236,7 @@
 
                 // Home tab
                 set('rpm-current', s.target_rpm);
+                showPresets(s.target_rpm);
                 set('rpm-measured', s.fan_controller ? s.fan_rpm : '--');
                 set('fan-status', !s.fan_controller ? 'No fan controller'
                                   : (s.target_rpm > 0 ? 'Running' : 'Stopped'));
@@ -1345,6 +1394,25 @@
             }
         }
 
+        async function saveFanSettings(event) {
+            event.preventDefault();
+            const v = id => document.getElementById(id).value;
+            try {
+                alert(await postForm('/api/fan/settings', {
+                    min_pwm: v('fan-min-pwm'),
+                    max_pwm: v('fan-max-pwm'),
+                    fan_max_rpm: v('fan-max-rpm'),
+                    preset_low: v('preset-low'),
+                    preset_medium: v('preset-medium'),
+                    preset_high: v('preset-high'),
+                    preset_max: v('preset-max')
+                }));
+                loadConfig();  // Home tab preset buttons show the new speeds
+            } catch (e) {
+                alert('Save failed: ' + e.message);
+            }
+        }
+
         async function saveConfig(event) {
             event.preventDefault();
             const v = id => document.getElementById(id).value;
@@ -1353,13 +1421,6 @@
                     tz: v('time-zone'),
                     tz_posix: TZ_ZONES[v('time-zone')],
                     time_format: v('time-format'),
-                    min_pwm: v('fan-min-pwm'),
-                    max_pwm: v('fan-max-pwm'),
-                    fan_max_rpm: v('fan-max-rpm'),
-                    preset_low: v('preset-low'),
-                    preset_medium: v('preset-medium'),
-                    preset_high: v('preset-high'),
-                    preset_max: v('preset-max'),
                     mqtt_broker: v('mqtt-broker'),
                     mqtt_port: v('mqtt-port'),
                     mqtt_user: v('mqtt-user'),
@@ -1438,7 +1499,8 @@
             event.preventDefault();
             const enable = document.getElementById('static-ip-enable').checked;
             const data = {
-                use_static_ip: enable
+                use_static_ip: enable,
+                hostname: document.getElementById('hostname').value.trim().toLowerCase()
             };
             if (enable) {
                 data.static_ip = document.getElementById('static-ip').value;

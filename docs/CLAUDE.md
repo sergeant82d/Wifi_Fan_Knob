@@ -53,7 +53,7 @@ cd Wifi_Fan_Knob
 | `include/config.h` / `src/config.cpp` | ✅ Working | SPIFFS JSON config load/save/validate/defaults |
 | `include/lv_conf.h` | ✅ Minimal | LVGL 8 config (240×240, 16-bit) |
 | `include/webserver.h` / `src/webserver.cpp` | 🟡 Partial | `/` → embedded index.html; `GET /api/status` (network + target RPM/range, fan controller, power mode); `POST /api/fan` (target RPM); `POST /api/ota` (firmware upload); `/api/wifi` save/forget/scan (scan async: 202→200); `GET/POST /api/config`, `POST /api/config/reset` |
-| `web/index.html` | 🟡 Partial | 4-tab web UI; All 4 tabs wired (Home, WiFi, Config, OTA); Standby button says not implemented |
+| `web/index.html` | ✅ Working | 5-tab web UI: Home, WiFi, Fan Settings, Config, OTA |
 | `include/mqtt.h` / `src/mqtt.cpp` | ✅ Working | MQTT (PubSubClient) + Home Assistant discovery in own task |
 | `include/fan_control.h` / `src/fan_control.cpp` | ✅ Working | Target RPM → EMC2101 PWM (12 kHz, 30 steps), tach RPM, Auto Configure |
 | `include/fan_profiles.h` / `src/fan_profiles.cpp` | ✅ Working | Up to 5 fan profiles (`/fans.json`): measured table, max RPM, presets |
@@ -271,6 +271,20 @@ See `platformio.ini`. Libraries:
   (60 ms): single dropped touch readings were counting as extra taps. A stirred eye draws at
   full frame rate. The screensaver is unchanged (any input dismisses it). Logs `Stir: touch/
   knob`, `Wake tap n/4`, `Wake: 4 taps`. Constants listed in `DISPLAY_GUIDE.md` section 5.
+- Web page changes from `docs/TODO.md` (verified 2026-09-26): Home tab presets styled like the
+  Display Mode buttons, the one at the current target solid gold (`showPresets()`); speed
+  slider sends live (throttled to 250 ms, final send on release; errors shown only then),
+  Apply Speed removed. New **Fan Settings** tab (between WiFi and Config): Fan Profiles, Min/Max
+  PWM, Fan max RPM, presets, saved by `POST /api/fan/settings` (`apply_fan_form()`; also syncs
+  the active profile and reconnects MQTT); `/api/config` no longer takes fan fields. Config
+  tab order: Display & Interface, time zone/format, MQTT, Peripheral Power Switch, Save, Web
+  Login (retitled "protects all changes"; kept on Config, user decision), Factory Reset. Header
+  shows `WiFi connected to "<ssid>"` / `Hotspot "<ssid>"`.
+- Device name / mDNS (verified 2026-09-26): `config.wifi.hostname` (default "fanknob"; 1-31
+  lowercase letters, digits, hyphens), set in WiFi tab → Network Configuration (saved with the
+  static IP settings; restarts). `WiFi.setHostname()` in `apply_ip_config()` (router list),
+  `MDNS.begin()` + `_http._tcp` service after `init_wifi()`: `http://fanknob.local:8080`
+  (tested from the PC). Some Android versions don't resolve `.local`.
 - Display modes as radio buttons (2026-09-26): one `mode_request` (`power_request_mode()`,
   `PowerMode` in `power.h`) replaces the separate standby/screensaver requests; knob, touch,
   web (`POST /api/mode` active|screensaver|standby) and HA all go through it, so exactly one
@@ -500,7 +514,7 @@ STANDBY (1)
 | Config Storage | SPIFFS + JSON | Flexible, debuggable |
 | Webserver | ESPAsyncWebServer, port 8080 | Non-blocking |
 | Webserver exposure | Only explicit routes, no `serveStatic` | `/config.json` in SPIFFS holds WiFi/MQTT passwords |
-| UI Layout | 4-tab (Home/WiFi/Config/OTA) | Mobile-responsive |
+| UI Layout | 5 tabs (Home/WiFi/Fan Settings/Config/OTA) | Mobile-responsive |
 | HA Integration | MQTT Auto-Discovery | Zero-config |
 | Fan Speed | 100 RPM steps, 0-2500 RPM | Noctua fan range |
 | Standby | External power off + eye at 15 fps | Deep sleep can't animate; light sleep not needed for now |
