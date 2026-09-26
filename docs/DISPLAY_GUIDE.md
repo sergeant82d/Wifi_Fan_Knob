@@ -347,6 +347,11 @@ In `create_menu()` and `menu_highlight()`:
 | Standby brightness (0 = screen off) | Web page → Config → Display & Interface |
 | How the eye sleeps in standby (how long it stays shut, twitches, peeks) | `sleep_openness()` in `src/dragon_eye.cpp` |
 | Eye speed in standby (15 frames per second) | `STANDBY_EYE_FPS` in `src/main.cpp` |
+| Taps needed to wake from standby, after the first tap that stirs the eye (4) | `WAKE_TAPS` in `src/main.cpp` |
+| How long a stirred eye stays awake after each tap or knob turn (5000 ms) | `STIR_MS` in `src/main.cpp` |
+| How long the eye glances left or right after a knob turn (1000 ms) | `KNOB_GLANCE_MS` in `src/main.cpp` |
+| How long the finger must be off the glass before the next tap counts (60 ms) | `TAP_LIFT_MS` in `src/main.cpp` |
+| How fast a stirred eye opens (400 ms) and closes again (1500 ms) | `STIR_OPEN_MS` and the `SLEEP_STIR` case in `sleep_openness()`, `src/dragon_eye.cpp` |
 | What counts as "activity" | `note_activity()` calls in `src/main.cpp` (knob, button, touch, speed changes) |
 | The styles on offer, and their order | `EYE_STYLES` in `src/eye_styles.cpp` |
 
@@ -360,6 +365,22 @@ The screensaver shows the eye while the fan keeps running. A touch, knob turn or
 short press only dismisses it. In standby the eye goes to sleep: it closes, stays shut,
 and now and then twitches or peeks. Standby also stops the fan and switches external
 power off.
+
+**Waking from standby (wake gestures).** A bump shouldn't wake the board, so the eye
+reacts first:
+
+- **First tap:** the eye stirs. It opens, looks toward your finger and stays awake for
+  `STIR_MS`.
+- **While it's awake:** it follows your finger. `WAKE_TAPS` more taps wake the board, and
+  each tap keeps the eye awake a little longer. If it falls asleep first, the count starts
+  over.
+- **Turning the knob:** stirs the eye, which glances the way the knob turned, without
+  waking the board.
+- **Pressing the knob:** always wakes the board straight away.
+- **The web page and Home Assistant:** wake it as before.
+
+None of this applies to the screensaver: any touch, knob turn or press dismisses it at
+once, and the eye doesn't follow your finger there.
 
 ---
 

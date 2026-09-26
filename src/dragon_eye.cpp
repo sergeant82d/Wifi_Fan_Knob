@@ -212,14 +212,24 @@ void eye_begin(lgfx::LGFX_Device *display) {
 // ============================================================================
 // SLEEPING (standby): lids close slowly, stay shut 3.5-10 s, then twitch (brief flicker)
 // or peek (open part way, look around, close). Openness 0 = shut, 1 = normal.
+// A stir (touch or knob) opens it fully and keeps it awake, blinking, then it closes again.
 // ============================================================================
 
-enum SleepPhase { SLEEP_CLOSING, SLEEP_CLOSED, SLEEP_TWITCH, SLEEP_PEEK_OPEN, SLEEP_PEEK_HOLD, SLEEP_PEEK_CLOSE };
+enum SleepPhase { SLEEP_CLOSING, SLEEP_CLOSED, SLEEP_TWITCH, SLEEP_PEEK_OPEN, SLEEP_PEEK_HOLD, SLEEP_PEEK_CLOSE,
+                  SLEEP_STIR_OPEN, SLEEP_STIR };
 static bool sleeping = false;
 static bool drawn_shut = false;    // Last frame drawn was fully shut: nothing to redraw
 static SleepPhase sleep_phase = SLEEP_CLOSED;
 static uint32_t phase_start = 0, phase_ms = 1;
 static float peek_open = 0;        // How far this twitch/peek opens (0-1)
+static float openness_now = 0;     // Last sleeping openness drawn (a stir opens from here)
+static float stir_from = 0;        // Openness when the stir began
+static uint32_t stir_ms = 0;       // How long to stay awake once open
+const uint32_t STIR_OPEN_MS = 400;
+
+// Gaze held by eye_look() (0-1023, like the autonomous motion)
+static int16_t gaze_x = 512, gaze_y = 512;
+static uint32_t gaze_until = 0;
 
 static void sleep_phase_set(SleepPhase p, uint32_t ms) {
   sleep_phase = p;
@@ -231,6 +241,37 @@ void eye_set_sleeping(bool on) {
   sleeping = on;
   drawn_shut = false;  // The screen was LVGL's (or awake eye) until now
   if (on) sleep_phase_set(SLEEP_CLOSING, 2000);
+}
+
+void eye_stir(uint32_t ms) {
+  if (!sleeping) return;
+  stir_ms = ms;
+  if (sleep_phase == SLEEP_STIR) {
+    sleep_phase_set(SLEEP_STIR, ms);  // Already awake: restart the awake time
+  } else if (sleep_phase != SLEEP_STIR_OPEN) {
+    stir_from = openness_now;
+    sleep_phase_set(SLEEP_STIR_OPEN, STIR_OPEN_MS);
+  }
+}
+
+bool eye_stirred() {
+  return sleeping && (sleep_phase == SLEEP_STIR_OPEN || sleep_phase == SLEEP_STIR);
+}
+
+void eye_look(int x, int y, uint32_t ms) {
+  // The view window slides over the sclera, so a larger offset shows the iris further
+  // left/up: invert so the eye turns toward the point.
+  int32_t gx = 1023 - constrain(x, 0, OUT - 1) * 1023 / (OUT - 1);
+  int32_t gy = 1023 - constrain(y, 0, OUT - 1) * 1023 / (OUT - 1);
+  int32_t dx = gx * 2 - 1023, dy = gy * 2 - 1023;  // Keep inside the circle
+  float r = sqrtf((float)(dx * dx + dy * dy));
+  if (r > 1023) {
+    gx = 512 + (int32_t)(dx * 1023 / r) / 2;
+    gy = 512 + (int32_t)(dy * 1023 / r) / 2;
+  }
+  gaze_x = gx;
+  gaze_y = gy;
+  gaze_until = millis() + ms;
 }
 
 static float smooth(float x) {  // Ease in/out, 0-1
@@ -261,6 +302,13 @@ static float sleep_openness() {
       case SLEEP_PEEK_HOLD:
         sleep_phase_set(SLEEP_PEEK_CLOSE, random(1200, 2000));
         break;
+      case SLEEP_STIR_OPEN:
+        sleep_phase_set(SLEEP_STIR, stir_ms);
+        break;
+      case SLEEP_STIR:  // Awake time over: close slowly, like the end of a peek
+        peek_open = 1;
+        sleep_phase_set(SLEEP_PEEK_CLOSE, 1500);
+        break;
     }
     x = 0;
   }
@@ -270,6 +318,8 @@ static float sleep_openness() {
     case SLEEP_PEEK_OPEN:  return peek_open * smooth(x);
     case SLEEP_PEEK_HOLD:  return peek_open;
     case SLEEP_PEEK_CLOSE: return peek_open * (1 - smooth(x));
+    case SLEEP_STIR_OPEN:  return stir_from + (1 - stir_from) * smooth(x);
+    case SLEEP_STIR:       return 1;
     default:               return 0;  // SLEEP_CLOSED
   }
 }
@@ -358,7 +408,15 @@ void eye_frame() {
   static uint32_t moveStart = 0;
   static int32_t moveDuration = 0;
   int32_t dt = t - moveStart;
-  if (inMotion) {
+  if ((int32_t)(gaze_until - millis()) > 0) {  // eye_look(): ease toward the point, then hold
+    oldX += (gaze_x - oldX) / 3;
+    oldY += (gaze_y - oldY) / 3;
+    eyeX = oldX;
+    eyeY = oldY;
+    inMotion = false;
+    moveStart = t;
+    moveDuration = random(1000000, 3000000);  // Roam again 1-3 s after the look ends
+  } else if (inMotion) {
     if (dt >= moveDuration) {
       inMotion = false;
       moveDuration = random(3000000);  // 0-3 s hold
@@ -428,8 +486,13 @@ void eye_frame() {
 
   // Sleeping: lids follow the sleep openness instead of blinking. While fully shut the
   // screen is already black, so skip drawing (standby does almost nothing then).
-  if (sleeping) {
+  // Stirred awake: draw like the awake eye (with blinks) until the stir ends
+  if (sleeping && sleep_openness() >= 1 && sleep_phase == SLEEP_STIR) {
+    openness_now = 1;
+    drawn_shut = false;
+  } else if (sleeping) {
     float f = sleep_openness();
+    openness_now = f;
     if (f <= 0.01f) {
       if (drawn_shut) return;
       drawn_shut = true;

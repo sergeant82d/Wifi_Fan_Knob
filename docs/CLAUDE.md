@@ -53,7 +53,7 @@ cd Wifi_Fan_Knob
 | `include/webserver.h` / `src/webserver.cpp` | 🟡 Partial | `/` → embedded index.html; `GET /api/status` (network + target RPM/range, fan controller, power mode); `POST /api/fan` (target RPM); `POST /api/ota` (firmware upload); `/api/wifi` save/forget/scan (scan async: 202→200); `GET/POST /api/config`, `POST /api/config/reset` |
 | `web/index.html` | 🟡 Partial | 4-tab web UI; All 4 tabs wired (Home, WiFi, Config, OTA); Standby button says not implemented |
 | `include/mqtt.h` / `src/mqtt.cpp` | ✅ Working | MQTT (PubSubClient) + Home Assistant discovery in own task |
-| `include/fan_control.h` / `src/fan_control.cpp` | 🟡 Partial | Target RPM (knob + web, clamped to config) and EMC2101 probe; PWM/tach TODO |
+| `include/fan_control.h` / `src/fan_control.cpp` | ✅ Working | Target RPM → EMC2101 PWM (12 kHz, 30 steps), tach RPM; calibration TODO |
 | `lib/Adafruit_EMC2101/` | Vendored | Adafruit EMC2101 driver (local copy, not from registry) |
 | `include/ui.h` / `src/ui.cpp` | ✅ Working | LVGL tileview pages (Main / Settings), segments, knob menu |
 | `include/dragon_eye.h` / `src/dragon_eye.cpp` | ✅ Working | Animated eye (standby + screensaver), native 240x240 |
@@ -244,6 +244,14 @@ See `platformio.ini`. Libraries:
   (web Config -> Display & Interface, 0-100 %, default 10, 0 = off; replaced STANDBY_BRIGHTNESS). Touch wake only after the screen has read "no touch" once (`standby_touch_armed`):
   pressing the knob also touches the glass. Each wake logs its cause (`Wake: button/knob/touch/
   fan target`).
+  Wake gestures (standby only, verified 2026-09-25): the first new tap stirs the eye
+  (`eye_stir()`: opens over 400 ms, blinks, `eye_look()` follows the finger), then `WAKE_TAPS`
+  (4) more taps wake the board; each tap restarts `STIR_MS` (5 s); when it closes again the
+  count restarts. A knob turn stirs it and glances that way (`KNOB_GLANCE_MS`); a knob press,
+  web or HA wakes at once. A tap only counts after the finger has been off for `TAP_LIFT_MS`
+  (60 ms): single dropped touch readings were counting as extra taps. A stirred eye draws at
+  full frame rate. The screensaver is unchanged (any input dismisses it). Logs `Stir: touch/
+  knob`, `Wake tap n/4`, `Wake: 4 taps`. Constants listed in `DISPLAY_GUIDE.md` section 5.
 - `include/ui.h` standby LVGL screen (grey clock) still exists but is no longer shown.
 - Peripheral power switch (verified): GPIO 4 drives a transistor that powers everything except
   MCU/LCD (fan, lights, sensors, EMC2101). ON while awake, OFF in standby; Fan Off only sets
@@ -290,17 +298,24 @@ See `platformio.ini`. Libraries:
 - Config tab: loads current settings, validates, saves (MQTT password never sent to browser;
   blank = keep). Brightness (PWM backlight) and time zone apply
   at boot and immediately on save via `applyDisplaySettings()` (verified on hardware).
+- Fan drive (verified 2026-09-25, EMC2101 at 0x4C on I2C 38/39, Noctua 3000 RPM): `fan_init()`
+  overrides Adafruit's `begin()` (which sets 100 % and the 1.4 kHz base clock, ~23 Hz PWM):
+  360 kHz base, PWM_F 15 → 12.0 kHz, then Fan Setting 0. `fan_update()` (every loop) maps the
+  target RPM linearly between Config Min/Max PWM (0-255 duty, kept in duty units so they
+  survive a PWM_F change) to a Fan Setting 0-30, written straight to register 0x4C only when
+  it changes; 0 RPM = setting 0 (fan stops). Tach read once a second → `fan_get_rpm()`,
+  `fan_rpm` in `/api/status`, and `[FAN] n RPM measured` in the log every 5 s. Open loop, so
+  target and measured differ (e.g. target 200 → 346 RPM with Min 16 / Max 255) until
+  calibration / auto sweep.
 
 ### 🔧 Implemented, not yet verified
 - NTP: background SNTP started when WiFi STA connects, re-syncs every 60 min, local time
   per configured zone (`configTzTime`; plain `configTime` would reset TZ to UTC).
-- EMC2101 detection at 0x4C on I2C 38/39 — module not yet delivered; `EMC2101 not found!` expected.
 
 ### ⬜ Not started
-- Fan PWM output and tachometer reading (EMC2101 not delivered yet; `fan_control.cpp` only
-  holds the target RPM and probes for the chip)
-- Measured RPM: on the LCD, web page and Home Assistant (MQTT sensor), once the tach reads
-- Fan calibration (min/max PWM are stored but not used yet)
+- Measured RPM on the LCD, web Home tab and Home Assistant (MQTT "Fan RPM" sensor); the
+  value exists (`fan_get_rpm()`, `/api/status` `fan_rpm`)
+- Fan calibration mode and auto sweep (Next Steps 3)
 
 ### Known quirks
 - **Forgotten web login**: every change needs it, so recovery is over USB — erase the SPIFFS
@@ -428,7 +443,7 @@ STANDBY (1)
 
 ## Next Steps
 
-1. `fan_control.cpp`: EMC2101 PWM + tach once the module arrives (target RPM already wired).
+1. ✅ Done 2026-09-25: `fan_control.cpp` EMC2101 PWM + tach (see Working).
    **PWM frequency (decided 2026-09-25): PWM_F = 15 (0x0F), divider 1 → 12.0 kHz, 30 speed
    steps of 3.3 % (~100 RPM each on the 3000 RPM fan).** Keep it one setting so it can be
    changed after bench testing. Datasheet (rev 2.54, App. A): steps = 2 × PWM_F, frequency =
@@ -454,11 +469,8 @@ STANDBY (1)
 
 ### Later (user notes)
 - **Eye upgrades** — done: native 240x240, 10 styles selectable on the web, 15 fps in
-  standby, sleeping eye in standby, standby brightness setting. Declined: light sleep between
-  frames (small saving with WiFi on; revisit only for battery power). Left:
-  - **Wake gestures** — needs more thought before starting; design it together with the
-    sleeping eye (e.g. a touch makes the sleeping eye open/peek first, a second touch or hold
-    wakes). Today any new touch wakes; the touch from a knob press is ignored until lifted.
+  standby, sleeping eye in standby, standby brightness setting, wake gestures. Declined:
+  light sleep between frames (small saving with WiFi on; revisit only for battery power). Left:
   - **Standalone eye project** (later, after M4 Eyes)
   - **Eyelid images** (user is looking for closed-dragon-eye imagery; belongs with the
     standalone eye project). Today every lid-covered pixel is drawn black (`p = 0` in
@@ -487,8 +499,8 @@ STANDBY (1)
 ## Open Questions
 
 1. Noctua fan min/max PWM: initial guess 50-200. Decided 2026-09-24: leave until the fan is
-   connected, then calibrate (see Next Steps 3). The stored 0-255 values will need to change
-   to Fan Setting units (0-30).
+   connected, then calibrate (see Next Steps 3). Kept in 0-255 duty units; the firmware
+   converts to Fan Settings. Set to Min 16 (≈6 %, where the fan starts) / Max 255 for now.
 2. Is 12 kHz PWM quiet and smooth on the Noctua? Check on the bench (see Next Steps 1).
 
 Decided: Home Assistant fan speed stays in RPM (2026-09-24). The eye is drawn procedurally

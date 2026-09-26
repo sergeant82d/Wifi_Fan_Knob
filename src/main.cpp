@@ -413,6 +413,14 @@ void init_wifi() {
 // on its own, so nothing here blocks.
 // Apply saved brightness and time zone (boot, and after Config tab save)
 const int STANDBY_EYE_FPS = 15;         // Eye frame rate in standby (screensaver: as fast as it draws)
+// Wake gestures in standby: the first tap stirs the eye (it opens and looks at the finger);
+// WAKE_TAPS more taps while it is awake wake the board. Each tap keeps it awake STIR_MS
+// longer; if it falls asleep, the count starts over. A knob turn stirs it (it glances that
+// way); a knob press always wakes at once.
+const int WAKE_TAPS = 4;
+const uint32_t STIR_MS = 5000;
+const uint32_t KNOB_GLANCE_MS = 1000;
+const uint32_t TAP_LIFT_MS = 60;        // Finger must be off this long before the next tap counts
 
 static void set_backlight(uint8_t percent) {
   uint32_t duty = percent * 255 / 100;
@@ -462,6 +470,7 @@ void applyPowerSettings() {
 
 static volatile int8_t standby_request = -1;  // -1 none, 0 wake, 1 standby
 static bool standby_touch_armed = false;      // Set once no touch is seen in standby
+static int wake_taps = 0;                     // Taps since the eye was stirred from sleep
 
 void power_request_standby(bool standby) {
   standby_request = standby ? 1 : 0;
@@ -677,12 +686,15 @@ void loop() {
   }
 
   // Handle encoder rotation
+  fan_update();
   int32_t delta = encoder_read_detents();
   poll_button();
   if (delta != 0) note_activity();
   if (delta != 0 && power_is_standby()) {
-    Serial.printf("Wake: knob (%ld)\n", (long)delta);
-    power_request_standby(false);  // Turning the knob wakes; this turn is discarded
+    Serial.printf("Stir: knob (%ld)\n", (long)delta);
+    if (!eye_stirred()) wake_taps = 0;  // Stirred from sleep: taps count from zero
+    eye_stir(STIR_MS);  // Turning the knob stirs the eye; it glances the way it turned
+    eye_look(delta > 0 ? 239 : 0, 120, KNOB_GLANCE_MS);
   } else if (delta != 0 && saver_on) {
     set_saver(false);  // Dismiss only; this turn is discarded
   } else if (delta != 0 && ui_menu_open()) {
@@ -776,7 +788,7 @@ void loop() {
     // is paused, so poll touch directly. LVGL redraws Main when the screen reloads.
     // Standby saves power by drawing fewer frames; the screensaver runs flat out.
     static unsigned long last_eye_frame = 0;
-    bool draw = !power_is_standby() || millis() - last_eye_frame >= 1000 / STANDBY_EYE_FPS;
+    bool draw = !power_is_standby() || eye_stirred() || millis() - last_eye_frame >= 1000 / STANDBY_EYE_FPS;
     if (draw) {
       last_eye_frame = millis();
       eye_frame();
@@ -786,14 +798,29 @@ void loop() {
     // Wake only on a NEW touch: pressing the knob puts a finger on the glass,
     // so the touch that accompanied the long press must lift first.
     uint16_t tx, ty;
+    // A single dropped reading mid-touch must not count as a second tap.
     bool touching = touch_ok && read_touch(tx, ty);
+    static unsigned long last_touch_ms = 0;
+    if (touching) last_touch_ms = millis();
     if (!touching) {
-      standby_touch_armed = true;
+      if (millis() - last_touch_ms >= TAP_LIFT_MS) standby_touch_armed = true;
     } else if (standby_touch_armed && saver_on) {
       set_saver(false);  // Dismiss only
-    } else if (standby_touch_armed) {
-      Serial.printf("Wake: touch %u,%u\n", tx, ty);
-      power_request_standby(false);
+    } else if (standby_touch_armed) {  // Standby: a new tap
+      standby_touch_armed = false;
+      if (!eye_stirred()) {
+        wake_taps = 0;
+        Serial.println("Stir: touch");
+      } else if (++wake_taps >= WAKE_TAPS) {
+        Serial.printf("Wake: %d taps\n", wake_taps);
+        power_request_standby(false);
+      } else {
+        Serial.printf("Wake tap %d/%d\n", wake_taps, WAKE_TAPS);
+      }
+      eye_stir(STIR_MS);
+    }
+    if (touching && power_is_standby() && eye_stirred()) {
+      eye_look(tx, ty, 1000);  // Follow the finger; hold the look 1 s after it lifts
     }
 
     static uint32_t eye_frames = 0, eye_fps_start = 0;

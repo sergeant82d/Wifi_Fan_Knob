@@ -235,6 +235,7 @@ void init_webserver() {
     doc["max_rpm"] = config.fan.maxRpm;
     doc["rpm_step"] = config.fan.rpmStep;
     doc["fan_controller"] = fan_controller_present();
+    doc["fan_rpm"] = fan_get_rpm();
     doc["power_mode"] = power_is_standby() ? "Standby" : power_screensaver_on() ? "Active (screensaver)" : "Active";
     doc["periph_power"] = power_peripherals_on();
     doc["mqtt_connected"] = mqtt_connected();
