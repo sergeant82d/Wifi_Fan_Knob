@@ -1,6 +1,7 @@
 #include "webserver.h"
 #include "config.h"
 #include "fan_control.h"
+#include "fan_profiles.h"
 #include "power.h"
 #include "mqtt.h"
 #include "eye_styles.h"
@@ -450,7 +451,78 @@ void init_webserver() {
     applyDisplaySettings();
     applyPowerSettings();
     mqtt_reconfigure();  // Broker/credentials may have changed
+    fan_profiles_sync_from_config();  // Max RPM + presets belong to the active fan profile
     request->send(200, "text/plain", "Configuration saved.");
+  });
+
+  // Fan profiles (Config tab): list + Auto Configure progress
+  server->on(AsyncURIMatcher::exact("/api/fans"), HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(200, "application/json", fan_profiles_json());
+  });
+
+  // Make a profile the active fan (slot -1 = none: linear Min/Max PWM)
+  server->on(AsyncURIMatcher::exact("/api/fans/activate"), HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (!require_login(request)) return;
+    long slot;
+    if (!form_int(request, "slot", -1, FAN_PROFILE_MAX - 1, slot) || !fan_profiles_activate(slot)) {
+      request->send(400, "text/plain", "No such fan profile");
+      return;
+    }
+    mqtt_reconfigure();  // Home Assistant's speed limit follows the fan
+    request->send(200, "text/plain", slot < 0 ? "No fan profile active" : "Fan profile active");
+  });
+
+  server->on(AsyncURIMatcher::exact("/api/fans/rename"), HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (!require_login(request)) return;
+    long slot;
+    String name = form_value(request, "name");
+    name.trim();
+    if (name.length() == 0 || name.length() >= FAN_PROFILE_NAME_LEN) {
+      request->send(400, "text/plain", "Name must be 1-" + String(FAN_PROFILE_NAME_LEN - 1) + " characters");
+      return;
+    }
+    if (!form_int(request, "slot", 0, FAN_PROFILE_MAX - 1, slot) || !fan_profiles_rename(slot, name.c_str())) {
+      request->send(400, "text/plain", "No such fan profile");
+      return;
+    }
+    request->send(200, "text/plain", "Renamed");
+  });
+
+  server->on(AsyncURIMatcher::exact("/api/fans/delete"), HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (!require_login(request)) return;
+    long slot;
+    if (!form_int(request, "slot", 0, FAN_PROFILE_MAX - 1, slot) || !fan_profiles_delete(slot)) {
+      request->send(400, "text/plain", "No such fan profile");
+      return;
+    }
+    request->send(200, "text/plain", "Deleted");
+  });
+
+  // Auto Configure into a slot (-1 = new profile); progress via GET /api/fans
+  server->on(AsyncURIMatcher::exact("/api/fans/autoconfig"), HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (!require_login(request)) return;
+    long slot;
+    String name = form_value(request, "name");
+    name.trim();
+    if (name.length() == 0 || name.length() >= FAN_PROFILE_NAME_LEN) {
+      request->send(400, "text/plain", "Name must be 1-" + String(FAN_PROFILE_NAME_LEN - 1) + " characters");
+      return;
+    }
+    if (!form_int(request, "slot", -1, FAN_PROFILE_MAX - 1, slot)) {
+      request->send(400, "text/plain", "Invalid profile slot");
+      return;
+    }
+    if (!fan_autoconfig_start(slot, name.c_str())) {
+      request->send(409, "text/plain", "Can't start: already running, no fan controller, or in standby");
+      return;
+    }
+    request->send(200, "text/plain", "Auto configure started");
+  });
+
+  server->on(AsyncURIMatcher::exact("/api/fans/cancel"), HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (!require_login(request)) return;
+    fan_autoconfig_cancel();
+    request->send(200, "text/plain", "Cancelling");
   });
 
   // Factory reset (includes WiFi credentials), then reboot

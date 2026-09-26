@@ -9,6 +9,7 @@
 #include "webserver.h"
 #include "ui.h"
 #include "fan_control.h"
+#include "fan_profiles.h"
 #include "power.h"
 #include "mqtt.h"
 
@@ -637,6 +638,7 @@ void setup() {
 
 Serial.println("Initializing configuration system...");
 initConfig();  // Load config from SPIFFS (or set defaults)
+fan_profiles_init();
 applyDisplaySettings();
 if (!eye_set_style(config.display.eyeStyle)) eye_set_style(EYE_STYLES[0]->id);  // Unknown: first style
 
@@ -690,6 +692,14 @@ void loop() {
   int32_t delta = encoder_read_detents();
   poll_button();
   if (delta != 0) note_activity();
+  // Auto Configure (started from the web page): the LCD shows its progress, so no
+  // screensaver; knob turns do nothing and a press cancels it (below)
+  bool configuring = fan_autoconfig_progress() >= 0;
+  if (configuring) {
+    note_activity();
+    if (saver_on) set_saver(false);
+    delta = 0;
+  }
   if (delta != 0 && power_is_standby()) {
     Serial.printf("Stir: knob (%ld)\n", (long)delta);
     if (!eye_stirred()) wake_taps = 0;  // Stirred from sleep: taps count from zero
@@ -727,6 +737,11 @@ void loop() {
     press_start = millis();
     press_handled = false;
     press_in_saver = saver_on;
+    if (configuring) {
+      Serial.println("Button: cancel auto configure");
+      fan_autoconfig_cancel();
+      press_handled = true;  // This press only cancels (no menu, no standby)
+    }
     if (power_is_standby()) {
       Serial.println("Wake: button");
       power_request_standby(false);

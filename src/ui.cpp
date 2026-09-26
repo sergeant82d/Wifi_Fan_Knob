@@ -18,6 +18,7 @@
 static lv_obj_t *rpm_arc = nullptr;
 static lv_obj_t *rpm_label = nullptr;
 static lv_obj_t *clock_label = nullptr;
+static lv_obj_t *unit_label = nullptr;  // "RPM", or "RPM (now 346)" with the measured speed
 static lv_obj_t *main_screen = nullptr;
 static lv_obj_t *standby_screen = nullptr;   // Dimmed: large clock only (dragon eye later)
 static lv_obj_t *standby_clock = nullptr;
@@ -357,7 +358,7 @@ static void create_main_page(lv_obj_t *scr) {
   lv_obj_set_style_text_color(rpm_label, lv_color_white(), 0);
   lv_obj_align(rpm_label, LV_ALIGN_CENTER, 0, -4);
 
-  lv_obj_t *unit_label = lv_label_create(scr);
+  unit_label = lv_label_create(scr);
   lv_obj_set_style_text_font(unit_label, &lv_font_montserrat_14, 0);
   lv_obj_set_style_text_color(unit_label, lv_color_hex(0x808080), 0);
   lv_label_set_text(unit_label, "RPM");
@@ -573,6 +574,15 @@ void ui_set_standby(bool standby) {
 }
 
 void ui_update() {
+  // Measured speed (tach) beside the RPM caption while the fan runs
+  char unit[24] = "RPM";
+  int setup = fan_autoconfig_progress();
+  if (setup >= 0) {
+    snprintf(unit, sizeof(unit), "Setup %d%% (%u)", setup, fan_get_rpm());
+  } else if (fan_controller_present() && (fan_get_target() > 0 || fan_get_rpm() > 0)) {
+    snprintf(unit, sizeof(unit), "RPM (now %u)", fan_get_rpm());
+  }
+  if (unit_label && strcmp(unit, lv_label_get_text(unit_label)) != 0) lv_label_set_text(unit_label, unit);
   seg_highlight();  // Presets may have been changed on the web page
   if (lv_arc_get_max_value(rpm_arc) != config.fan.maxRpm) {  // Fan max RPM changed on the web page
     lv_arc_set_range(rpm_arc, config.fan.minRpm, config.fan.maxRpm);

@@ -53,7 +53,8 @@ cd Wifi_Fan_Knob
 | `include/webserver.h` / `src/webserver.cpp` | 🟡 Partial | `/` → embedded index.html; `GET /api/status` (network + target RPM/range, fan controller, power mode); `POST /api/fan` (target RPM); `POST /api/ota` (firmware upload); `/api/wifi` save/forget/scan (scan async: 202→200); `GET/POST /api/config`, `POST /api/config/reset` |
 | `web/index.html` | 🟡 Partial | 4-tab web UI; All 4 tabs wired (Home, WiFi, Config, OTA); Standby button says not implemented |
 | `include/mqtt.h` / `src/mqtt.cpp` | ✅ Working | MQTT (PubSubClient) + Home Assistant discovery in own task |
-| `include/fan_control.h` / `src/fan_control.cpp` | ✅ Working | Target RPM → EMC2101 PWM (12 kHz, 30 steps), tach RPM; calibration TODO |
+| `include/fan_control.h` / `src/fan_control.cpp` | ✅ Working | Target RPM → EMC2101 PWM (12 kHz, 30 steps), tach RPM, Auto Configure |
+| `include/fan_profiles.h` / `src/fan_profiles.cpp` | ✅ Working | Up to 5 fan profiles (`/fans.json`): measured table, max RPM, presets |
 | `lib/Adafruit_EMC2101/` | Vendored | Adafruit EMC2101 driver (local copy, not from registry) |
 | `include/ui.h` / `src/ui.cpp` | ✅ Working | LVGL tileview pages (Main / Settings), segments, knob menu |
 | `include/dragon_eye.h` / `src/dragon_eye.cpp` | ✅ Working | Animated eye (standby + screensaver), native 240x240 |
@@ -112,6 +113,7 @@ https://github.com/Elecrow-RD/CrowPanel-1.28inch-HMI-ESP32-Rotary-Display-240-24
 | Touch SDA / SCL | 6 / 7 | |
 | Touch INT / RST | 5 / 13 | |
 | Main I2C SDA / SCL | 38 / 39 | EMC2101 (0x4C) + optional OLED |
+| EMC2101 TACH (on the Adafruit 4808 board) | — | **Needs a 10 kΩ pull-up to 3.3 V** (added by user 2026-09-25; the board's own TACH pull-up is off unless its solder jumper is bridged). Without it the tach floats and counts PWM noise |
 | Encoder A / B / SW | 45 / 42 / 41 | A/B decoded by PCNT hardware (no interrupts); SW polled, active-low |
 | Power Light | 40 | Elecrow drives it LOW |
 | RGB LED Data | 48 | |
@@ -304,18 +306,44 @@ See `platformio.ini`. Libraries:
   target RPM linearly between Config Min/Max PWM (0-255 duty, kept in duty units so they
   survive a PWM_F change) to a Fan Setting 0-30, written straight to register 0x4C only when
   it changes; 0 RPM = setting 0 (fan stops). Tach read once a second → `fan_get_rpm()`,
-  `fan_rpm` in `/api/status`, and `[FAN] n RPM measured` in the log every 5 s. Open loop, so
-  target and measured differ (e.g. target 200 → 346 RPM with Min 16 / Max 255) until
-  calibration / auto sweep.
+  `fan_rpm` in `/api/status`, and `[FAN] n RPM measured` in the log every 5 s. Starting from
+  stopped is left to the chip's spin-up (Fan Spin Up register default: 100 % for up to 3.2 s,
+  ended early by the tach).
+- Measured RPM shown (verified 2026-09-25): LCD caption "RPM (now N)" under the big target
+  number while the fan runs (`ui_update()`), web Home tab "Measured: N RPM", Home Assistant
+  sensor "Fan RPM" (`<base>/rpm`, state class measurement; published on a 30 RPM change, to/from
+  0, or every 10 s while it moves).
+- Fan profiles + Auto Configure (verified 2026-09-25 on an NF-P12 and an NF-A20): Config tab
+  "Fan Profiles" card. Up to 5 profiles in `/fans.json` (separate from `config.json`; survive
+  firmware updates). Each: name, `rpm[31]` measured at every Fan Setting, stall setting, max
+  RPM, presets. Activating one copies its max RPM + presets into `config.fan` (which the knob,
+  LCD, web and HA already use) and reconnects MQTT so HA's Fan Speed max follows; saving the
+  Config tab copies them back into the active profile (`fan_profiles_sync_from_config()`), so
+  presets are per fan. With a profile active, `setting_for()` picks the running setting whose
+  measured RPM is closest to the target; with none, the old linear Min/Max PWM estimate.
+  Auto Configure (`fan_autoconfig_start()`, web button, ~2 min): Fan Setting 30, then down one
+  step at a time to 0 or until the fan stops; runs a step per `fan_update()` call (loop keeps
+  going). New profile's max = top speed rounded down to the RPM step; presets 25/50/75/100 %
+  of it, or, when 25 % is below the slowest held speed (e.g. a fan that never stops), spread
+  evenly from that slowest speed to the top. LCD caption "Setup NN% (RPM)"; screensaver
+  blocked, knob turns ignored, knob press or web Cancel cancels; standby cancels. Fails with a
+  message if there is no RPM at full speed (nothing saved; fan returns to its target).
+  Measured: NF-P12 1626 → 149 RPM, stops at setting 1, presets 400/800/1200/1600. NF-A20
+  1011 → 421 RPM and **never stops** (still 421 RPM at 0 %), so Off can't stop it; only
+  standby (external power off) does. Tuned after that run, **not yet re-tested**: each step
+  now waits until two tach reads 500 ms apart agree within 1 % (min 2 s, max 10 s; full speed
+  min 3 s, max 20 s) because the NF-A20 was still speeding up at the fixed 6 s full-speed wait;
+  and the even-spread preset rule (it gave 500/500/800/1000 before).
 
 ### 🔧 Implemented, not yet verified
 - NTP: background SNTP started when WiFi STA connects, re-syncs every 60 min, local time
   per configured zone (`configTzTime`; plain `configTime` would reset TZ to UTC).
 
 ### ⬜ Not started
-- Measured RPM on the LCD, web Home tab and Home Assistant (MQTT "Fan RPM" sensor); the
-  value exists (`fan_get_rpm()`, `/api/status` `fan_rpm`)
-- Fan calibration mode and auto sweep (Next Steps 3)
+- Noctua industrial 3000 RPM fans: Auto Configure failed ("no RPM at full speed") because the
+  bench supply can't power them yet. User to re-test after wiring up their power supply.
+- Manual calibration mode (knob steps one Fan Setting, press to accept): superseded by Auto
+  Configure unless the user asks for it.
 
 ### Known quirks
 - **Forgotten web login**: every change needs it, so recovery is over USB — erase the SPIFFS
@@ -454,9 +482,9 @@ STANDBY (1)
    smooth response; fallbacks are PWM_F 16 (11.25 kHz, 32 steps), PWM_F 8 (22.5 kHz, 16
    steps) or PWM from an ESP32 pin (25 kHz, fine steps; EMC2101 reads the tach only).
    Fan: Noctua 140 mm Chromax 3000 RPM, 4-wire; starts at about 6 % duty at 25 kHz.
-2. Measured RPM from the tach: Home Assistant sensor (MQTT, "Fan RPM", state class
-   measurement), plus the LCD and the web Home tab
-3. Calibration (agreed design, 2026-09-25): a **Calibrate** button in the Config tab's fan
+2. ✅ Done 2026-09-25: measured RPM on the LCD, web Home tab and Home Assistant.
+3. ✅ Done 2026-09-25 as **Auto Configure + fan profiles** (see Working). Original design,
+   kept for reference: a **Calibrate** button in the Config tab's fan
    section. The LCD shows a calibration screen with the raw Fan Setting and the measured RPM
    (also live on the web page). Standby, screensaver and double-tap are blocked meanwhile.
    The knob moves one raw step per click. Min: start from stopped, raise until the fan
@@ -465,7 +493,7 @@ STANDBY (1)
    values; leaving always restores the previous fan setting. Then a second button,
    **Auto Sweep**: step through every setting, let it settle, record the RPM, and store the
    table so a target RPM maps to the right setting. Build manual first, then the sweep.
-4. Field testing
+4. Field testing, including the industrial fans once they have power.
 
 ### Later (user notes)
 - **Eye upgrades** — done: native 240x240, 10 styles selectable on the web, 15 fps in
@@ -501,7 +529,14 @@ STANDBY (1)
 1. Noctua fan min/max PWM: initial guess 50-200. Decided 2026-09-24: leave until the fan is
    connected, then calibrate (see Next Steps 3). Kept in 0-255 duty units; the firmware
    converts to Fan Settings. Set to Min 16 (≈6 %, where the fan starts) / Max 255 for now.
-2. Is 12 kHz PWM quiet and smooth on the Noctua? Check on the bench (see Next Steps 1).
+2. ✅ 12 kHz PWM: no audible whine (user, 2026-09-25).
+3. Finer PWM (discussed 2026-09-25, not wanted for now): the EMC2101 has at most 64 steps (6-bit
+   Fan Setting), 30 at 12 kHz. Noctua fans accept any duty cycle, so the ESP32's LEDC could
+   drive the fan's PWM wire at exactly 25 kHz with ~11-bit resolution (one spare GPIO, via the
+   5 V level shifter), with the EMC2101 kept for the tach. Revisit if exact RPM or closed-loop
+   control is wanted. User will re-look after wiring the industrial fans' supply.
+4. Off can't stop fans that keep turning at 0 % PWM (e.g. NF-A20). Option if wanted: Off also
+   cuts the GPIO 4 external power (also switches off anything else on that rail).
 
 Decided: Home Assistant fan speed stays in RPM (2026-09-24). The eye is drawn procedurally
 with LovyanGFX (Uncanny Eyes), not pre-rendered frames or LVGL.

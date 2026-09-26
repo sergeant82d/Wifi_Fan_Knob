@@ -74,6 +74,15 @@ static void publish_discovery() {
   }
   {
     StaticJsonDocument<768> doc;
+    doc["name"] = "Fan RPM";
+    doc["state_topic"] = topic("rpm");
+    doc["unit_of_measurement"] = "RPM";
+    doc["state_class"] = "measurement";
+    doc["icon"] = "mdi:fan";
+    publish_config("sensor", "rpm", doc);
+  }
+  {
+    StaticJsonDocument<768> doc;
     doc["name"] = "WiFi Signal";
     doc["state_topic"] = topic("rssi");
     doc["unit_of_measurement"] = "dBm";
@@ -138,6 +147,16 @@ static void publish_state(bool force) {
     client.publish(topic("speed").c_str(), String(rpm).c_str(), true);
     client.publish(topic("running").c_str(), rpm > 0 ? "ON" : "OFF", true);
     last_rpm = rpm;
+  }
+  // Measured RPM: on a change of 30+ RPM, to/from stopped, or at most every 10 s while it moves
+  static int last_measured = -1;
+  static unsigned long last_measured_ms = 0;
+  int measured = fan_get_rpm();
+  if (force || abs(measured - last_measured) >= 30 || ((measured == 0) != (last_measured == 0)) ||
+      (measured != last_measured && millis() - last_measured_ms >= 10000)) {
+    client.publish(topic("rpm").c_str(), String(measured).c_str(), true);
+    last_measured = measured;
+    last_measured_ms = millis();
   }
   int standby = power_is_standby();
   if (force || standby != last_standby) {

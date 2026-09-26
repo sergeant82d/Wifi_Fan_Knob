@@ -15,4 +15,12 @@ uint16_t fan_get_target();
 void fan_update();                      // loop() only: apply the target to the EMC2101, read the tach
 uint16_t fan_get_rpm();                 // Measured RPM (tach, updated once a second; 0 = stopped/absent)
 
+// Auto configure: measure the fan at every Fan Setting and save the result as a fan profile
+// (slot -1 = first free). Takes ~2 minutes; the fan's normal target is ignored meanwhile.
+// Safe to call from any task; loop() does the work.
+bool fan_autoconfig_start(int slot, const char *name);  // false if running, no controller or standby
+void fan_autoconfig_cancel();
+int fan_autoconfig_progress();          // -1 not running, else 0-99 %
+const char *fan_autoconfig_result();    // Last outcome ("" if none yet)
+
 #endif

@@ -202,6 +202,11 @@ All three are in `create_main_page()`, one block each:
 |---|---|---|---|
 | RPM number (`rpm_label`) | `montserrat_40` | white | 0, -4 |
 | "RPM" caption (`unit_label`) | `montserrat_14` | `0x808080` grey | 0, 28 |
+
+The caption's text changes by itself, once a second (`ui_update()` in `src/ui.cpp`): plain
+"RPM" when the fan is stopped, "RPM (now 346)" with the measured speed while it runs, and
+"Setup 40% (1200)" during Auto Configure. It has about 106 px of room between the segments,
+so keep any new wording short. The font has no special characters such as "·".
 | Clock (`clock_label`) | `montserrat_20` | `0xB0B0B0` light grey | 0, 50 |
 
 **Watch the RPM number's size.** A 4-digit speed at a larger font runs into the Off and Max

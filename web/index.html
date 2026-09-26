@@ -436,6 +436,7 @@
             <div class="rpm-display">
                 <div class="rpm-number" id="rpm-current">--</div>
                 <div class="rpm-label">Target RPM</div>
+                <div class="rpm-label">Measured: <span id="rpm-measured">--</span> RPM</div>
             </div>
 
             <button class="btn-danger" onclick="fanOff()"
@@ -634,8 +635,41 @@
                 </div>
 
                 <div class="status-card" style="margin-top: 20px;">
-                    <h3>Fan Calibration</h3>
-                    <p style="color: #a0a0a0; margin-bottom: 15px; font-size: 0.9rem;">Calibrate min/max PWM for your fan model</p>
+                    <h3>Fan Profiles</h3>
+                    <p style="color: #a0a0a0; margin-bottom: 15px; font-size: 0.9rem;">
+                        A fan profile holds one fan's measured speeds, plus its own Fan max RPM and presets
+                        (below). Auto Configure measures the fan connected now (about 2 minutes: full speed,
+                        then slower step by step until it stops) and sets the presets to 25 / 50 / 75 / 100 %
+                        of its top speed. You can edit them afterwards; saving keeps them with the active fan.
+                    </p>
+                    <div class="form-group">
+                        <label for="fan-profile">Active fan</label>
+                        <select id="fan-profile" onchange="activateFanProfile()"></select>
+                        <small id="fan-profile-info" style="color: #a0a0a0;"></small>
+                    </div>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px;">
+                        <button type="button" class="btn-secondary" onclick="renameFanProfile()">Rename</button>
+                        <button type="button" class="btn-danger" onclick="deleteFanProfile()">Delete</button>
+                    </div>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="autoconfig-name">Fan name</label>
+                            <input type="text" id="autoconfig-name" maxlength="23" placeholder="e.g. Noctua 140">
+                        </div>
+                        <div class="form-group">
+                            <label for="autoconfig-slot">Save as</label>
+                            <select id="autoconfig-slot"></select>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <button type="button" class="btn-primary" id="autoconfig-btn" onclick="startAutoConfig()">Auto Configure</button>
+                        <button type="button" class="btn-danger" id="autoconfig-cancel" onclick="cancelAutoConfig()" style="display: none;">Cancel</button>
+                    </div>
+                    <div id="autoconfig-status" style="margin-top: 10px; color: #a0a0a0;"></div>
+
+                    <p style="color: #a0a0a0; margin: 20px 0 15px; font-size: 0.9rem;">
+                        Without a fan profile, speed is estimated in a straight line between these:
+                    </p>
                     <div class="form-grid">
                         <div class="form-group">
                             <label for="fan-min-pwm">Min PWM (start threshold)</label>
@@ -1081,6 +1115,7 @@
                     btn.textContent = btn.textContent.split(' ')[0] + ' (' + rpm + ')';
                     btn.onclick = () => setPreset(rpm);
                 });
+                loadFanProfiles();
                 document.getElementById('mqtt-broker').value = c.network.mqtt.broker;
                 document.getElementById('mqtt-port').value = c.network.mqtt.port;
                 document.getElementById('mqtt-user').value = c.network.mqtt.username;
@@ -1129,6 +1164,7 @@
 
                 // Home tab
                 set('rpm-current', s.target_rpm);
+                set('rpm-measured', s.fan_controller ? s.fan_rpm : '--');
                 set('fan-status', !s.fan_controller ? 'No fan controller'
                                   : (s.target_rpm > 0 ? 'Running' : 'Stopped'));
                 set('power-mode', s.power_mode);
@@ -1171,6 +1207,123 @@
         }
         document.addEventListener('DOMContentLoaded', loadStatus);
         setInterval(loadStatus, 2000);  // Knob changes show within ~2 s
+
+        // Fan profiles (Config tab)
+        let fanProfiles = null;
+        let autoconfigTimer = null;
+
+        async function loadFanProfiles() {
+            try {
+                fanProfiles = await (await fetch('/api/fans')).json();
+            } catch (e) {
+                return;
+            }
+            const sel = document.getElementById('fan-profile');
+            const slotSel = document.getElementById('autoconfig-slot');
+            sel.innerHTML = '';
+            slotSel.innerHTML = '';
+            const add = (el, value, text) => {
+                const o = document.createElement('option');
+                o.value = value;
+                o.textContent = text;
+                el.appendChild(o);
+            };
+            add(sel, -1, 'None (use Min/Max PWM below)');
+            add(slotSel, -1, 'New profile');
+            fanProfiles.profiles.forEach((p, i) => {
+                if (!p) return;
+                add(sel, i, p.name);
+                add(slotSel, i, 'Replace: ' + p.name);
+            });
+            sel.value = fanProfiles.active;
+            const p = fanProfiles.profiles[fanProfiles.active];
+            document.getElementById('fan-profile-info').textContent =
+                !p ? '' : 'Measured: top ' + p.top + ' RPM, slowest ' + p.slowest + ' RPM' +
+                          (p.stops ? '' : ' (still turns at 0 %: Off can\'t stop it; standby cuts its power)');
+            showAutoConfig(fanProfiles.autoconfig);
+        }
+
+        function showAutoConfig(ac) {
+            const running = ac.progress >= 0;
+            document.getElementById('autoconfig-btn').disabled = running;
+            document.getElementById('autoconfig-cancel').style.display = running ? 'inline-block' : 'none';
+            document.getElementById('autoconfig-status').textContent = running
+                ? 'Measuring... ' + ac.progress + '% (a knob press on the device also cancels)'
+                : ac.result;
+            if (running && !autoconfigTimer) {
+                autoconfigTimer = setInterval(pollAutoConfig, 1000);
+            } else if (!running && autoconfigTimer) {
+                clearInterval(autoconfigTimer);
+                autoconfigTimer = null;
+                loadConfig();  // New profile, max RPM and presets
+            }
+        }
+
+        async function pollAutoConfig() {
+            try {
+                showAutoConfig((await (await fetch('/api/fans')).json()).autoconfig);
+            } catch (e) {}
+        }
+
+        async function fanAction(url, fields) {
+            try {
+                await postForm(url, fields);
+            } catch (e) {
+                alert(e.message);
+            }
+            loadConfig();
+        }
+
+        function selectedFanProfile() {
+            const slot = parseInt(document.getElementById('fan-profile').value, 10);
+            if (slot < 0) alert('Pick a fan profile first.');
+            return slot;
+        }
+
+        function activateFanProfile() {
+            fanAction('/api/fans/activate', { slot: document.getElementById('fan-profile').value });
+        }
+
+        function renameFanProfile() {
+            const slot = selectedFanProfile();
+            if (slot < 0) return;
+            const name = prompt('New name for this fan:', fanProfiles.profiles[slot].name);
+            if (name) fanAction('/api/fans/rename', { slot, name });
+        }
+
+        function deleteFanProfile() {
+            const slot = selectedFanProfile();
+            if (slot < 0) return;
+            if (confirm('Delete the fan profile "' + fanProfiles.profiles[slot].name + '"?')) {
+                fanAction('/api/fans/delete', { slot });
+            }
+        }
+
+        async function startAutoConfig() {
+            const name = document.getElementById('autoconfig-name').value.trim();
+            if (!name) {
+                alert('Enter a name for this fan first.');
+                return;
+            }
+            if (!confirm('Auto Configure runs the fan at full speed, then slows it step by step until it stops. ' +
+                         'It takes about 2 minutes. Continue?')) return;
+            try {
+                await postForm('/api/fans/autoconfig', { slot: document.getElementById('autoconfig-slot').value, name });
+            } catch (e) {
+                alert(e.message);
+                return;
+            }
+            document.getElementById('autoconfig-name').value = '';
+            pollAutoConfig();
+        }
+
+        async function cancelAutoConfig() {
+            try {
+                await postForm('/api/fans/cancel', {});
+            } catch (e) {
+                alert(e.message);
+            }
+        }
 
         async function saveConfig(event) {
             event.preventDefault();
