@@ -23,3 +23,6 @@ __pycache__/
 .env
 # Photo eye converter previews (large); preview.png is kept
 assets/eye_photos/*/preview.gif
+
+# Local reference copies, not part of the project
+docs/markdown-cheat-sheet.md
