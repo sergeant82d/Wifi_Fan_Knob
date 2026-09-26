@@ -21,6 +21,9 @@ uint16_t fan_get_rpm();                 // Measured RPM (tach, updated once a se
 bool fan_autoconfig_start(int slot, const char *name);  // false if running, no controller or standby
 void fan_autoconfig_cancel();
 int fan_autoconfig_progress();          // -1 not running, else 0-99 %
+int fan_autoconfig_step();              // Fan Setting being measured (FAN_STEPS down to 0)
+int fan_autoconfig_steps();             // FAN_STEPS
+const char *fan_autoconfig_name();      // Name of the profile being made
 const char *fan_autoconfig_result();    // Last outcome ("" if none yet)
 
 #endif

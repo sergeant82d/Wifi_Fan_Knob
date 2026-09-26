@@ -155,6 +155,18 @@ const char *fan_autoconfig_result() {
   return ac_result;
 }
 
+int fan_autoconfig_step() {
+  return ac_running ? ac_setting : FAN_STEPS;
+}
+
+int fan_autoconfig_steps() {
+  return FAN_STEPS;
+}
+
+const char *fan_autoconfig_name() {
+  return ac_running ? ac_name : ac_request_name;
+}
+
 // ============================================================================
 // NORMAL RUNNING
 // ============================================================================

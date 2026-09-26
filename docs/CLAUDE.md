@@ -194,8 +194,12 @@ See `platformio.ini`. Libraries:
   `THEME_*` colours at the top of `ui.cpp`. Main: navy gradient; gold target RPM (y -6) and
   arc; dim "RPM" caption (y 22, "Setup NN%" during Auto Configure); actual RPM "now N" in light
   text (y 48, LVGL recolour for the dim "now", hidden when stopped); dim clock in the bottom
-  gap (y 82). Settings is reversed (gold tile, navy text/slider) and now holds the IP box
-  (`create_status_box(tile, 22)`); its info shows SSID + MQTT only. WiFi lost flashes both the
+  gap (y 82). Settings (same dark theme) now holds the IP box (`create_status_box(tile, 22)`,
+  panel + gold text + gold border); its info shows SSID + MQTT only. Auto Configure has its
+  own gold screen (reversed theme, `create_config_screen()` / `update_config_screen()`):
+  progress ring, fan name, big %, live RPM, step, cancel hint; loaded automatically while it
+  runs, then the result for 30 s (`CFG_RESULT_MS`; knob turn/press skips), then Main unless something else
+  (standby) took the screen. WiFi lost flashes both the
   IP box and Main's clock red (`status_flash_cb`). Page dots have a navy outline so the gold
   current dot shows on the gold page.
 - Knob menu (verified): short press shows the page names (current one
@@ -539,12 +543,7 @@ STANDBY (1)
    connected, then calibrate (see Next Steps 3). Kept in 0-255 duty units; the firmware
    converts to Fan Settings. Set to Min 16 (≈6 %, where the fan starts) / Max 255 for now.
 2. ✅ 12 kHz PWM: no audible whine (user, 2026-09-25).
-3. Finer PWM (discussed 2026-09-25, not wanted for now): the EMC2101 has at most 64 steps (6-bit
-   Fan Setting), 30 at 12 kHz. Noctua fans accept any duty cycle, so the ESP32's LEDC could
-   drive the fan's PWM wire at exactly 25 kHz with ~11-bit resolution (one spare GPIO, via the
-   5 V level shifter), with the EMC2101 kept for the tach. Revisit if exact RPM or closed-loop
-   control is wanted. User will re-look after wiring the industrial fans' supply.
-4. Off can't stop fans that keep turning at 0 % PWM (e.g. NF-A20). Option if wanted: Off also
+3. Off can't stop fans that keep turning at 0 % PWM (e.g. NF-A20). Option if wanted: Off also
    cuts the GPIO 4 external power (also switches off anything else on that rail).
 
 Decided: Home Assistant fan speed stays in RPM (2026-09-24). The eye is drawn procedurally

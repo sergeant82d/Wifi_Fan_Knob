@@ -9,8 +9,8 @@
 // Main screen (240x240 round) is a horizontal tileview built from PAGES (below); swipe left from Main:
 //   Main:     RPM arc · band of Off + preset segments inside it (top) · target RPM
 //             (gold, centre) · actual RPM (light, below) · clock (bottom gap)
-//   Settings: gold (reversed theme): brightness slider (live; saved on release),
-//             IP box, network/MQTT info
+//   Settings: brightness slider (live; saved on release), IP box, network/MQTT info
+// Auto Configure has its own gold screen (reversed theme), shown only while it runs.
 // Page dots sit in the arc's bottom gap. Knob turns and wake return to Main.
 // Knob short press opens a menu of the pages: turn to choose, press or tap to go.
 // Double-tap on Main stops the fan (or pops up "Fan is not running").
@@ -27,7 +27,7 @@ static const uint32_t THEME_PANEL = 0x2A3150;      // Unlit segments, IP box, me
 static const uint32_t THEME_TRACK = 0x252B45;      // RPM arc's unfilled track
 static const uint32_t THEME_OFF = 0x8B1E1E;        // Off segment when not lit
 static const uint32_t THEME_ALERT = 0xD32F2F;      // "Fan stopped" popup, WiFi-lost flash
-static const uint32_t THEME_GOLD_DARK = 0xB39700;  // Settings page (gold): slider's unfilled track
+static const uint32_t THEME_GOLD_DARK = 0xB39700;  // Auto Configure screen (gold): progress ring's track
 
 static lv_obj_t *rpm_arc = nullptr;
 static lv_obj_t *rpm_label = nullptr;
@@ -37,6 +37,14 @@ static lv_obj_t *actual_label = nullptr;  // Measured RPM ("now 1234"), hidden w
 static lv_obj_t *main_screen = nullptr;
 static lv_obj_t *standby_screen = nullptr;   // Dimmed: large clock only (dragon eye later)
 static lv_obj_t *standby_clock = nullptr;
+static lv_obj_t *config_screen = nullptr;    // Auto Configure progress (gold), shown only while it runs
+static lv_obj_t *cfg_ring = nullptr;
+static lv_obj_t *cfg_name = nullptr;
+static lv_obj_t *cfg_big = nullptr;          // "40%", then "Done" / "Cancelled" / "Failed"
+static lv_obj_t *cfg_rpm = nullptr;
+static lv_obj_t *cfg_detail = nullptr;       // "Step 12 of 30", then the result message
+static lv_obj_t *cfg_hint = nullptr;
+static unsigned long cfg_result_until = 0;   // Result shown until (millis); 0 = not showing
 static lv_obj_t *status_box = nullptr;
 static lv_obj_t *status_label = nullptr;
 static lv_timer_t *status_flash_timer = nullptr;
@@ -48,6 +56,7 @@ static lv_obj_t *brightness_label = nullptr;
 static lv_obj_t *info_label = nullptr;
 
 static void create_standby_screen();
+static void create_config_screen();
 static void create_main_page(lv_obj_t *tile);
 static void create_settings_page(lv_obj_t *tile);
 static void create_page_dots(lv_obj_t *parent);
@@ -83,7 +92,7 @@ static void status_flash_cb(lv_timer_t *) {
   if (status_flash_red) {
     status_set_colors(lv_color_hex(THEME_ALERT), lv_color_white());
   } else {
-    status_set_colors(lv_color_hex(THEME_BG_TOP), lv_color_hex(THEME_GOLD));
+    status_set_colors(lv_color_hex(THEME_PANEL), lv_color_hex(THEME_GOLD));
   }
   lv_obj_set_style_text_color(clock_label, lv_color_hex(status_flash_red ? THEME_ALERT : THEME_TEXT_DIM), 0);
 }
@@ -93,7 +102,8 @@ static void create_status_box(lv_obj_t *parent, int y) {
   lv_obj_set_size(status_box, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
   lv_obj_align(status_box, LV_ALIGN_CENTER, 0, y);
   lv_obj_clear_flag(status_box, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_set_style_border_width(status_box, 0, 0);
+  lv_obj_set_style_border_width(status_box, 1, 0);
+  lv_obj_set_style_border_color(status_box, lv_color_hex(THEME_GOLD), 0);
   lv_obj_set_style_radius(status_box, 6, 0);
   lv_obj_set_style_pad_hor(status_box, 8, 0);
   lv_obj_set_style_pad_ver(status_box, 4, 0);
@@ -103,7 +113,7 @@ static void create_status_box(lv_obj_t *parent, int y) {
   lv_obj_set_style_text_font(status_label, &lv_font_montserrat_14, 0);
   lv_label_set_text(status_label, "Starting...");
 
-  status_set_colors(lv_color_hex(THEME_BG_TOP), lv_color_hex(THEME_GOLD));
+  status_set_colors(lv_color_hex(THEME_PANEL), lv_color_hex(THEME_GOLD));
   status_flash_timer = lv_timer_create(status_flash_cb, 500, nullptr);
   lv_timer_pause(status_flash_timer);
 }
@@ -116,7 +126,7 @@ void ui_set_attention(bool attention) {
   } else {
     lv_timer_pause(status_flash_timer);
     status_flash_red = false;
-    status_set_colors(lv_color_hex(THEME_BG_TOP), lv_color_hex(THEME_GOLD));
+    status_set_colors(lv_color_hex(THEME_PANEL), lv_color_hex(THEME_GOLD));
     lv_obj_set_style_text_color(clock_label, lv_color_hex(THEME_TEXT_DIM), 0);
   }
 }
@@ -192,6 +202,7 @@ void ui_init() {
   create_page_dots(main_screen);
   create_menu(main_screen);  // After the dots so it covers them
   create_standby_screen();
+  create_config_screen();
   ui_set_target_rpm(config.fan.minRpm);
 }
 
@@ -409,6 +420,10 @@ static void tap_back_cb(lv_event_t *) {
 }
 
 void ui_show_main() {
+  if (lv_scr_act() == config_screen && fan_autoconfig_progress() < 0) {  // Result showing: skip it
+    cfg_result_until = 0;
+    lv_scr_load(main_screen);
+  }
   lv_obj_set_tile_id(tileview, 0, 0, LV_ANIM_ON);
 }
 
@@ -515,6 +530,10 @@ bool ui_menu_open() {
 }
 
 void ui_menu_button() {
+  if (lv_scr_act() == config_screen) {  // Auto Configure result showing: a press just dismisses it
+    ui_show_main();
+    return;
+  }
   if (ui_menu_open()) {
     menu_go(menu_sel);
     return;
@@ -532,7 +551,7 @@ void ui_menu_turn(int delta) {
 static lv_obj_t *page_title(lv_obj_t *tile, const char *text) {
   lv_obj_t *title = lv_label_create(tile);
   lv_obj_set_style_text_font(title, &lv_font_montserrat_20, 0);
-  lv_obj_set_style_text_color(title, lv_color_hex(THEME_BG_TOP), 0);
+  lv_obj_set_style_text_color(title, lv_color_hex(THEME_TEXT_DIM), 0);
   lv_label_set_text(title, text);
   lv_obj_align(title, LV_ALIGN_CENTER, 0, -80);
   return title;
@@ -548,14 +567,11 @@ static void brightness_cb(lv_event_t *e) {
   }
 }
 
-// Reversed theme: gold background, dark blue text and controls
 static void create_settings_page(lv_obj_t *tile) {
-  lv_obj_set_style_bg_color(tile, lv_color_hex(THEME_GOLD), 0);
-  lv_obj_set_style_bg_opa(tile, LV_OPA_COVER, 0);
   page_title(tile, "Settings");
 
   brightness_label = lv_label_create(tile);
-  lv_obj_set_style_text_color(brightness_label, lv_color_hex(THEME_BG_TOP), 0);
+  lv_obj_set_style_text_color(brightness_label, lv_color_hex(THEME_TEXT), 0);
   lv_label_set_text_fmt(brightness_label, "Brightness %u%%", config.display.brightness);
   lv_obj_align(brightness_label, LV_ALIGN_CENTER, 0, -42);
 
@@ -566,15 +582,15 @@ static void create_settings_page(lv_obj_t *tile) {
   lv_slider_set_value(brightness_slider, config.display.brightness, LV_ANIM_OFF);
   lv_obj_add_event_cb(brightness_slider, brightness_cb, LV_EVENT_VALUE_CHANGED, nullptr);
   lv_obj_add_event_cb(brightness_slider, brightness_cb, LV_EVENT_RELEASED, nullptr);
-  lv_obj_set_style_bg_color(brightness_slider, lv_color_hex(THEME_GOLD_DARK), LV_PART_MAIN);
-  lv_obj_set_style_bg_color(brightness_slider, lv_color_hex(THEME_BG_TOP), LV_PART_INDICATOR);
-  lv_obj_set_style_bg_color(brightness_slider, lv_color_hex(THEME_BG_TOP), LV_PART_KNOB);
+  lv_obj_set_style_bg_color(brightness_slider, lv_color_hex(THEME_PANEL), LV_PART_MAIN);
+  lv_obj_set_style_bg_color(brightness_slider, lv_color_hex(THEME_GOLD), LV_PART_INDICATOR);
+  lv_obj_set_style_bg_color(brightness_slider, lv_color_hex(THEME_GOLD), LV_PART_KNOB);
 
   create_status_box(tile, 22);  // IP address (web page link)
 
   info_label = lv_label_create(tile);
   lv_obj_set_style_text_font(info_label, &lv_font_montserrat_14, 0);
-  lv_obj_set_style_text_color(info_label, lv_color_hex(THEME_BG_TOP), 0);
+  lv_obj_set_style_text_color(info_label, lv_color_hex(THEME_TEXT_DIM), 0);
   lv_obj_set_style_text_align(info_label, LV_TEXT_ALIGN_CENTER, 0);
   lv_label_set_text(info_label, "");
   lv_obj_align(info_label, LV_ALIGN_CENTER, 0, 60);
@@ -607,6 +623,92 @@ static void create_standby_screen() {
   lv_obj_center(standby_clock);
 }
 
+// Auto Configure: gold (reversed theme) so it can't be mistaken for any other screen.
+// Ring = progress; big % in the middle; cancel hint under it; live RPM and step below.
+// Keep text inside y = +/-80 or so: lower down, the ring cuts across the line.
+static const int CFG_DETAIL_Y = 70;         // "Step N of 31" while running
+static const int CFG_RESULT_Y = 34;         // Result message: higher, it wraps onto 2-3 lines
+static const uint32_t CFG_RESULT_MS = 30000; // Result stays up this long (a knob turn/press leaves sooner)
+
+static lv_obj_t *config_label(const lv_font_t *font, int y) {
+  lv_obj_t *label = lv_label_create(config_screen);
+  lv_obj_set_style_text_font(label, font, 0);
+  lv_obj_set_style_text_color(label, lv_color_hex(THEME_BG_TOP), 0);
+  lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
+  lv_label_set_text(label, "");
+  lv_obj_align(label, LV_ALIGN_CENTER, 0, y);
+  return label;
+}
+
+static void create_config_screen() {
+  config_screen = lv_obj_create(nullptr);
+  lv_obj_set_style_bg_color(config_screen, lv_color_hex(THEME_GOLD), 0);
+  lv_obj_clear_flag(config_screen, LV_OBJ_FLAG_SCROLLABLE);
+
+  cfg_ring = lv_arc_create(config_screen);
+  lv_obj_set_size(cfg_ring, 232, 232);
+  lv_obj_center(cfg_ring);
+  lv_obj_clear_flag(cfg_ring, LV_OBJ_FLAG_CLICKABLE);
+  lv_arc_set_rotation(cfg_ring, 270);  // Fills clockwise from 12 o'clock
+  lv_arc_set_bg_angles(cfg_ring, 0, 360);
+  lv_arc_set_range(cfg_ring, 0, 100);
+  lv_obj_set_style_arc_width(cfg_ring, 10, LV_PART_MAIN);
+  lv_obj_set_style_arc_width(cfg_ring, 10, LV_PART_INDICATOR);
+  lv_obj_set_style_arc_color(cfg_ring, lv_color_hex(THEME_GOLD_DARK), LV_PART_MAIN);
+  lv_obj_set_style_arc_color(cfg_ring, lv_color_hex(THEME_BG_TOP), LV_PART_INDICATOR);
+  lv_obj_set_style_bg_opa(cfg_ring, LV_OPA_TRANSP, LV_PART_KNOB);
+
+  lv_label_set_text(config_label(&lv_font_montserrat_14, -70), "AUTO CONFIGURE");
+  cfg_name = config_label(&lv_font_montserrat_14, -48);
+  lv_label_set_long_mode(cfg_name, LV_LABEL_LONG_DOT);
+  lv_obj_set_width(cfg_name, 170);
+  cfg_big = config_label(&lv_font_montserrat_48, -16);
+  cfg_hint = config_label(&lv_font_montserrat_14, 20);
+  lv_label_set_text(cfg_hint, "Press knob to cancel");
+  cfg_rpm = config_label(&lv_font_montserrat_20, 46);
+  cfg_detail = config_label(&lv_font_montserrat_14, CFG_DETAIL_Y);
+  lv_label_set_long_mode(cfg_detail, LV_LABEL_LONG_WRAP);  // Result messages are long
+  lv_obj_set_width(cfg_detail, 170);
+}
+
+// Once a second from ui_update(): show the screen while Auto Configure runs, then its
+// result for CFG_RESULT_MS, then back to Main (only if nothing else, e.g. standby, took the screen)
+static void update_config_screen() {
+  static bool was_running = false;
+  int progress = fan_autoconfig_progress();
+  if (progress >= 0) {
+    if (!was_running) {
+      was_running = true;
+      menu_close();
+      lv_label_set_text(cfg_name, fan_autoconfig_name());
+      lv_obj_clear_flag(cfg_hint, LV_OBJ_FLAG_HIDDEN);
+      lv_obj_align(cfg_detail, LV_ALIGN_CENTER, 0, CFG_DETAIL_Y);
+    }
+    if (lv_scr_act() != config_screen) lv_scr_load(config_screen);
+    lv_arc_set_value(cfg_ring, progress);
+    lv_label_set_text_fmt(cfg_big, "%d%%", progress);
+    lv_label_set_text_fmt(cfg_rpm, "%u RPM", fan_get_rpm());
+    lv_label_set_text_fmt(cfg_detail, "Step %d of %d",
+                          fan_autoconfig_steps() - fan_autoconfig_step() + 1, fan_autoconfig_steps() + 1);
+    return;
+  }
+  if (was_running) {  // Just finished: show the outcome
+    was_running = false;
+    const char *result = fan_autoconfig_result();
+    bool saved = strncmp(result, "Saved", 5) == 0;
+    lv_label_set_text(cfg_big, saved ? "Done" : strncmp(result, "Cancelled", 9) == 0 ? "Cancelled" : "Failed");
+    if (saved) lv_arc_set_value(cfg_ring, 100);
+    lv_label_set_text(cfg_rpm, "");
+    lv_label_set_text(cfg_detail, result);
+    lv_obj_align(cfg_detail, LV_ALIGN_CENTER, 0, CFG_RESULT_Y);
+    lv_obj_add_flag(cfg_hint, LV_OBJ_FLAG_HIDDEN);
+    cfg_result_until = millis() + CFG_RESULT_MS;
+  } else if (cfg_result_until && (long)(millis() - cfg_result_until) >= 0) {
+    cfg_result_until = 0;
+    if (lv_scr_act() == config_screen) lv_scr_load(main_screen);
+  }
+}
+
 void ui_set_standby(bool standby) {
   if (standby) menu_close();
   if (!standby) lv_obj_set_tile_id(tileview, 0, 0, LV_ANIM_OFF);  // Wake on Main page
@@ -614,17 +716,14 @@ void ui_set_standby(bool standby) {
 }
 
 void ui_update() {
-  // Caption under the target: "RPM", or Auto Configure progress. Actual RPM below it while
-  // the fan turns (hidden when stopped or without a fan controller).
-  char unit[24] = "RPM";
+  // Actual RPM under the target while the fan turns (hidden when stopped or without a fan
+  // controller). Auto Configure has its own screen.
   char actual[40] = "";
-  int setup = fan_autoconfig_progress();
-  if (setup >= 0) snprintf(unit, sizeof(unit), "Setup %d%%", setup);
-  if (fan_controller_present() && (fan_get_target() > 0 || fan_get_rpm() > 0 || setup >= 0)) {
+  if (fan_controller_present() && (fan_get_target() > 0 || fan_get_rpm() > 0)) {
     snprintf(actual, sizeof(actual), "#%06lX now# %u", (unsigned long)THEME_TEXT_DIM, fan_get_rpm());
   }
-  if (strcmp(unit, lv_label_get_text(unit_label)) != 0) lv_label_set_text(unit_label, unit);
   if (strcmp(actual, lv_label_get_text(actual_label)) != 0) lv_label_set_text(actual_label, actual);
+  update_config_screen();
   seg_highlight();  // Presets may have been changed on the web page
   if (lv_arc_get_max_value(rpm_arc) != config.fan.maxRpm) {  // Fan max RPM changed on the web page
     lv_arc_set_range(rpm_arc, config.fan.minRpm, config.fan.maxRpm);

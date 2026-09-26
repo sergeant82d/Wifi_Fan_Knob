@@ -72,15 +72,15 @@ at the top of `src/ui.cpp`, and used everywhere by name. Change one there and ev
 | Name | Colour | Used for |
 |---|---|---|
 | `THEME_BG_TOP`, `THEME_BG_BOTTOM` | `0x1A1A2E` → `0x16213E` dark blue | Main's background (a top-to-bottom gradient); dark text on gold |
-| `THEME_GOLD` | `0xFFD700` gold | Target RPM, RPM arc, lit segment, current page dot, selected menu item, Settings page background |
+| `THEME_GOLD` | `0xFFD700` gold | Target RPM, RPM arc, lit segment, current page dot, selected menu item, IP box text and border, Settings slider, Auto Configure screen background |
 | `THEME_ON_GOLD` | `0x1A1A2E` | Text on a gold segment or menu item |
-| `THEME_TEXT` | `0xE0E0E0` light grey | Actual RPM, segment labels, menu items |
-| `THEME_TEXT_DIM` | `0xA0A0A0` grey | "RPM" caption, "now", clock |
-| `THEME_PANEL` | `0x2A3150` slate blue | Unlit segments, other page dots, menu items, "not running" popup |
+| `THEME_TEXT` | `0xE0E0E0` light grey | Actual RPM, segment labels, menu items, Settings brightness label |
+| `THEME_TEXT_DIM` | `0xA0A0A0` grey | "RPM" caption, "now", clock, Settings title and info |
+| `THEME_PANEL` | `0x2A3150` slate blue | Unlit segments, other page dots, menu items, IP box, Settings slider track, "not running" popup |
 | `THEME_TRACK` | `0x252B45` | RPM arc's unfilled track |
 | `THEME_OFF` | `0x8B1E1E` dark red | Off segment when not lit |
 | `THEME_ALERT` | `0xD32F2F` red | "Fan stopped" popup, WiFi-lost flash |
-| `THEME_GOLD_DARK` | `0xB39700` | Settings page: brightness slider's unfilled track |
+| `THEME_GOLD_DARK` | `0xB39700` | Auto Configure screen: progress ring's unfilled track |
 
 For a one-off colour, write it as a hex code, like on a web page:
 
@@ -223,9 +223,8 @@ text means "what the fan is doing":
 | Actual RPM (`actual_label`): "now 1234" from the tach | `montserrat_20` | `THEME_TEXT`, "now" dim | 0, 48 |
 | Clock (`clock_label`), in the arc's bottom gap | `montserrat_20` | `THEME_TEXT_DIM` | 0, 82 |
 
-The caption and actual line change by themselves, once a second (`ui_update()` in
-`src/ui.cpp`). The caption reads "Setup 40%" during Auto Configure. The actual line is hidden
-while the fan is stopped (or with no fan controller). The grey "now" uses LVGL's recolour
+The actual line changes by itself, once a second (`ui_update()` in `src/ui.cpp`). It is
+hidden while the fan is stopped (or with no fan controller). The grey "now" uses LVGL's recolour
 code: `#A0A0A0 now#` in the text. The font has no special characters such as "·".
 
 When the saved WiFi is lost, the clock flashes red (with the IP box on Settings), in
@@ -238,7 +237,7 @@ segments; that's why it's 40 and not 48.
 
 In `create_page_dots()`: 8-pixel dots, 16 pixels apart, 10 pixels up from the bottom.
 The current page is gold and the others slate blue, all with a thin dark outline so the gold
-dot shows on the gold Settings page. There's one dot per page, added automatically.
+dot always stands out. There's one dot per page, added automatically.
 
 ### Double-tap popup
 
@@ -343,17 +342,39 @@ static void my_button_cb(lv_event_t *) {
 
 ### The Settings page
 
-In `create_settings_page()`. It uses the theme **reversed**: a gold background with dark
-blue text and controls.
+In `create_settings_page()`, in the same dark blue and gold as Main:
 * title at `y = -80`
-* brightness label and slider (slider 150 wide, range 10–100 %)
-* IP address box at `y = 22`: dark blue with gold text, made by `create_status_box(tile, 22)`.
+* brightness label and slider (slider 150 wide, range 10–100 %; gold fill and knob)
+* IP address box at `y = 22`: slate blue with gold text and a thin gold border, made by
+  `create_status_box(tile, 22)`.
   When the saved WiFi is lost it flashes red and white every half second (colours in
   `status_flash_cb()`, speed in `lv_timer_create(status_flash_cb, 500, ...)`).
 * network name and MQTT status at `y = 60`
 
 The IP box and the information text are updated once a second (`update_status_box()`,
 `update_info()`).
+
+### The Auto Configure screen
+
+A separate screen (not a swipe page) that appears by itself while Auto Configure runs (web
+page → Config → Fan Profiles). It uses the theme **reversed**, a gold background with dark
+blue text, so it can't be mistaken for anything else. Built in `create_config_screen()`,
+updated once a second by `update_config_screen()`:
+
+| Item | Font | Position (y) |
+|---|---|---|
+| Progress ring around the edge (fills clockwise from the top) | 10 px wide, 232 across | — |
+| "AUTO CONFIGURE" | `montserrat_14` | -70 |
+| Fan name (cut with "..." if too long) | `montserrat_14` | -48 |
+| Percentage, then "Done" / "Cancelled" / "Failed" | `montserrat_48` | -16 |
+| "Press knob to cancel" | `montserrat_14` | 20 |
+| Live RPM | `montserrat_20` | 46 |
+| "Step 12 of 31" (`CFG_DETAIL_Y`) | `montserrat_14` | 70 |
+| Result message, wraps onto 2-3 lines (`CFG_RESULT_Y`) | `montserrat_14` | 34 |
+
+Keep text within about ±80 of the centre: lower down, the progress ring cuts across it.
+
+When it finishes, the result stays up for 30 seconds (`CFG_RESULT_MS` in `src/ui.cpp`), then Main returns. A knob turn or press skips the wait.
 
 ### The knob menu
 
