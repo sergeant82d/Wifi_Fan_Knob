@@ -337,7 +337,9 @@ See `platformio.ini`. Libraries:
   blank = keep). Brightness (PWM backlight) and time zone apply
   at boot and immediately on save via `applyDisplaySettings()` (verified on hardware).
 - Fan drive (verified 2026-09-25, EMC2101 at 0x4C on I2C 38/39, Noctua 3000 RPM): `fan_init()`
-  overrides Adafruit's `begin()` (which sets 100 % and the 1.4 kHz base clock, ~23 Hz PWM):
+  overrides Adafruit's `begin()` (which picks the 1.4 kHz base clock, ~23 Hz PWM; its 100 % start
+  was changed to 0 % in our copy of the library on 2026-09-26, because it spun the fan briefly at
+  every boot and wake from standby):
   360 kHz base, PWM_F 15 → 12.0 kHz, then Fan Setting 0. `fan_update()` (every loop) maps the
   target RPM linearly between Config Min/Max PWM (0-255 duty, kept in duty units so they
   survive a PWM_F change) to a Fan Setting 0-30, written straight to register 0x4C only when

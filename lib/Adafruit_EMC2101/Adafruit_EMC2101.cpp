@@ -94,7 +94,9 @@ bool Adafruit_EMC2101::_init(void) {
   configPWMClock(1, 0);
   DACOutEnabled(false); // output PWM mode by default
   LUTEnabled(false);
-  setDutyCycle(100);
+  // Wifi_Fan_Knob change: start stopped. Adafruit's 100 % here spun the fan briefly at every
+  // boot and wake from standby, until fan_init() set the real speed.
+  setDutyCycle(0);
 
   enableForcedTemperature(false);
 

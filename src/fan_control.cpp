@@ -178,7 +178,7 @@ bool fan_init() {
   if (controller_present) {
     emc2101.configPWMClock(false, false);  // 360 kHz base clock, divider not used
     emc2101.setPWMFrequency(FAN_PWM_F);
-    write_fan_setting(0);                  // begin() left it at 100 %; fan_update() sets the target
+    write_fan_setting(0);                  // Stopped until fan_update() applies the target
   }
   Serial.println(controller_present ? "EMC2101 initialized" : "EMC2101 not found!");
   return controller_present;
