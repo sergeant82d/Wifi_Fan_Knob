@@ -257,9 +257,11 @@ of `ui.cpp`:
 
 ```cpp
 static const Page PAGES[] = {
-  {"Main", create_main_page},
   {"Settings", create_settings_page},
+  {"Main", create_main_page},
 };
+static const int SETTINGS_PAGE = 0;
+static const int MAIN_PAGE = 1;
 ```
 
 Each row is a **name** (shown in the knob menu) and a **function that builds the page**.
@@ -270,11 +272,14 @@ Everything else follows this table automatically:
 * the knob menu (short press on the knob)
 * tap-empty-space-to-return-to-Main, on every page except Main
 
-**Main must stay first.** Turning the knob and waking up both return to the first page.
+**Keep `MAIN_PAGE` and `SETTINGS_PAGE` pointing at the right rows** whenever you reorder:
+the board starts and wakes on `MAIN_PAGE`, and the knob uses both. Settings is left of Main:
+swipe right from Main to reach it. With the fan stopped, a left knob turn also opens Settings,
+and a right turn there returns to Main (speed unchanged).
 
 ### Reordering, renaming or removing a page
 
-* **Reorder:** move the rows.
+* **Reorder:** move the rows, then fix the numbers in `MAIN_PAGE` and `SETTINGS_PAGE`.
 * **Rename in the menu:** change the name in quotes.
 * **Remove:** delete the row. Also delete the page's `create_..._page` function and its
   declaration near the top of the file, or the build warns that it's unused.
@@ -294,9 +299,9 @@ static void create_about_page(lv_obj_t *tile);      // ← add
 
 ```cpp
 static const Page PAGES[] = {
-  {"Main", create_main_page},
   {"Settings", create_settings_page},
-  {"About", create_about_page},                     // ← add
+  {"Main", create_main_page},
+  {"About", create_about_page},                     // ← add (right of Main)
 };
 ```
 
@@ -344,12 +349,16 @@ static void my_button_cb(lv_event_t *) {
 
 In `create_settings_page()`, in the same dark blue and gold as Main:
 * title at `y = -80`
-* brightness label and slider (slider 150 wide, range 10–100 %; gold fill and knob)
-* IP address box at `y = 22`: slate blue with gold text and a thin gold border, made by
-  `create_status_box(tile, 22)`.
+* brightness label (`y = -52`) and slider (`y = -28`; 150 wide, range 10–100 %; gold fill and knob)
+* **Screensaver** label and switch at `y = 6` (`saver_switch`; gold when on). Off pauses the
+  screensaver without saving anything: it comes back on when switched back, when the fan stops,
+  at standby, after the web's "Screensaver pause limit", or on restart. While it's off, a
+  closed eye (`saver_off_icon`, `LV_SYMBOL_EYE_CLOSE`) shows just left of the clock on Main.
+* IP address box at `y = 40`: slate blue with gold text and a thin gold border, made by
+  `create_status_box(tile, 40)`.
   When the saved WiFi is lost it flashes red and white every half second (colours in
   `status_flash_cb()`, speed in `lv_timer_create(status_flash_cb, 500, ...)`).
-* network name and MQTT status at `y = 60`
+* network name and MQTT status at `y = 74`
 
 The IP box and the information text are updated once a second (`update_status_box()`,
 `update_info()`).
@@ -394,6 +403,8 @@ In `create_menu()` and `menu_highlight()`:
 | Standby brightness (0 = screen off) | Web page → Config → Display & Interface |
 | How long the screensaver runs before asking "Keep the fan running?" (0 = never) | Web page → Config → Display & Interface → Standby after screensaver (minutes) |
 | How long that question waits for an answer before standby | Web page → Config → Display & Interface → Standby prompt timeout (seconds) |
+| Pause the screensaver for now (not saved) | LCD Settings page → Screensaver switch |
+| How long that pause lasts at most (0 = no limit) | Web page → Config → Display & Interface → Screensaver pause limit (minutes) |
 | The question's look: text, buttons, countdown | `create_prompt()` in `src/ui.cpp` |
 | How the eye sleeps in standby (how long it stays shut, twitches, peeks) | `sleep_openness()` in `src/dragon_eye.cpp` |
 | Eye speed in standby (15 frames per second) | `STANDBY_EYE_FPS` in `src/main.cpp` |

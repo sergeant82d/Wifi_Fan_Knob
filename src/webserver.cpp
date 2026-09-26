@@ -100,6 +100,10 @@ static String apply_config_form(AsyncWebServerRequest *request) {
   if (!form_int(request, "standby_prompt_sec", 5, 300, standby_prompt_sec)) {
     return "Standby prompt timeout must be 5-300 seconds";
   }
+  long saver_pause_max_min;
+  if (!form_int(request, "saver_pause_max_min", 0, 1440, saver_pause_max_min)) {
+    return "Screensaver pause limit must be 0-1440 minutes";
+  }
   String eye_style = form_value(request, "eye_style");
   if (!eye_style_find(eye_style.c_str())) return "Unknown eye style";
   String broker = form_value(request, "mqtt_broker");
@@ -125,6 +129,7 @@ static String apply_config_form(AsyncWebServerRequest *request) {
   config.display.standbyBrightness = standby_brightness;
   config.display.standbyAfterMin = standby_after_min;
   config.display.standbyPromptSec = standby_prompt_sec;
+  config.display.saverPauseMaxMin = saver_pause_max_min;
   strlcpy(config.display.eyeStyle, eye_style.c_str(), sizeof(config.display.eyeStyle));  // loop() applies it
   config.power.activeHigh = level == "high";
   return "";
@@ -267,6 +272,7 @@ void init_webserver() {
                         : power_standby_prompt_on() ? "Active (standby prompt)"
                                                    : "Active";
     doc["periph_power"] = power_peripherals_on();
+    doc["saver_paused"] = power_saver_paused();
     doc["mqtt_connected"] = mqtt_connected();
     doc["fw_version"] = config.firmwareVersion;
     char build_id[9];  // First 8 hex chars of firmware ELF SHA-256: unique per build
@@ -608,4 +614,18 @@ void init_webserver() {
 
   server->begin();
   Serial.printf("[WEB] Serving on port %u\n", config.webserver.port);
+
+  // Browsers use port 80 when none is typed: redirect there to the real port, so
+  // http://fanknob.local works as well as http://fanknob.local:8080
+  if (config.webserver.port != 80) {
+    AsyncWebServer *redirect = new AsyncWebServer(80);
+    redirect->onNotFound([](AsyncWebServerRequest *request) {
+      String host = request->host();
+      int colon = host.indexOf(':');
+      if (colon >= 0) host = host.substring(0, colon);
+      request->redirect("http://" + host + ":" + String(config.webserver.port) + request->url());
+    });
+    redirect->begin();
+    Serial.printf("[WEB] Port 80 redirects to %u\n", config.webserver.port);
+  }
 }

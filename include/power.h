@@ -11,6 +11,11 @@ void power_request_screensaver(bool on);   // true = Screensaver (also leaves st
 bool power_is_standby();
 bool power_screensaver_on();               // Eye showing while Active (idle)
 bool power_standby_prompt_on();            // LCD asking "Keep the fan running?" before standby
+// LCD Settings "Screensaver" switch: paused = no automatic screensaver (so no standby prompt).
+// Not saved; back on when the fan stops, on standby, after config.display.saverPauseMaxMin, or
+// on restart. loop() task only (LVGL callback).
+void power_set_saver_paused(bool paused);
+bool power_saver_paused();
 
 // Peripheral power switch (GPIO 4): on while awake, off in standby.
 // Level (active HIGH/LOW) comes from config.power.activeHigh.

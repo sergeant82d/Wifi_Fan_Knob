@@ -2,14 +2,17 @@
 #include "config.h"
 #include "fan_control.h"
 #include "mqtt.h"
+#include "power.h"
 #include <lvgl.h>
 #include <WiFi.h>
 #include <time.h>
 
-// Main screen (240x240 round) is a horizontal tileview built from PAGES (below); swipe left from Main:
+// Main screen (240x240 round) is a horizontal tileview built from PAGES (below). Settings is
+// left of Main (swipe right from Main, or a left knob turn with the fan stopped):
 //   Main:     RPM arc · band of Off + preset segments inside it (top) · target RPM
 //             (gold, centre) · actual RPM (light, below) · clock (bottom gap)
-//   Settings: brightness slider (live; saved on release), IP box, network/MQTT info
+//   Settings: brightness slider (live; saved on release), Screensaver switch (pause, not
+//             saved), IP box, network/MQTT info
 // Auto Configure has its own gold screen (reversed theme), shown only while it runs.
 // Page dots sit in the arc's bottom gap. Knob turns and wake return to Main.
 // Knob short press opens a menu of the pages: turn to choose, press or tap to go.
@@ -54,6 +57,8 @@ static lv_obj_t *tileview = nullptr;
 static lv_obj_t *brightness_slider = nullptr;
 static lv_obj_t *brightness_label = nullptr;
 static lv_obj_t *info_label = nullptr;
+static lv_obj_t *saver_switch = nullptr;   // Settings: off = screensaver paused
+static lv_obj_t *saver_off_icon = nullptr; // Main: closed eye beside the clock while paused
 
 static void create_standby_screen();
 static void create_config_screen();
@@ -66,15 +71,17 @@ static void create_menu(lv_obj_t *parent);
 
 // Swipe pages, left to right. To add or reorder a page, write a create_*_page(tile)
 // builder and edit this table: tiles, page dots and the knob menu all follow it.
-// Main must stay first (knob turns and wake return to page 0).
+// Keep MAIN_PAGE / SETTINGS_PAGE pointing at the right rows (start-up, wake and knob use them).
 struct Page {
   const char *name;                 // Shown in the knob menu
   void (*create)(lv_obj_t *tile);   // Builds the page's widgets on its tile
 };
 static const Page PAGES[] = {
-  {"Main", create_main_page},
   {"Settings", create_settings_page},
+  {"Main", create_main_page},
 };
+static const int SETTINGS_PAGE = 0;
+static const int MAIN_PAGE = 1;
 static const int PAGE_COUNT = sizeof(PAGES) / sizeof(PAGES[0]);
 static lv_obj_t *page_dots[PAGE_COUNT];
 
@@ -169,6 +176,7 @@ static void update_clock() {
   if (strcmp(text, lv_label_get_text(clock_label)) != 0) {
     lv_label_set_text(clock_label, text);
     lv_label_set_text(standby_clock, text);
+    lv_obj_align_to(saver_off_icon, clock_label, LV_ALIGN_OUT_LEFT_MID, -6, 0);
   }
 }
 
@@ -198,8 +206,9 @@ void ui_init() {
     lv_obj_t *tile = lv_tileview_add_tile(tileview, i, 0, (lv_dir_t)dir);
     PAGES[i].create(tile);
     // Tap on empty space returns to Main (controls handle their own taps; swipes send no CLICKED)
-    if (i > 0) lv_obj_add_event_cb(tile, tap_back_cb, LV_EVENT_CLICKED, nullptr);
+    if (i != MAIN_PAGE) lv_obj_add_event_cb(tile, tap_back_cb, LV_EVENT_CLICKED, nullptr);
   }
+  lv_obj_set_tile_id(tileview, MAIN_PAGE, 0, LV_ANIM_OFF);
   create_page_dots(main_screen);
   create_menu(main_screen);  // After the dots so it covers them
   create_prompt(main_screen);
@@ -390,6 +399,14 @@ static void create_main_page(lv_obj_t *scr) {
   lv_label_set_text(clock_label, "--:--");
   lv_obj_align(clock_label, LV_ALIGN_CENTER, 0, 82);
 
+  // Screensaver paused (Settings switch): closed eye just left of the clock
+  saver_off_icon = lv_label_create(scr);
+  lv_obj_set_style_text_font(saver_off_icon, &lv_font_montserrat_14, 0);
+  lv_obj_set_style_text_color(saver_off_icon, lv_color_hex(THEME_TEXT_DIM), 0);
+  lv_label_set_text(saver_off_icon, LV_SYMBOL_EYE_CLOSE);
+  lv_obj_align_to(saver_off_icon, clock_label, LV_ALIGN_OUT_LEFT_MID, -6, 0);
+  lv_obj_add_flag(saver_off_icon, LV_OBJ_FLAG_HIDDEN);
+
   // Target RPM: what the knob, arc and segments set (gold, like the arc)
   rpm_label = lv_label_create(scr);
   lv_obj_set_style_text_font(rpm_label, &lv_font_montserrat_40, 0);  // 48 crowded the Off/Max segments
@@ -421,17 +438,29 @@ static void tap_back_cb(lv_event_t *) {
   ui_show_main();
 }
 
-void ui_show_main() {
+static void show_page(int page) {
   if (lv_scr_act() == config_screen && fan_autoconfig_progress() < 0) {  // Result showing: skip it
     cfg_result_until = 0;
     lv_scr_load(main_screen);
   }
-  lv_obj_set_tile_id(tileview, 0, 0, LV_ANIM_ON);
+  lv_obj_set_tile_id(tileview, page, 0, LV_ANIM_ON);
+}
+
+void ui_show_main() {
+  show_page(MAIN_PAGE);
+}
+
+void ui_show_settings() {
+  show_page(SETTINGS_PAGE);
 }
 
 static int current_page() {
   lv_obj_t *tile = lv_tileview_get_tile_act(tileview);  // NULL until the first scroll
-  return tile ? lv_obj_get_x(tile) / lv_obj_get_width(tileview) : 0;
+  return tile ? lv_obj_get_x(tile) / lv_obj_get_width(tileview) : MAIN_PAGE;
+}
+
+bool ui_on_main_page() {
+  return current_page() == MAIN_PAGE;
 }
 
 static void page_changed_cb(lv_event_t *) {
@@ -575,11 +604,11 @@ static void create_settings_page(lv_obj_t *tile) {
   brightness_label = lv_label_create(tile);
   lv_obj_set_style_text_color(brightness_label, lv_color_hex(THEME_TEXT), 0);
   lv_label_set_text_fmt(brightness_label, "Brightness %u%%", config.display.brightness);
-  lv_obj_align(brightness_label, LV_ALIGN_CENTER, 0, -42);
+  lv_obj_align(brightness_label, LV_ALIGN_CENTER, 0, -52);
 
   brightness_slider = lv_slider_create(tile);
   lv_obj_set_width(brightness_slider, 150);
-  lv_obj_align(brightness_slider, LV_ALIGN_CENTER, 0, -14);
+  lv_obj_align(brightness_slider, LV_ALIGN_CENTER, 0, -28);
   lv_slider_set_range(brightness_slider, 10, 100);
   lv_slider_set_value(brightness_slider, config.display.brightness, LV_ANIM_OFF);
   lv_obj_add_event_cb(brightness_slider, brightness_cb, LV_EVENT_VALUE_CHANGED, nullptr);
@@ -588,14 +617,31 @@ static void create_settings_page(lv_obj_t *tile) {
   lv_obj_set_style_bg_color(brightness_slider, lv_color_hex(THEME_GOLD), LV_PART_INDICATOR);
   lv_obj_set_style_bg_color(brightness_slider, lv_color_hex(THEME_GOLD), LV_PART_KNOB);
 
-  create_status_box(tile, 22);  // IP address (web page link)
+  // Screensaver switch: off pauses it until switched back, the fan stops, standby, the web's
+  // pause limit, or a restart (power_set_saver_paused in main.cpp)
+  lv_obj_t *saver_label = lv_label_create(tile);
+  lv_obj_set_style_text_color(saver_label, lv_color_hex(THEME_TEXT), 0);
+  lv_label_set_text(saver_label, "Screensaver");
+  lv_obj_align(saver_label, LV_ALIGN_CENTER, -28, 6);
+  saver_switch = lv_switch_create(tile);
+  lv_obj_set_size(saver_switch, 46, 24);
+  lv_obj_align(saver_switch, LV_ALIGN_CENTER, 58, 6);
+  lv_obj_add_state(saver_switch, LV_STATE_CHECKED);
+  lv_obj_set_style_bg_color(saver_switch, lv_color_hex(THEME_PANEL), LV_PART_MAIN);
+  lv_obj_set_style_bg_color(saver_switch, lv_color_hex(THEME_GOLD), LV_PART_INDICATOR | LV_STATE_CHECKED);
+  lv_obj_set_style_bg_color(saver_switch, lv_color_hex(THEME_TEXT), LV_PART_KNOB);
+  lv_obj_add_event_cb(saver_switch, [](lv_event_t *) {
+    power_set_saver_paused(!lv_obj_has_state(saver_switch, LV_STATE_CHECKED));
+  }, LV_EVENT_VALUE_CHANGED, nullptr);
+
+  create_status_box(tile, 40);  // IP address (web page link)
 
   info_label = lv_label_create(tile);
   lv_obj_set_style_text_font(info_label, &lv_font_montserrat_14, 0);
   lv_obj_set_style_text_color(info_label, lv_color_hex(THEME_TEXT_DIM), 0);
   lv_obj_set_style_text_align(info_label, LV_TEXT_ALIGN_CENTER, 0);
   lv_label_set_text(info_label, "");
-  lv_obj_align(info_label, LV_ALIGN_CENTER, 0, 60);
+  lv_obj_align(info_label, LV_ALIGN_CENTER, 0, 74);
 }
 
 static void update_info() {
@@ -810,7 +856,7 @@ static void update_config_screen() {
 
 void ui_set_standby(bool standby) {
   if (standby) menu_close();
-  if (!standby) lv_obj_set_tile_id(tileview, 0, 0, LV_ANIM_OFF);  // Wake on Main page
+  if (!standby) lv_obj_set_tile_id(tileview, MAIN_PAGE, 0, LV_ANIM_OFF);  // Wake on Main page
   lv_scr_load(standby ? standby_screen : main_screen);
 }
 
@@ -823,6 +869,15 @@ void ui_update() {
   }
   if (strcmp(actual, lv_label_get_text(actual_label)) != 0) lv_label_set_text(actual_label, actual);
   update_config_screen();
+  bool paused = power_saver_paused();
+  if (lv_obj_has_state(saver_switch, LV_STATE_CHECKED) == paused) {
+    if (paused) lv_obj_clear_state(saver_switch, LV_STATE_CHECKED);
+    else lv_obj_add_state(saver_switch, LV_STATE_CHECKED);
+  }
+  if (lv_obj_has_flag(saver_off_icon, LV_OBJ_FLAG_HIDDEN) == paused) {
+    if (paused) lv_obj_clear_flag(saver_off_icon, LV_OBJ_FLAG_HIDDEN);
+    else lv_obj_add_flag(saver_off_icon, LV_OBJ_FLAG_HIDDEN);
+  }
   seg_highlight();  // Presets may have been changed on the web page
   if (lv_arc_get_max_value(rpm_arc) != config.fan.maxRpm) {  // Fan max RPM changed on the web page
     lv_arc_set_range(rpm_arc, config.fan.minRpm, config.fan.maxRpm);

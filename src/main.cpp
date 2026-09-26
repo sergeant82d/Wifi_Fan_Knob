@@ -513,6 +513,20 @@ bool power_standby_prompt_on() {
   return prompt_on;
 }
 
+static bool saver_paused = false;           // LCD Settings switch (not saved)
+static unsigned long saver_paused_since = 0;
+
+void power_set_saver_paused(bool paused) {
+  if (paused == saver_paused) return;
+  saver_paused = paused;
+  saver_paused_since = millis();
+  Serial.println(paused ? "Screensaver paused (LCD switch)" : "Screensaver resumed");
+}
+
+bool power_saver_paused() {
+  return saver_paused;
+}
+
 static void note_activity() {
   last_activity = millis();
 }
@@ -551,6 +565,7 @@ static void set_standby(bool standby) {
   prompt_close();
   note_activity();    // Idle timer restarts after standby or wake
   if (standby) {
+    power_set_saver_paused(false);  // A screensaver pause ends at standby
     standby_touch_armed = false;  // Ignore the touch that came with the knob press
     fan_stop_now();     // Standby stops the fan (written to the EMC2101 before its power goes)
     set_peripheral_power(false);
@@ -744,6 +759,10 @@ void loop() {
     set_saver(false);  // Dismiss only; this turn is discarded
   } else if (delta != 0 && ui_menu_open()) {
     ui_menu_turn(delta);  // Menu open: knob chooses a page, RPM unchanged
+  } else if (delta != 0 && !ui_on_main_page()) {
+    if (delta > 0) ui_show_main();  // Settings (left of Main): a right turn returns; speed unchanged
+  } else if (delta < 0 && fan_get_target() == 0) {
+    ui_show_settings();  // Fan stopped: a left turn can't slow it, so it opens Settings
   } else if (delta != 0) {
     // Knob sets target RPM (fan_control clamps to config range)
     fan_set_target((int32_t)fan_get_target() + delta * config.fan.rpmStep);
@@ -754,6 +773,7 @@ void loop() {
   // Redraw target RPM when changed by knob or web UI (LVGL only touched here)
   static uint16_t shown_rpm = 0;
   if (fan_get_target() != shown_rpm) {
+    if (shown_rpm > 0 && fan_get_target() == 0) power_set_saver_paused(false);  // Fan stopped: pause ends
     shown_rpm = fan_get_target();
     note_activity();
     if (saver_on) set_saver(false);  // Show the new speed (web/MQTT change)
@@ -862,7 +882,11 @@ void loop() {
 
   // Screensaver after the idle delay (a held button counts as activity)
   if (press_start != 0) note_activity();
-  if (!eye_showing() && config.display.screensaverSec > 0 &&
+  if (saver_paused && config.display.saverPauseMaxMin > 0 &&
+      millis() - saver_paused_since >= config.display.saverPauseMaxMin * 60000UL) {
+    power_set_saver_paused(false);  // Pause time limit reached
+  }
+  if (!eye_showing() && !saver_paused && config.display.screensaverSec > 0 &&
       millis() - last_activity >= config.display.screensaverSec * 1000UL) {
     set_saver(true);
   }

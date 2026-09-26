@@ -758,9 +758,16 @@
                             <input type="number" id="standby-prompt-sec" min="5" max="300" value="30" required>
                             <small style="color: #606060;">No answer on the LCD this long: standby. 5-300 (5 minutes)</small>
                         </div>
+                        <div class="form-group">
+                            <label for="saver-pause-max-min">Screensaver pause limit (minutes)</label>
+                            <input type="number" id="saver-pause-max-min" min="0" max="1440" value="120" required>
+                            <small style="color: #606060;">The LCD Settings page's Screensaver switch pauses it until switched back, the fan stops, standby, a restart, or this long. 0 = no limit</small>
+                        </div>
                     </div>
                 </div>
 
+                <div class="status-card">
+                    <h3>Clock</h3>
                 <div class="form-grid">
                     <div class="form-group">
                         <label for="time-zone">Time Zone</label>
@@ -775,6 +782,7 @@
                             <option value="24h">24-Hour</option>
                         </select>
                     </div>
+                </div>
                 </div>
 
                 <div class="status-card">
@@ -977,7 +985,7 @@
             }
         }
 
-        function showMode(powerMode) {
+        function showMode(powerMode, saverPaused) {
             const mode = powerMode === 'Standby' ? 'standby'
                        : powerMode === 'Active (screensaver)' ? 'screensaver' : 'active';
             ['active', 'screensaver', 'standby'].forEach(m => {
@@ -985,6 +993,7 @@
             });
             document.getElementById('mode-note').textContent = powerMode === 'Active (standby prompt)'
                 ? 'The LCD is asking whether to keep the fan running. Active keeps it running; Standby stops it.'
+                : saverPaused ? 'Screensaver paused on the LCD (Settings page): it won\'t start by itself for now.'
                 : '';
         }
 
@@ -1193,6 +1202,7 @@
                 document.getElementById('standby-brightness').value = c.display.standbyBrightness;
                 document.getElementById('standby-after-min').value = c.display.standbyAfterMin;
                 document.getElementById('standby-prompt-sec').value = c.display.standbyPromptSec;
+                document.getElementById('saver-pause-max-min').value = c.display.saverPauseMaxMin;
                 const eyeSelect = document.getElementById('eye-style');
                 eyeSelect.innerHTML = '';
                 c.eyeStyles.forEach(st => {
@@ -1242,7 +1252,7 @@
                                   : (s.target_rpm > 0 ? 'Running' : 'Stopped'));
                 set('power-mode', s.power_mode);
                 set('periph-power', s.periph_power ? 'On' : 'Off');
-                showMode(s.power_mode);
+                showMode(s.power_mode, s.saver_paused);
                 set('mqtt-status', s.mqtt_connected ? 'Yes' : 'No');
                 set('speed-range', s.min_rpm + '-' + s.max_rpm);
                 const slider = document.getElementById('speed-slider');
@@ -1430,6 +1440,7 @@
                     standby_brightness: v('standby-brightness'),
                     standby_after_min: v('standby-after-min'),
                     standby_prompt_sec: v('standby-prompt-sec'),
+                    saver_pause_max_min: v('saver-pause-max-min'),
                     eye_style: v('eye-style'),
                     power_level: v('power-level')
                 }));

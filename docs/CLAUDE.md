@@ -183,12 +183,13 @@ See `platformio.ini`. Libraries:
   for the UI) and `display.posixTz` (applied via setenv/tzset and `configTzTime`). Old US codes
   ("CST" etc.) are migrated on load (`migrateLegacyTimezone()` in config.cpp). Server checks
   both fields' characters/lengths only; the page supplies the rule from its table.
-- LCD pages (verified): horizontal LVGL tileview, swipe left from Main. Main: RPM arc (drag
+- LCD pages (verified): horizontal LVGL tileview; Settings is left of Main (swipe right from Main). Main: RPM arc (drag
   along the ring to set speed, snaps to rpmStep; ring-only hit test (needs LV_OBJ_FLAG_ADV_HITTEST, off by default) + 8 px ext area (stops at the segments' outer edge, SEG_R_OUT) so
   mid-screen swipes still page), target RPM, actual RPM, clock. Settings: brightness slider (live; saveConfig on release) +
   IP box + SSID/MQTT info. Page dots in the arc's bottom gap. Knob turns and wake return to Main.
   Pages come from the `PAGES` table in `ui.cpp` (name + builder); tiles, dots and the knob
-  menu follow it, so adding a page = one builder + one table row (Main stays first).
+  menu follow it, so adding a page = one builder + one table row (keep `MAIN_PAGE` /
+  `SETTINGS_PAGE` pointing at the right rows).
   On every page after Main, a tap on empty space slides back to Main (verified).
 - Main quick segments (verified): Off + Low/Med/High/Max drawn as 5 ring slices inside the
   RPM arc (non-clickable `lv_arc`s, `SEG_*` constants in `ui.cpp`); taps on the Main tile are
@@ -280,6 +281,15 @@ See `platformio.ini`. Libraries:
   tab order: Display & Interface, time zone/format, MQTT, Peripheral Power Switch, Save, Web
   Login (retitled "protects all changes"; kept on Config, user decision), Factory Reset. Header
   shows `WiFi connected to "<ssid>"` / `Hotspot "<ssid>"`.
+- TODO.md items, second batch (verified 2026-09-26): Settings moved left of Main (`PAGES` order,
+  `MAIN_PAGE` / `SETTINGS_PAGE`; start-up, wake and tap-back use `MAIN_PAGE`); knob: fan target
+  0 + left turn → Settings (`ui_show_settings()`), on Settings a right turn → Main, speed
+  unchanged. Settings "Screensaver" switch = temporary pause (`power_set_saver_paused()`, not
+  saved): no automatic screensaver (so no standby prompt); ends when the fan target goes from
+  >0 to 0, at standby, after `config.display.saverPauseMaxMin` (default 120, 0 = no limit), or
+  on restart; closed-eye icon left of the Main clock while paused; `/api/status` saver_paused,
+  shown in the web Display Mode note. Config tab: time zone/format in a "Clock" card. Port 80:
+  second AsyncWebServer that redirects to `:<port>` (so `http://fanknob.local` works; tested).
 - Device name / mDNS (verified 2026-09-26): `config.wifi.hostname` (default "fanknob"; 1-31
   lowercase letters, digits, hyphens), set in WiFi tab → Network Configuration (saved with the
   static IP settings; restarts). `WiFi.setHostname()` in `apply_ip_config()` (router list),

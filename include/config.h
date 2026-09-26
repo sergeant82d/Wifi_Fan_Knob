@@ -66,6 +66,7 @@ typedef struct {
     uint8_t standbyBrightness;      // Backlight % in standby (0 = off)
     uint16_t standbyAfterMin;       // Screensaver on this long -> standby prompt (0 = never; max 1440)
     uint16_t standbyPromptSec;      // Prompt unanswered this long -> standby (5-300)
+    uint16_t saverPauseMaxMin;      // LCD "Screensaver" switch off: back on after this long (0 = no limit)
   } display;
 
   // Fan Settings
