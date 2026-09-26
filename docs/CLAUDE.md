@@ -534,6 +534,22 @@ STANDBY (1)
 4. Field testing, including the industrial fans once they have power.
 
 ### Later (user notes)
+- **Air quality sensor + Auto mode (upcoming hardware, user 2026-09-26)**: Adafruit BME688
+  (product 5046) on the main I2C bus (0x77, or 0x76 via jumper; no clash with EMC2101 0x4C),
+  Adafruit BME680 library (temperature, humidity, pressure, gas resistance). Works the same
+  whether the fan stays on the EMC2101 or moves to direct PWM (Auto only sets the target RPM).
+  - LCD: a 6th Main segment, **green "Auto"**, right of Max (6 x 40 deg instead of 5 x 48;
+    see DISPLAY_GUIDE "Adding or removing a segment"); lit green while Auto is on. Knob or any
+    other segment = manual override (Auto off). Web + HA: Auto switch; the four readings as HA
+    sensors (history graphs help pick thresholds).
+  - Step 1, binary: bad air -> fan High; good air -> off. Detect by gas resistance dropping
+    below a learned clean-air baseline (e.g. 30 %), not a fixed value; separate on/off
+    thresholds + minimum run time (e.g. 2 min after clearing) so it doesn't flap; ignore the
+    sensor during heater warm-up (a few minutes). Bosch BSEC (IAQ index) is the alternative:
+    closed-source, more work.
+  - Step 2, later: fan speed scaled from how bad the air is (Low..Max), smoothed.
+  - Placement matters: in the fan's airflow the readings depend on the fan running; near the
+    work it reads the air the user breathes.
 - **Short term, after the FPC breakout (GPIO 4 / 12) arrives: replace the EMC2101 with
   "real" 25 kHz PWM + tach on the UART0 connector** (user, 2026-09-26). Serial is on native
   USB (`ARDUINO_USB_CDC_ON_BOOT=1`), so both UART connectors are free GPIOs. UART0 is almost
