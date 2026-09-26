@@ -4,7 +4,7 @@
 //
 // To add a style: copy another block below, change the namespace, header, id and name,
 // and add it to EYE_STYLES. The id is what config.json stores; the name is shown on
-// the web page.
+// the web page. Photo eyes (artist pictures, tools/photo_eye.py) use PHOTO_STYLE_DEF.
 
 #include "eye_styles.h"
 
@@ -18,7 +18,10 @@
   const EyeStyle style = {                                                          \
     ID, NAME, &sclera[0][0], SCLERA_WIDTH, SCLERA_HEIGHT,                           \
     &iris[0][0], IRIS_MAP_WIDTH, IRIS_MAP_HEIGHT, &upper[0][0], &lower[0][0],        \
-    &polar[0][0], IRIS_WIDTH, EYE_IRIS_MIN, EYE_IRIS_MAX};
+    &polar[0][0], IRIS_WIDTH, EYE_IRIS_MIN, EYE_IRIS_MAX, nullptr};
+
+#define PHOTO_STYLE_DEF(ID, NAME) \
+  const EyeStyle style = {ID, NAME, nullptr, 0, 0, nullptr, 0, 0, nullptr, nullptr, nullptr, 0, 0, 0, &photo};
 
 namespace eye_dragon {
 #include "eyes/dragonEye.h"
@@ -26,6 +29,11 @@ namespace eye_dragon {
 EYE_STYLE_DEF("dragon", "Dragon")
 }
 #include "eyes/eye_undef.h"
+
+namespace eye_dragon2 {
+#include "eyes/dragon2Photo.h"
+PHOTO_STYLE_DEF("dragon2", "Dragon 2")
+}
 
 namespace eye_default {
 #include "eyes/defaultEye.h"
@@ -92,7 +100,7 @@ EYE_STYLE_DEF("terminator", "Terminator")
 
 // Order shown on the web page; the first is the default
 const EyeStyle *const EYE_STYLES[] = {
-  &eye_dragon::style, &eye_default::style, &eye_cat::style, &eye_goat::style,
+  &eye_dragon::style, &eye_dragon2::style, &eye_default::style, &eye_cat::style, &eye_goat::style,
   &eye_owl::style, &eye_doe::style, &eye_newt::style, &eye_nauga::style,
   &eye_nosclera::style, &eye_terminator::style,
 };

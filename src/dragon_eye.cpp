@@ -7,6 +7,7 @@
 // frame per call (the original's blocking iris loop is replaced by a non-blocking ramp).
 // Iris/pupil formula and per-style pupil limits are the original's.
 // Added: sleeping mode for standby (lids close, then an occasional twitch or peek).
+// Photo eyes (artist pictures, photo_eye.cpp) share the motion, blinks and sleep here.
 
 #include "dragon_eye.h"
 #include "eye_styles.h"
@@ -172,6 +173,12 @@ bool eye_set_style(const char *id) {
     return false;
   }
   if (s == eye.style) return true;
+  if (s->photo) {  // Photo eye: drawn straight from flash, no tables to build
+    free_tables(eye);
+    eye.style = s;
+    Serial.printf("[EYE] Style %s ready\n", s->name);
+    return true;
+  }
 
   uint32_t start = millis();
   Tables t;
@@ -397,6 +404,92 @@ static uint16_t next_iris(uint32_t t) {
   return from + (int32_t)(to - from) * (int32_t)dt / (int32_t)duration;
 }
 
+// ============================================================================
+// PHOTO EYES
+// ============================================================================
+
+// Pupil 0 (slit) - 1 (wide), reacting as if to light: wide while the lids are shut,
+// narrowing as they open; snaps narrow when stirred or when the eye appears (screensaver),
+// then relaxes; awake, it drifts and now and then flinches narrow.
+static float photo_pupil(float openness) {
+  static float p = 1, target = 0.4f;
+  static uint32_t last = 0, next_drift = 0, next_flinch = 0, flash_until = 0;
+  static bool was_stirred = false;
+  uint32_t now = millis();
+  float dt = (now - last) / 1000.0f;
+  if (now - last > 1000) {  // Not drawn for a while: the eye just appeared out of the dark
+    p = 1;
+    if (!sleeping) flash_until = now + 700;
+    next_flinch = now + random(12000, 30000);
+    dt = 0;
+  }
+  last = now;
+  bool stirred = eye_stirred();
+  if (stirred && !was_stirred) flash_until = now + 700;  // Stirred: bright, snap narrow
+  was_stirred = stirred;
+
+  float tau;  // Seconds to get most of the way to the target
+  if ((int32_t)(flash_until - now) > 0) {
+    target = 0.02f;
+    tau = 0.12f;
+  } else if (sleeping && !stirred) {
+    target = 1 - 0.6f * openness;  // Dark behind the lids; a peek lets light in
+    tau = 1.0f;
+  } else {
+    if ((int32_t)(now - next_flinch) >= 0) {
+      next_flinch = now + random(12000, 30000);
+      flash_until = now + random(400, 800);
+    }
+    if ((int32_t)(now - next_drift) >= 0) {
+      next_drift = now + random(1500, 4000);
+      target = random(20, 65) / 100.0f;
+    }
+    tau = 1.2f;
+  }
+  p += (target - p) * (1 - expf(-dt / tau));
+  return p;
+}
+
+static void photo_frame(uint32_t t, int eyeX, int eyeY) {
+  const PhotoEye *e = eye.style->photo;
+  // Autonomous motion and eye_look() use 0-1023 as a view-window offset (larger = iris
+  // further left/up): invert to an iris offset in px
+  int gx = (int)lroundf((512 - eyeX) * e->range_x / 512);
+  int gy = (int)lroundf((512 - eyeY) * e->range_y / 512);
+  float droop = gy > 0 && e->range_y > 0 ? e->droop * gy / e->range_y : 0;
+
+  float f = sleeping ? sleep_openness() : 1;
+  float closure;
+  if (sleeping && !(f >= 1 && sleep_phase == SLEEP_STIR)) {  // Lids follow the sleep openness
+    openness_now = f;
+    if (f <= 0.01f) {
+      if (drawn_shut) {  // Already shut on screen: nothing to redraw
+        photo_pupil(0);
+        return;
+      }
+      drawn_shut = true;
+      f = 0;
+    } else {
+      drawn_shut = false;
+    }
+    closure = 1 - f;
+  } else {  // Awake (or stirred awake): blinks
+    if (sleeping) {
+      openness_now = 1;
+      drawn_shut = false;
+    }
+    f = 1;
+    closure = 0;
+    if (blink.state) {
+      uint32_t s = t - blink.startTime;
+      s = (s >= blink.duration) ? 255 : 255 * s / blink.duration;
+      s = (blink.state == DEBLINK) ? 1 + s : 256 - s;  // Openness, 1-256
+      closure = 1 - s / 256.0f;
+    }
+  }
+  photo_eye_draw(tft, e, gx, gy, closure, closure, droop, photo_pupil(f), row_x0, row_x1);
+}
+
 void eye_frame() {
   if (!tft || !eye.style) return;
   uint32_t t = micros();
@@ -464,6 +557,11 @@ void eye_frame() {
       blink.duration *= 2;
       blink.startTime = t;
     }
+  }
+
+  if (eye.style->photo) {
+    photo_frame(t, eyeX, eyeY);
+    return;
   }
 
   // Scale motion to sclera offsets of the 240x240 view window
