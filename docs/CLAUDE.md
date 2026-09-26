@@ -1,11 +1,13 @@
 # WiFi Fan Knob - Claude Code Guide
 
+(The short root `CLAUDE.md` loads automatically in every session and points here.)
+
 **Project**: ESP32-S3 PWM Fan Controller with Rotary Display + Home Assistant  
 **Repository**: https://github.com/sergeant82d/Wifi_Fan_Knob.git  
 **Repo root**: `D:\GitHub\VSCodeProjects\Wifi_Bench_Fan\Wifi_Fan_Knob`  
 **PlatformIO project**: the repo root (`platformio.ini` is at the top level)  
 **Status**: Hardware bring-up in progress — display, WiFi AP, SPIFFS and webserver verified on the board  
-**Last updated**: 2026-09-25
+**Last updated**: 2026-09-26
 
 
 1. Don’t assume. Don’t hide confusion. Surface tradeoffs.
@@ -33,9 +35,9 @@ cd Wifi_Fan_Knob
   otherwise `Serial` goes to unconnected UART0 and only IDF logs reach USB.
 - Platform is pioarduino `espressif32` 51.x → Arduino core 3.0.4 / ESP-IDF 5.1.
 - Build: PlatformIO **Build**. Flash: **Upload** only — the web UI (`web/index.html`) is
-  compiled into the firmware via `board_build.embed_txtfiles`. SPIFFS holds only
-  `/config.json`. Do not run `uploadfs`: it rewrites the whole SPIFFS partition, wiping
-  `/config.json` (defaults are recreated on next boot).
+  compiled into the firmware via `board_build.embed_txtfiles`. SPIFFS holds `/config.json`
+  and `/fans.json` (fan profiles). Do not run `uploadfs`: it rewrites the whole SPIFFS
+  partition, wiping both (config defaults are recreated on next boot; profiles are lost).
 - CLI builds: use `~/.platformio/penv/Scripts/pio.exe`. An older PlatformIO in
   `C:\Python312\Scripts` (6.1.19) fails with `SCons.Tool.FortranCommon` errors.
 
