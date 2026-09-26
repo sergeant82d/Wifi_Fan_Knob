@@ -54,7 +54,7 @@ The screen is 240 × 240 pixels, but round: the corners can't be seen. Most thin
 placed relative to the **centre** of the screen:
 
 ```cpp
-lv_obj_align(clock_label, LV_ALIGN_CENTER, 0, 50);
+lv_obj_align(clock_label, LV_ALIGN_CENTER, 0, 82);
 //                                          x   y
 ```
 
@@ -62,11 +62,27 @@ lv_obj_align(clock_label, LV_ALIGN_CENTER, 0, 50);
 * **y**: positive moves **down**, negative moves up.
 * The visible circle has a radius of 120, so keep everything within about 110 of the centre.
 
-Example: to move the clock up 10 pixels, change `50` to `40`.
+Example: to move the clock up 10 pixels, change `82` to `72`.
 
 ### Colours
 
-Colours are written as a hex code, like on a web page:
+**The theme.** The screen uses the web page's dark blue and gold. The colours are named once,
+at the top of `src/ui.cpp`, and used everywhere by name. Change one there and every use follows:
+
+| Name | Colour | Used for |
+|---|---|---|
+| `THEME_BG_TOP`, `THEME_BG_BOTTOM` | `0x1A1A2E` → `0x16213E` dark blue | Main's background (a top-to-bottom gradient); dark text on gold |
+| `THEME_GOLD` | `0xFFD700` gold | Target RPM, RPM arc, lit segment, current page dot, selected menu item, Settings page background |
+| `THEME_ON_GOLD` | `0x1A1A2E` | Text on a gold segment or menu item |
+| `THEME_TEXT` | `0xE0E0E0` light grey | Actual RPM, segment labels, menu items |
+| `THEME_TEXT_DIM` | `0xA0A0A0` grey | "RPM" caption, "now", clock |
+| `THEME_PANEL` | `0x2A3150` slate blue | Unlit segments, other page dots, menu items, "not running" popup |
+| `THEME_TRACK` | `0x252B45` | RPM arc's unfilled track |
+| `THEME_OFF` | `0x8B1E1E` dark red | Off segment when not lit |
+| `THEME_ALERT` | `0xD32F2F` red | "Fan stopped" popup, WiFi-lost flash |
+| `THEME_GOLD_DARK` | `0xB39700` | Settings page: brightness slider's unfilled track |
+
+For a one-off colour, write it as a hex code, like on a web page:
 
 ```cpp
 lv_color_hex(0x8B1E1E)          // dark red
@@ -146,7 +162,7 @@ shows this.
 | Move the band in or out | `SEG_R_OUT` and `SEG_R_IN` together. Keep `SEG_R_OUT` at 94 or less, or the segments touch the RPM arc |
 | Make the gaps between segments wider | `SEG_GAP` |
 | Rotate the whole band | `SEG_START` |
-| Make each segment longer or shorter | `SEG_SPAN` (the band covers `SEG_COUNT × SEG_SPAN` degrees; keep it at 240 or less so the bottom stays open for the clock and IP box) |
+| Make each segment longer or shorter | `SEG_SPAN` (the band covers `SEG_COUNT × SEG_SPAN` degrees; keep it at 240 or less so the bottom stays open for the actual RPM and clock) |
 
 **The RPM arc follows the band automatically.** Its ends are worked out from these numbers,
 so it always ends level with the outer segments.
@@ -159,12 +175,13 @@ static const char *const seg_text[SEG_COUNT] = {LV_SYMBOL_POWER "\nOff", "Low", 
 
 `"\n"` starts a new line. The labels use `lv_font_montserrat_14`, set in `create_segments()`.
 
-**Colours** are in `seg_highlight()`:
+**Colours** are in `seg_highlight()`. A lit segment (pressed, or the current speed) is gold
+with dark text; otherwise Off is dark red and the others slate blue, with light text:
 
 ```cpp
-lv_color_t c = lit         ? lv_palette_main(LV_PALETTE_CYAN)   // pressed, or the current speed
-             : i == 0      ? lv_color_hex(0x8B1E1E)             // Off: dark red
-                           : lv_color_hex(0x4A5058);            // others: steel grey
+lv_color_t c = lit    ? lv_color_hex(THEME_GOLD)
+             : i == 0 ? lv_color_hex(THEME_OFF)
+                      : lv_color_hex(THEME_PANEL);
 ```
 
 **Speeds:** each segment's speed comes from the preset speeds on the web page (Config →
@@ -187,47 +204,46 @@ In `create_main_page()`:
 | To change | Look for |
 |---|---|
 | Ring thickness | `lv_obj_set_style_arc_width(rpm_arc, 12, ...)`. There are two lines: track and fill |
-| Track colour (unfilled part) | `lv_color_hex(0x303030)` on the `LV_PART_MAIN` line |
-| Fill colour | `lv_palette_main(LV_PALETTE_CYAN)` on the `LV_PART_INDICATOR` line |
-| Drag knob colour | `lv_color_white()` on the `LV_PART_KNOB` line |
+| Track colour (unfilled part) | `THEME_TRACK` on the `LV_PART_MAIN` line |
+| Fill colour | `THEME_GOLD` on the `LV_PART_INDICATOR` line |
+| Drag knob colour | `THEME_TEXT` on the `LV_PART_KNOB` line |
 | Overall size | `lv_obj_set_size(rpm_arc, 228, 228)`. If you make it smaller, reduce `SEG_R_OUT` to match |
 
 The arc can be dragged to set the speed. It snaps to the RPM step size set in the config.
 
-### RPM number, "RPM" caption and clock
+### Target RPM, actual RPM and clock
 
-All three are in `create_main_page()`, one block each:
+All four are in `create_main_page()`, one block each. Gold means "what you asked for", light
+text means "what the fan is doing":
 
 | Item | Font | Colour | Position (x, y) |
 |---|---|---|---|
-| RPM number (`rpm_label`) | `montserrat_40` | white | 0, -4 |
-| "RPM" caption (`unit_label`) | `montserrat_14` | `0x808080` grey | 0, 28 |
+| Target RPM (`rpm_label`): set by knob, arc and segments | `montserrat_40` | `THEME_GOLD` | 0, -6 |
+| "RPM" caption (`unit_label`) | `montserrat_14` | `THEME_TEXT_DIM` | 0, 22 |
+| Actual RPM (`actual_label`): "now 1234" from the tach | `montserrat_20` | `THEME_TEXT`, "now" dim | 0, 48 |
+| Clock (`clock_label`), in the arc's bottom gap | `montserrat_20` | `THEME_TEXT_DIM` | 0, 82 |
 
-The caption's text changes by itself, once a second (`ui_update()` in `src/ui.cpp`): plain
-"RPM" when the fan is stopped, "RPM (now 346)" with the measured speed while it runs, and
-"Setup 40% (1200)" during Auto Configure. It has about 106 px of room between the segments,
-so keep any new wording short. The font has no special characters such as "·".
-| Clock (`clock_label`) | `montserrat_20` | `0xB0B0B0` light grey | 0, 50 |
+The caption and actual line change by themselves, once a second (`ui_update()` in
+`src/ui.cpp`). The caption reads "Setup 40%" during Auto Configure. The actual line is hidden
+while the fan is stopped (or with no fan controller). The grey "now" uses LVGL's recolour
+code: `#A0A0A0 now#` in the text. The font has no special characters such as "·".
+
+When the saved WiFi is lost, the clock flashes red (with the IP box on Settings), in
+`status_flash_cb()`.
 
 **Watch the RPM number's size.** A 4-digit speed at a larger font runs into the Off and Max
 segments; that's why it's 40 and not 48.
 
-### IP address box (status box)
-
-In `create_status_box()`: position `0, 82`, white box with black text, corner radius 6.
-When the saved WiFi is lost, it flashes red and white every half second. The flash colours
-are in `status_flash_cb()`, and the speed (500 ms) is in `lv_timer_create(status_flash_cb, 500, ...)`.
-
 ### Page dots
 
 In `create_page_dots()`: 8-pixel dots, 16 pixels apart, 10 pixels up from the bottom.
-The current page is white and the others are `0x404040`. There's one dot per page,
-added automatically.
+The current page is gold and the others slate blue, all with a thin dark outline so the gold
+dot shows on the gold Settings page. There's one dot per page, added automatically.
 
 ### Double-tap popup
 
 Double-tapping empty space on Main stops the fan. The popup text and colours are in
-`main_tap_cb()`: `"Fan stopped"` on red, `"Fan is not running"` on grey. The popup's font,
+`main_tap_cb()`: `"Fan stopped"` on `THEME_ALERT` red, `"Fan is not running"` on `THEME_PANEL`. The popup's font,
 padding and 1.5-second display time are in `show_popup()`. The double-tap window
 (400 ms) is in `main_tap_cb()`: `now - last_tap < 400`.
 
@@ -327,19 +343,24 @@ static void my_button_cb(lv_event_t *) {
 
 ### The Settings page
 
-In `create_settings_page()`:
+In `create_settings_page()`. It uses the theme **reversed**: a gold background with dark
+blue text and controls.
 * title at `y = -80`
 * brightness label and slider (slider 150 wide, range 10–100 %)
-* network and MQTT information at `y = 40`
+* IP address box at `y = 22`: dark blue with gold text, made by `create_status_box(tile, 22)`.
+  When the saved WiFi is lost it flashes red and white every half second (colours in
+  `status_flash_cb()`, speed in `lv_timer_create(status_flash_cb, 500, ...)`).
+* network name and MQTT status at `y = 60`
 
-The information text is written in `update_info()`, once a second.
+The IP box and the information text are updated once a second (`update_status_box()`,
+`update_info()`).
 
 ### The knob menu
 
 In `create_menu()` and `menu_highlight()`:
-* The background is black at 90 % opacity (`LV_OPA_90`).
+* The background is dark blue (`THEME_BG_BOTTOM`) at 90 % opacity (`LV_OPA_90`).
 * Each item is 150 × 40 with `montserrat_20` text.
-* The selected item is cyan with black text; the others are `0x303030` with white text.
+* The selected item is gold with dark text; the others are slate blue with light text.
 
 ---
 

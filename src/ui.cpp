@@ -7,18 +7,33 @@
 #include <time.h>
 
 // Main screen (240x240 round) is a horizontal tileview built from PAGES (below); swipe left from Main:
-//   Main:     RPM arc · band of Off + preset segments inside it (top) · RPM number
-//             (centre) · clock · status box (bottom gap)
-//   Settings: brightness slider (live; saved on release) + network/MQTT info
+//   Main:     RPM arc · band of Off + preset segments inside it (top) · target RPM
+//             (gold, centre) · actual RPM (light, below) · clock (bottom gap)
+//   Settings: gold (reversed theme): brightness slider (live; saved on release),
+//             IP box, network/MQTT info
 // Page dots sit in the arc's bottom gap. Knob turns and wake return to Main.
 // Knob short press opens a menu of the pages: turn to choose, press or tap to go.
 // Double-tap on Main stops the fan (or pops up "Fan is not running").
 // On every other page, a tap on empty space slides back to Main.
 
+// Theme: the web page's dark blue and gold. Change a colour here and everything using it follows.
+static const uint32_t THEME_BG_TOP = 0x1A1A2E;     // Screen background: top-to-bottom gradient,
+static const uint32_t THEME_BG_BOTTOM = 0x16213E;  //   as on the web page
+static const uint32_t THEME_GOLD = 0xFFD700;       // Accent: target RPM, RPM arc, lit segment, selection
+static const uint32_t THEME_ON_GOLD = 0x1A1A2E;    // Text on gold
+static const uint32_t THEME_TEXT = 0xE0E0E0;       // Main text: clock, segment labels, IP box
+static const uint32_t THEME_TEXT_DIM = 0xA0A0A0;   // Secondary text: "RPM (now N)" caption
+static const uint32_t THEME_PANEL = 0x2A3150;      // Unlit segments, IP box, menu items, popups
+static const uint32_t THEME_TRACK = 0x252B45;      // RPM arc's unfilled track
+static const uint32_t THEME_OFF = 0x8B1E1E;        // Off segment when not lit
+static const uint32_t THEME_ALERT = 0xD32F2F;      // "Fan stopped" popup, WiFi-lost flash
+static const uint32_t THEME_GOLD_DARK = 0xB39700;  // Settings page (gold): slider's unfilled track
+
 static lv_obj_t *rpm_arc = nullptr;
 static lv_obj_t *rpm_label = nullptr;
 static lv_obj_t *clock_label = nullptr;
-static lv_obj_t *unit_label = nullptr;  // "RPM", or "RPM (now 346)" with the measured speed
+static lv_obj_t *unit_label = nullptr;    // "RPM" under the target, or Auto Configure progress
+static lv_obj_t *actual_label = nullptr;  // Measured RPM ("now 1234"), hidden when stopped
 static lv_obj_t *main_screen = nullptr;
 static lv_obj_t *standby_screen = nullptr;   // Dimmed: large clock only (dragon eye later)
 static lv_obj_t *standby_clock = nullptr;
@@ -62,19 +77,21 @@ static void status_set_colors(lv_color_t bg, lv_color_t fg) {
   lv_obj_set_style_text_color(status_label, fg, 0);
 }
 
+// WiFi lost: the IP box (Settings) and the clock (Main) flash red, so it shows on either page
 static void status_flash_cb(lv_timer_t *) {
   status_flash_red = !status_flash_red;
   if (status_flash_red) {
-    status_set_colors(lv_palette_main(LV_PALETTE_RED), lv_color_white());
+    status_set_colors(lv_color_hex(THEME_ALERT), lv_color_white());
   } else {
-    status_set_colors(lv_color_white(), lv_color_black());
+    status_set_colors(lv_color_hex(THEME_BG_TOP), lv_color_hex(THEME_GOLD));
   }
+  lv_obj_set_style_text_color(clock_label, lv_color_hex(status_flash_red ? THEME_ALERT : THEME_TEXT_DIM), 0);
 }
 
-static void create_status_box(lv_obj_t *parent) {
+static void create_status_box(lv_obj_t *parent, int y) {
   status_box = lv_obj_create(parent);
   lv_obj_set_size(status_box, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-  lv_obj_align(status_box, LV_ALIGN_CENTER, 0, 82);  // In the arc's bottom gap, above the page dots
+  lv_obj_align(status_box, LV_ALIGN_CENTER, 0, y);
   lv_obj_clear_flag(status_box, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_set_style_border_width(status_box, 0, 0);
   lv_obj_set_style_radius(status_box, 6, 0);
@@ -86,7 +103,7 @@ static void create_status_box(lv_obj_t *parent) {
   lv_obj_set_style_text_font(status_label, &lv_font_montserrat_14, 0);
   lv_label_set_text(status_label, "Starting...");
 
-  status_set_colors(lv_color_white(), lv_color_black());
+  status_set_colors(lv_color_hex(THEME_BG_TOP), lv_color_hex(THEME_GOLD));
   status_flash_timer = lv_timer_create(status_flash_cb, 500, nullptr);
   lv_timer_pause(status_flash_timer);
 }
@@ -99,7 +116,8 @@ void ui_set_attention(bool attention) {
   } else {
     lv_timer_pause(status_flash_timer);
     status_flash_red = false;
-    status_set_colors(lv_color_white(), lv_color_black());
+    status_set_colors(lv_color_hex(THEME_BG_TOP), lv_color_hex(THEME_GOLD));
+    lv_obj_set_style_text_color(clock_label, lv_color_hex(THEME_TEXT_DIM), 0);
   }
 }
 
@@ -156,7 +174,9 @@ static void arc_changed_cb(lv_event_t *) {
 
 void ui_init() {
   main_screen = lv_scr_act();
-  lv_obj_set_style_bg_color(main_screen, lv_color_black(), 0);
+  lv_obj_set_style_bg_color(main_screen, lv_color_hex(THEME_BG_TOP), 0);
+  lv_obj_set_style_bg_grad_color(main_screen, lv_color_hex(THEME_BG_BOTTOM), 0);
+  lv_obj_set_style_bg_grad_dir(main_screen, LV_GRAD_DIR_VER, 0);
   lv_obj_clear_flag(main_screen, LV_OBJ_FLAG_SCROLLABLE);
 
   tileview = lv_tileview_create(main_screen);
@@ -189,6 +209,7 @@ static const int SEG_R_OUT = 94;    // Inside the RPM ring (inner edge ~102) and
 static const int SEG_R_IN = 60;
 static const char *const seg_text[SEG_COUNT] = {LV_SYMBOL_POWER "\nOff", "Low", "Med", "High", "Max"};
 static lv_obj_t *segs[SEG_COUNT];
+static lv_obj_t *seg_labels[SEG_COUNT];
 static int seg_pressed = -1;
 static uint16_t seg_target = 0;   // Current target RPM; the matching segment stays lit
 
@@ -198,15 +219,16 @@ static uint16_t seg_rpm(int i) {  // Read at tap time, so Config changes apply
   return rpm[i];
 }
 
-// Cyan while pressed, and while its speed is the current target (Off when stopped)
+// Gold while pressed, and while its speed is the current target (Off when stopped)
 static void seg_highlight() {
   for (int i = 0; i < SEG_COUNT; i++) {
     bool lit = i == seg_pressed || seg_rpm(i) == seg_target;
-    lv_color_t c = lit         ? lv_palette_main(LV_PALETTE_CYAN)
-                 : i == 0      ? lv_color_hex(0x8B1E1E)   // Off: dark red
-                               : lv_color_hex(0x4A5058);  // Presets: steel grey
-    if (lv_obj_get_style_arc_color(segs[i], LV_PART_MAIN).full != c.full) {
-      lv_obj_set_style_arc_color(segs[i], c, LV_PART_MAIN);  // Only on change (avoids redraws)
+    lv_color_t c = lit    ? lv_color_hex(THEME_GOLD)
+                 : i == 0 ? lv_color_hex(THEME_OFF)
+                          : lv_color_hex(THEME_PANEL);
+    if (lv_obj_get_style_arc_color(segs[i], LV_PART_MAIN).full != c.full) {  // Only on change (avoids redraws)
+      lv_obj_set_style_arc_color(segs[i], c, LV_PART_MAIN);
+      lv_obj_set_style_text_color(seg_labels[i], lv_color_hex(lit ? THEME_ON_GOLD : THEME_TEXT), 0);
     }
   }
 }
@@ -251,8 +273,9 @@ static void create_segments(lv_obj_t *tile) {
     float mid = (a0 + a1) / 2.0f * DEG_TO_RAD;
     lv_obj_t *label = lv_label_create(tile);
     lv_obj_set_style_text_font(label, &lv_font_montserrat_14, 0);
-    lv_obj_set_style_text_color(label, lv_color_white(), 0);
+    lv_obj_set_style_text_color(label, lv_color_hex(THEME_TEXT), 0);
     lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);  // Off: icon above word
+    seg_labels[i] = label;
     lv_label_set_text(label, seg_text[i]);
     lv_obj_align(label, LV_ALIGN_CENTER, lroundf(label_r * cosf(mid)), lroundf(label_r * sinf(mid)));
   }
@@ -311,9 +334,9 @@ static void main_tap_cb(lv_event_t *) {
     if (fan_get_target() > 0) {
       fan_set_target(0);
       Serial.println("Double-tap: fan stopped");
-      show_popup("Fan stopped", lv_palette_main(LV_PALETTE_RED));
+      show_popup("Fan stopped", lv_color_hex(THEME_ALERT));
     } else {
-      show_popup("Fan is not running", lv_color_hex(0x404040));
+      show_popup("Fan is not running", lv_color_hex(THEME_PANEL));
     }
   } else {
     last_tap = now;
@@ -341,30 +364,38 @@ static void create_main_page(lv_obj_t *scr) {
   lv_obj_set_ext_click_area(rpm_arc, 114 - 12 - SEG_R_OUT);
   lv_obj_set_style_arc_width(rpm_arc, 12, LV_PART_MAIN);
   lv_obj_set_style_arc_width(rpm_arc, 12, LV_PART_INDICATOR);
-  lv_obj_set_style_arc_color(rpm_arc, lv_color_hex(0x303030), LV_PART_MAIN);
-  lv_obj_set_style_arc_color(rpm_arc, lv_palette_main(LV_PALETTE_CYAN), LV_PART_INDICATOR);
-  lv_obj_set_style_bg_color(rpm_arc, lv_color_white(), LV_PART_KNOB);
+  lv_obj_set_style_arc_color(rpm_arc, lv_color_hex(THEME_TRACK), LV_PART_MAIN);
+  lv_obj_set_style_arc_color(rpm_arc, lv_color_hex(THEME_GOLD), LV_PART_INDICATOR);
+  lv_obj_set_style_bg_color(rpm_arc, lv_color_hex(THEME_TEXT), LV_PART_KNOB);
   lv_obj_set_style_pad_all(rpm_arc, 2, LV_PART_KNOB);
   lv_obj_add_event_cb(rpm_arc, arc_changed_cb, LV_EVENT_VALUE_CHANGED, nullptr);
 
+  // Clock in the arc's bottom gap, above the page dots
   clock_label = lv_label_create(scr);
   lv_obj_set_style_text_font(clock_label, &lv_font_montserrat_20, 0);
-  lv_obj_set_style_text_color(clock_label, lv_color_hex(0xB0B0B0), 0);
+  lv_obj_set_style_text_color(clock_label, lv_color_hex(THEME_TEXT_DIM), 0);
   lv_label_set_text(clock_label, "--:--");
-  lv_obj_align(clock_label, LV_ALIGN_CENTER, 0, 50);
+  lv_obj_align(clock_label, LV_ALIGN_CENTER, 0, 82);
 
+  // Target RPM: what the knob, arc and segments set (gold, like the arc)
   rpm_label = lv_label_create(scr);
   lv_obj_set_style_text_font(rpm_label, &lv_font_montserrat_40, 0);  // 48 crowded the Off/Max segments
-  lv_obj_set_style_text_color(rpm_label, lv_color_white(), 0);
-  lv_obj_align(rpm_label, LV_ALIGN_CENTER, 0, -4);
+  lv_obj_set_style_text_color(rpm_label, lv_color_hex(THEME_GOLD), 0);
+  lv_obj_align(rpm_label, LV_ALIGN_CENTER, 0, -6);
 
   unit_label = lv_label_create(scr);
   lv_obj_set_style_text_font(unit_label, &lv_font_montserrat_14, 0);
-  lv_obj_set_style_text_color(unit_label, lv_color_hex(0x808080), 0);
+  lv_obj_set_style_text_color(unit_label, lv_color_hex(THEME_TEXT_DIM), 0);
   lv_label_set_text(unit_label, "RPM");
-  lv_obj_align(unit_label, LV_ALIGN_CENTER, 0, 28);
+  lv_obj_align(unit_label, LV_ALIGN_CENTER, 0, 22);
 
-  create_status_box(scr);
+  // Actual RPM from the tach, light text so it can't be mistaken for the gold target
+  actual_label = lv_label_create(scr);
+  lv_obj_set_style_text_font(actual_label, &lv_font_montserrat_20, 0);
+  lv_obj_set_style_text_color(actual_label, lv_color_hex(THEME_TEXT), 0);
+  lv_label_set_recolor(actual_label, true);  // "now" in the dim colour
+  lv_label_set_text(actual_label, "");
+  lv_obj_align(actual_label, LV_ALIGN_CENTER, 0, 48);
 
   create_segments(scr);
 }
@@ -389,7 +420,7 @@ static int current_page() {
 static void page_changed_cb(lv_event_t *) {
   int page = current_page();
   for (int i = 0; i < PAGE_COUNT; i++) {
-    lv_obj_set_style_bg_color(page_dots[i], i == page ? lv_color_white() : lv_color_hex(0x404040), 0);
+    lv_obj_set_style_bg_color(page_dots[i], lv_color_hex(i == page ? THEME_GOLD : THEME_PANEL), 0);
   }
 }
 
@@ -398,7 +429,8 @@ static void create_page_dots(lv_obj_t *parent) {
     lv_obj_t *dot = lv_obj_create(parent);
     lv_obj_set_size(dot, 8, 8);
     lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_border_width(dot, 0, 0);
+    lv_obj_set_style_border_width(dot, 1, 0);  // Outline: the gold dot still shows on the gold Settings page
+    lv_obj_set_style_border_color(dot, lv_color_hex(THEME_BG_TOP), 0);
     lv_obj_clear_flag(dot, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_align(dot, LV_ALIGN_BOTTOM_MID, (2 * i - (PAGE_COUNT - 1)) * 8, -10);  // 16 px apart, centred
     page_dots[i] = dot;
@@ -418,8 +450,8 @@ static int menu_sel = 0;
 static void menu_highlight() {
   for (int i = 0; i < PAGE_COUNT; i++) {
     bool sel = i == menu_sel;
-    lv_obj_set_style_bg_color(menu_items[i], sel ? lv_palette_main(LV_PALETTE_CYAN) : lv_color_hex(0x303030), 0);
-    lv_obj_set_style_text_color(menu_items[i], sel ? lv_color_black() : lv_color_white(), 0);
+    lv_obj_set_style_bg_color(menu_items[i], lv_color_hex(sel ? THEME_GOLD : THEME_PANEL), 0);
+    lv_obj_set_style_text_color(menu_items[i], lv_color_hex(sel ? THEME_ON_GOLD : THEME_TEXT), 0);
   }
   lv_obj_scroll_to_view(menu_items[menu_sel], LV_ANIM_ON);  // Long lists scroll
 }
@@ -446,7 +478,7 @@ static void create_menu(lv_obj_t *parent) {
   lv_obj_set_size(menu, 240, 240);
   lv_obj_center(menu);
   lv_obj_set_style_radius(menu, LV_RADIUS_CIRCLE, 0);
-  lv_obj_set_style_bg_color(menu, lv_color_black(), 0);
+  lv_obj_set_style_bg_color(menu, lv_color_hex(THEME_BG_BOTTOM), 0);
   lv_obj_set_style_bg_opa(menu, LV_OPA_90, 0);
   lv_obj_set_style_border_width(menu, 0, 0);
   lv_obj_clear_flag(menu, LV_OBJ_FLAG_SCROLLABLE);
@@ -500,7 +532,7 @@ void ui_menu_turn(int delta) {
 static lv_obj_t *page_title(lv_obj_t *tile, const char *text) {
   lv_obj_t *title = lv_label_create(tile);
   lv_obj_set_style_text_font(title, &lv_font_montserrat_20, 0);
-  lv_obj_set_style_text_color(title, lv_color_hex(0xB0B0B0), 0);
+  lv_obj_set_style_text_color(title, lv_color_hex(THEME_BG_TOP), 0);
   lv_label_set_text(title, text);
   lv_obj_align(title, LV_ALIGN_CENTER, 0, -80);
   return title;
@@ -516,11 +548,14 @@ static void brightness_cb(lv_event_t *e) {
   }
 }
 
+// Reversed theme: gold background, dark blue text and controls
 static void create_settings_page(lv_obj_t *tile) {
+  lv_obj_set_style_bg_color(tile, lv_color_hex(THEME_GOLD), 0);
+  lv_obj_set_style_bg_opa(tile, LV_OPA_COVER, 0);
   page_title(tile, "Settings");
 
   brightness_label = lv_label_create(tile);
-  lv_obj_set_style_text_color(brightness_label, lv_color_white(), 0);
+  lv_obj_set_style_text_color(brightness_label, lv_color_hex(THEME_BG_TOP), 0);
   lv_label_set_text_fmt(brightness_label, "Brightness %u%%", config.display.brightness);
   lv_obj_align(brightness_label, LV_ALIGN_CENTER, 0, -42);
 
@@ -531,21 +566,26 @@ static void create_settings_page(lv_obj_t *tile) {
   lv_slider_set_value(brightness_slider, config.display.brightness, LV_ANIM_OFF);
   lv_obj_add_event_cb(brightness_slider, brightness_cb, LV_EVENT_VALUE_CHANGED, nullptr);
   lv_obj_add_event_cb(brightness_slider, brightness_cb, LV_EVENT_RELEASED, nullptr);
+  lv_obj_set_style_bg_color(brightness_slider, lv_color_hex(THEME_GOLD_DARK), LV_PART_MAIN);
+  lv_obj_set_style_bg_color(brightness_slider, lv_color_hex(THEME_BG_TOP), LV_PART_INDICATOR);
+  lv_obj_set_style_bg_color(brightness_slider, lv_color_hex(THEME_BG_TOP), LV_PART_KNOB);
+
+  create_status_box(tile, 22);  // IP address (web page link)
 
   info_label = lv_label_create(tile);
   lv_obj_set_style_text_font(info_label, &lv_font_montserrat_14, 0);
-  lv_obj_set_style_text_color(info_label, lv_color_hex(0x909090), 0);
+  lv_obj_set_style_text_color(info_label, lv_color_hex(THEME_BG_TOP), 0);
   lv_obj_set_style_text_align(info_label, LV_TEXT_ALIGN_CENTER, 0);
   lv_label_set_text(info_label, "");
-  lv_obj_align(info_label, LV_ALIGN_CENTER, 0, 40);
+  lv_obj_align(info_label, LV_ALIGN_CENTER, 0, 60);
 }
 
 static void update_info() {
   String text;
   if (WiFi.status() == WL_CONNECTED) {
-    text = WiFi.localIP().toString() + "\n" + WiFi.SSID();
+    text = WiFi.SSID();
   } else if (WiFi.getMode() & WIFI_AP) {
-    text = WiFi.softAPIP().toString() + "\nHotspot";
+    text = "Hotspot";
   } else {
     text = "WiFi lost";
   }
@@ -574,15 +614,17 @@ void ui_set_standby(bool standby) {
 }
 
 void ui_update() {
-  // Measured speed (tach) beside the RPM caption while the fan runs
+  // Caption under the target: "RPM", or Auto Configure progress. Actual RPM below it while
+  // the fan turns (hidden when stopped or without a fan controller).
   char unit[24] = "RPM";
+  char actual[40] = "";
   int setup = fan_autoconfig_progress();
-  if (setup >= 0) {
-    snprintf(unit, sizeof(unit), "Setup %d%% (%u)", setup, fan_get_rpm());
-  } else if (fan_controller_present() && (fan_get_target() > 0 || fan_get_rpm() > 0)) {
-    snprintf(unit, sizeof(unit), "RPM (now %u)", fan_get_rpm());
+  if (setup >= 0) snprintf(unit, sizeof(unit), "Setup %d%%", setup);
+  if (fan_controller_present() && (fan_get_target() > 0 || fan_get_rpm() > 0 || setup >= 0)) {
+    snprintf(actual, sizeof(actual), "#%06lX now# %u", (unsigned long)THEME_TEXT_DIM, fan_get_rpm());
   }
-  if (unit_label && strcmp(unit, lv_label_get_text(unit_label)) != 0) lv_label_set_text(unit_label, unit);
+  if (strcmp(unit, lv_label_get_text(unit_label)) != 0) lv_label_set_text(unit_label, unit);
+  if (strcmp(actual, lv_label_get_text(actual_label)) != 0) lv_label_set_text(actual_label, actual);
   seg_highlight();  // Presets may have been changed on the web page
   if (lv_arc_get_max_value(rpm_arc) != config.fan.maxRpm) {  // Fan max RPM changed on the web page
     lv_arc_set_range(rpm_arc, config.fan.minRpm, config.fan.maxRpm);

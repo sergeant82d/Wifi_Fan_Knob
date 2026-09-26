@@ -180,16 +180,24 @@ See `platformio.ini`. Libraries:
   both fields' characters/lengths only; the page supplies the rule from its table.
 - LCD pages (verified): horizontal LVGL tileview, swipe left from Main. Main: RPM arc (drag
   along the ring to set speed, snaps to rpmStep; ring-only hit test (needs LV_OBJ_FLAG_ADV_HITTEST, off by default) + 8 px ext area (stops at the segments' outer edge, SEG_R_OUT) so
-  mid-screen swipes still page), clock, status box. Settings: brightness slider (live; saveConfig on release) +
-  IP/SSID/MQTT info. Page dots in the arc's bottom gap. Knob turns and wake return to Main.
+  mid-screen swipes still page), target RPM, actual RPM, clock. Settings: brightness slider (live; saveConfig on release) +
+  IP box + SSID/MQTT info. Page dots in the arc's bottom gap. Knob turns and wake return to Main.
   Pages come from the `PAGES` table in `ui.cpp` (name + builder); tiles, dots and the knob
   menu follow it, so adding a page = one builder + one table row (Main stays first).
   On every page after Main, a tap on empty space slides back to Main (verified).
 - Main quick segments (verified): Off + Low/Med/High/Max drawn as 5 ring slices inside the
   RPM arc (non-clickable `lv_arc`s, `SEG_*` constants in `ui.cpp`); taps on the Main tile are
-  mapped to a segment by angle/radius (`seg_at`). A segment is cyan while pressed and while
+  mapped to a segment by angle/radius (`seg_at`). A segment is gold while pressed and while
   its speed is the current target. RPM arc ends are derived from the band (152° to 28°) to
-  clear the status box. RPM number uses Montserrat 40. How-to: `docs/DISPLAY_GUIDE.md`.
+  clear the bottom gap. RPM number uses Montserrat 40. How-to: `docs/DISPLAY_GUIDE.md`.
+- Theme + layout (verified 2026-09-25): the web page's dark blue and gold, as named
+  `THEME_*` colours at the top of `ui.cpp`. Main: navy gradient; gold target RPM (y -6) and
+  arc; dim "RPM" caption (y 22, "Setup NN%" during Auto Configure); actual RPM "now N" in light
+  text (y 48, LVGL recolour for the dim "now", hidden when stopped); dim clock in the bottom
+  gap (y 82). Settings is reversed (gold tile, navy text/slider) and now holds the IP box
+  (`create_status_box(tile, 22)`); its info shows SSID + MQTT only. WiFi lost flashes both the
+  IP box and Main's clock red (`status_flash_cb`). Page dots have a navy outline so the gold
+  current dot shows on the gold page.
 - Knob menu (verified): short press shows the page names (current one
   highlighted); turn to choose, press again or tap a name to go; tap outside closes. While
   open, knob turns don't change RPM. Standby closes it.
@@ -292,8 +300,9 @@ See `platformio.ini`. Libraries:
   button. Serial prints `Encoder: n` / `Button pressed`.
 - Main screen (`ui.cpp`): 270° cyan arc + large target RPM (knob, `rpmStep` per detent,
   clamped to min/max; not persisted, starts at 0), clock (12h/24h + TZ, `--:--` until
-  valid), one-line status box at bottom (`[AP ]IP:port` / `WiFi lost`). Status box flashes
-  red/white via `ui_set_attention()` when a saved network is configured but not connected.
+  valid), one-line status box (`[AP ]IP:port` / `WiFi lost`; now on the Settings page). It
+  flashes red via `ui_set_attention()` when a saved network is configured but not connected
+  (the Main clock flashes with it). Colours and layout since changed: see Theme + layout.
 - SPIFFS mount + config defaults written
 - WiFi AP mode (`WiFi-Fan-Knob-XXXXXX` / `12345678`)
 - Webserver serves `index.html` at `http://192.168.4.1:8080`
