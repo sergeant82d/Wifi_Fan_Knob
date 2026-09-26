@@ -269,6 +269,26 @@ See `platformio.ini`. Libraries:
   (60 ms): single dropped touch readings were counting as extra taps. A stirred eye draws at
   full frame rate. The screensaver is unchanged (any input dismisses it). Logs `Stir: touch/
   knob`, `Wake tap n/4`, `Wake: 4 taps`. Constants listed in `DISPLAY_GUIDE.md` section 5.
+- Display modes as radio buttons (2026-09-26): one `mode_request` (`power_request_mode()`,
+  `PowerMode` in `power.h`) replaces the separate standby/screensaver requests; knob, touch,
+  web (`POST /api/mode` active|screensaver|standby) and HA all go through it, so exactly one
+  of Active / Screensaver / Standby is on and any can be picked from any (Standby →
+  Screensaver works; HA Screensaver ON now leaves standby). Web Home tab "Display Mode" card:
+  three buttons, the current one gold. Not yet confirmed by the user on the web/HA side.
+- Standby prompt (verified 2026-09-26): after `config.display.standbyAfterMin` minutes of
+  screensaver (default 10, 0-1440, 0 = never; counted from `saver_since`), the eye closes and
+  a full-screen LVGL overlay asks "Keep the fan running?" (`ui_prompt_*` in `ui.cpp`). Keep
+  running / Standby buttons: tap, or knob turn to choose + press. Countdown
+  `standbyPromptSec` (default 30, 5-300); no answer → standby. Keep running → back to the
+  screensaver, countdown restarts (changed after user review; first version went to Main).
+  Fan target already 0 → straight to standby, no prompt. A mode chosen on the web/HA answers
+  it. `/api/status` power_mode "Active (standby prompt)" while it shows.
+- Standby stops the fan first (fixed 2026-09-26): `set_standby()` calls `fan_stop_now()`,
+  which writes Fan Setting 0 to the EMC2101 before the external power is cut. Before, the
+  target became 0 but the write only happened on the next `fan_update()`, after the chip was
+  already marked unpowered, so the fan kept running. Note: if a future wiring cuts the
+  EMC2101's power but not the fan's 12 V, the PWM line floats high and a 4-wire fan runs at
+  100 %: switch the fan's 12 V too (or keep the EMC2101 powered).
 - `include/ui.h` standby LVGL screen (grey clock) still exists but is no longer shown.
 - Peripheral power switch (verified): GPIO 4 drives a transistor that powers everything except
   MCU/LCD (fan, lights, sensors, EMC2101). ON while awake, OFF in standby; Fan Off only sets
@@ -512,6 +532,16 @@ STANDBY (1)
 4. Field testing, including the industrial fans once they have power.
 
 ### Later (user notes)
+- **Short term, after the FPC breakout (GPIO 4 / 12) arrives: replace the EMC2101 with
+  "real" 25 kHz PWM + tach on the UART0 connector** (user, 2026-09-26). Serial is on native
+  USB (`ARDUINO_USB_CDC_ON_BOOT=1`), so both UART connectors are free GPIOs. UART0 is almost
+  certainly GPIO 43 (TX) / 44 (RX); the second UART connector's pins are not documented by
+  Elecrow (confirm with the schematic or a pin-toggle test build). Plan: LEDC PWM at 25 kHz
+  (fine resolution) and tach via MCPWM capture or a spare PCNT unit (4 units; the knob uses
+  one). GPIO 43 prints the ROM boot log at power-up, so use it for the tach **input** and
+  GPIO 44 for the PWM **output** (else the fan blips at every boot). 3.3 V logic: tach needs a
+  pull-up to 3.3 V; PWM via the 5 V level shifter if a fan needs it. Auto Configure / profiles
+  stay the same idea with finer steps.
 - **Eye upgrades** — done: native 240x240, 10 styles selectable on the web, 15 fps in
   standby, sleeping eye in standby, standby brightness setting, wake gestures. Declined:
   light sleep between frames (small saving with WiFi on; revisit only for battery power). Left:

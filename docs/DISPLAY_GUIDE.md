@@ -392,6 +392,9 @@ In `create_menu()` and `menu_highlight()`:
 | Screensaver delay, or turn it off | Web page → Config → Display & Interface (seconds; 0 = off) |
 | Eye style | Web page → Config → Display & Interface |
 | Standby brightness (0 = screen off) | Web page → Config → Display & Interface |
+| How long the screensaver runs before asking "Keep the fan running?" (0 = never) | Web page → Config → Display & Interface → Standby after screensaver (minutes) |
+| How long that question waits for an answer before standby | Web page → Config → Display & Interface → Standby prompt timeout (seconds) |
+| The question's look: text, buttons, countdown | `create_prompt()` in `src/ui.cpp` |
 | How the eye sleeps in standby (how long it stays shut, twitches, peeks) | `sleep_openness()` in `src/dragon_eye.cpp` |
 | Eye speed in standby (15 frames per second) | `STANDBY_EYE_FPS` in `src/main.cpp` |
 | Taps needed to wake from standby, after the first tap that stirs the eye (4) | `WAKE_TAPS` in `src/main.cpp` |
@@ -412,6 +415,15 @@ The screensaver shows the eye while the fan keeps running. A touch, knob turn or
 short press only dismisses it. In standby the eye goes to sleep: it closes, stays shut,
 and now and then twitches or peeks. Standby also stops the fan and switches external
 power off.
+
+**Screensaver, then standby.** After the screensaver has run for the set time, the eye
+closes and the LCD asks **"Keep the fan running?"** with **Keep running** and **Standby**
+buttons and a countdown. Tap a button, or turn the knob to choose and press to pick. Keep
+running goes back to the screensaver (and the time starts again); no answer means standby. If
+the fan is already off, there's nothing to ask: it goes straight to standby.
+
+**Modes are like radio buttons.** Active, Screensaver and Standby: exactly one is on. The web
+Home tab's Display Mode buttons and Home Assistant's switches can pick any of them directly.
 
 **Waking from standby (wake gestures).** A bump shouldn't wake the board, so the eye
 reacts first:

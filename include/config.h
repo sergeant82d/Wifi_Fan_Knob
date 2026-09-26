@@ -63,6 +63,8 @@ typedef struct {
     uint16_t screenTimeout;         // Minutes (0 = never)
     uint16_t screensaverSec;        // Dragon eye after this many idle seconds (0 = off)
     uint8_t standbyBrightness;      // Backlight % in standby (0 = off)
+    uint16_t standbyAfterMin;       // Screensaver on this long -> standby prompt (0 = never; max 1440)
+    uint16_t standbyPromptSec;      // Prompt unanswered this long -> standby (5-300)
   } display;
 
   // Fan Settings

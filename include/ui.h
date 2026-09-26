@@ -13,4 +13,14 @@ bool ui_menu_open();                     // Knob page menu showing?
 void ui_menu_button();                   // Short press: open menu, or go to the chosen page
 void ui_menu_turn(int delta);            // Knob turn while the menu is open
 
+// Standby prompt ("Keep the fan running?") over the Main page. Touch picks a button;
+// the knob turns between them and a press picks the highlighted one.
+enum { UI_PROMPT_NONE = -1, UI_PROMPT_KEEP = 0, UI_PROMPT_STANDBY = 1 };
+void ui_prompt_show();                   // Keep running highlighted
+void ui_prompt_hide();
+void ui_prompt_countdown(int seconds);   // "Standby in N s"
+void ui_prompt_turn(int delta);
+void ui_prompt_press();
+int ui_prompt_take_answer();             // UI_PROMPT_* once per answer, else UI_PROMPT_NONE
+
 #endif

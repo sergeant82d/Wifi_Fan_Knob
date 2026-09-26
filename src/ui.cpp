@@ -57,6 +57,7 @@ static lv_obj_t *info_label = nullptr;
 
 static void create_standby_screen();
 static void create_config_screen();
+static void create_prompt(lv_obj_t *parent);
 static void create_main_page(lv_obj_t *tile);
 static void create_settings_page(lv_obj_t *tile);
 static void create_page_dots(lv_obj_t *parent);
@@ -201,6 +202,7 @@ void ui_init() {
   }
   create_page_dots(main_screen);
   create_menu(main_screen);  // After the dots so it covers them
+  create_prompt(main_screen);
   create_standby_screen();
   create_config_screen();
   ui_set_target_rpm(config.fan.minRpm);
@@ -621,6 +623,103 @@ static void create_standby_screen() {
   lv_obj_set_style_text_color(standby_clock, lv_color_hex(0x606060), 0);
   lv_label_set_text(standby_clock, "--:--");
   lv_obj_center(standby_clock);
+}
+
+// ============================================================================
+// STANDBY PROMPT: "Keep the fan running?" once the screensaver has run its time (main.cpp
+// decides when, counts down and applies the answer). Covers the whole screen like the menu.
+// ============================================================================
+
+static lv_obj_t *prompt = nullptr;
+static lv_obj_t *prompt_btns[2];
+static lv_obj_t *prompt_count = nullptr;
+static int prompt_sel = UI_PROMPT_KEEP;
+static int prompt_answer = UI_PROMPT_NONE;
+
+static void prompt_highlight() {
+  for (int i = 0; i < 2; i++) {
+    bool sel = i == prompt_sel;
+    lv_obj_set_style_bg_color(prompt_btns[i], lv_color_hex(sel ? THEME_GOLD : THEME_PANEL), 0);
+    lv_obj_set_style_text_color(prompt_btns[i], lv_color_hex(sel ? THEME_ON_GOLD : THEME_TEXT), 0);
+  }
+}
+
+static void prompt_btn_cb(lv_event_t *e) {
+  prompt_answer = (int)(intptr_t)lv_event_get_user_data(e);
+}
+
+static void create_prompt(lv_obj_t *parent) {
+  prompt = lv_obj_create(parent);  // Clickable: taps between the buttons do nothing
+  lv_obj_set_size(prompt, 240, 240);
+  lv_obj_center(prompt);
+  lv_obj_set_style_radius(prompt, LV_RADIUS_CIRCLE, 0);
+  lv_obj_set_style_bg_color(prompt, lv_color_hex(THEME_BG_BOTTOM), 0);
+  lv_obj_set_style_bg_opa(prompt, LV_OPA_COVER, 0);
+  lv_obj_set_style_border_width(prompt, 0, 0);
+  lv_obj_clear_flag(prompt, LV_OBJ_FLAG_SCROLLABLE);
+
+  lv_obj_t *title = lv_label_create(prompt);
+  lv_obj_set_style_text_font(title, &lv_font_montserrat_20, 0);
+  lv_obj_set_style_text_color(title, lv_color_hex(THEME_GOLD), 0);
+  lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, 0);
+  lv_label_set_text(title, "Keep the fan\nrunning?");
+  lv_obj_align(title, LV_ALIGN_CENTER, 0, -52);
+
+  const char *const text[2] = {"Keep running", "Standby"};
+  for (int i = 0; i < 2; i++) {
+    lv_obj_t *btn = lv_btn_create(prompt);
+    lv_obj_set_size(btn, 150, 40);
+    lv_obj_align(btn, LV_ALIGN_CENTER, 0, i == UI_PROMPT_KEEP ? 2 : 50);
+    lv_obj_add_event_cb(btn, prompt_btn_cb, LV_EVENT_CLICKED, (void *)(intptr_t)i);
+    lv_obj_t *label = lv_label_create(btn);
+    lv_obj_set_style_text_font(label, &lv_font_montserrat_20, 0);
+    lv_label_set_text(label, text[i]);
+    lv_obj_center(label);
+    prompt_btns[i] = btn;
+  }
+
+  prompt_count = lv_label_create(prompt);
+  lv_obj_set_style_text_font(prompt_count, &lv_font_montserrat_14, 0);
+  lv_obj_set_style_text_color(prompt_count, lv_color_hex(THEME_TEXT_DIM), 0);
+  lv_label_set_text(prompt_count, "");
+  lv_obj_align(prompt_count, LV_ALIGN_CENTER, 0, 88);
+  lv_obj_add_flag(prompt, LV_OBJ_FLAG_HIDDEN);
+}
+
+void ui_prompt_show() {
+  menu_close();
+  prompt_sel = UI_PROMPT_KEEP;
+  prompt_answer = UI_PROMPT_NONE;
+  prompt_highlight();
+  lv_label_set_text(prompt_count, "");
+  lv_obj_clear_flag(prompt, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_move_foreground(prompt);
+}
+
+void ui_prompt_hide() {
+  lv_obj_add_flag(prompt, LV_OBJ_FLAG_HIDDEN);
+  prompt_answer = UI_PROMPT_NONE;
+}
+
+void ui_prompt_countdown(int seconds) {
+  char text[24];
+  snprintf(text, sizeof(text), "Standby in %d s", seconds);
+  if (strcmp(text, lv_label_get_text(prompt_count)) != 0) lv_label_set_text(prompt_count, text);
+}
+
+void ui_prompt_turn(int delta) {
+  prompt_sel = delta > 0 ? UI_PROMPT_STANDBY : UI_PROMPT_KEEP;  // Clockwise: down to Standby
+  prompt_highlight();
+}
+
+void ui_prompt_press() {
+  prompt_answer = prompt_sel;
+}
+
+int ui_prompt_take_answer() {
+  int answer = prompt_answer;
+  prompt_answer = UI_PROMPT_NONE;
+  return answer;
 }
 
 // Auto Configure: gold (reversed theme) so it can't be mistaken for any other screen.

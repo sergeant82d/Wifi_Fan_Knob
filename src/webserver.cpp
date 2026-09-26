@@ -96,6 +96,13 @@ static String apply_config_form(AsyncWebServerRequest *request) {
   if (!form_int(request, "mqtt_port", 1, 65535, mqtt_port)) return "MQTT port must be 1-65535";
   if (!form_int(request, "screensaver_sec", 0, 3600, saver_sec)) return "Screensaver delay must be 0-3600 seconds";
   if (!form_int(request, "standby_brightness", 0, 100, standby_brightness)) return "Standby brightness must be 0-100";
+  long standby_after_min, standby_prompt_sec;
+  if (!form_int(request, "standby_after_min", 0, 1440, standby_after_min)) {
+    return "Standby after screensaver must be 0-1440 minutes";
+  }
+  if (!form_int(request, "standby_prompt_sec", 5, 300, standby_prompt_sec)) {
+    return "Standby prompt timeout must be 5-300 seconds";
+  }
   String eye_style = form_value(request, "eye_style");
   if (!eye_style_find(eye_style.c_str())) return "Unknown eye style";
   // Fan's rated top speed; everything else (presets, knob, arc, web, HA) is limited to it
@@ -142,6 +149,8 @@ static String apply_config_form(AsyncWebServerRequest *request) {
   config.mqtt.discoveryEnabled = form_value(request, "mqtt_discovery") == "1";
   config.display.screensaverSec = saver_sec;
   config.display.standbyBrightness = standby_brightness;
+  config.display.standbyAfterMin = standby_after_min;
+  config.display.standbyPromptSec = standby_prompt_sec;
   strlcpy(config.display.eyeStyle, eye_style.c_str(), sizeof(config.display.eyeStyle));  // loop() applies it
   config.power.activeHigh = level == "high";
   return "";
@@ -237,7 +246,10 @@ void init_webserver() {
     doc["rpm_step"] = config.fan.rpmStep;
     doc["fan_controller"] = fan_controller_present();
     doc["fan_rpm"] = fan_get_rpm();
-    doc["power_mode"] = power_is_standby() ? "Standby" : power_screensaver_on() ? "Active (screensaver)" : "Active";
+    doc["power_mode"] = power_is_standby()         ? "Standby"
+                        : power_screensaver_on()   ? "Active (screensaver)"
+                        : power_standby_prompt_on() ? "Active (standby prompt)"
+                                                   : "Active";
     doc["periph_power"] = power_peripherals_on();
     doc["mqtt_connected"] = mqtt_connected();
     doc["fw_version"] = config.firmwareVersion;
@@ -337,7 +349,24 @@ void init_webserver() {
     request->send(200, "text/plain", "Brightness saved");
   });
 
-  // Screensaver start (on=1) / dismiss (on=0); applied by loop(), ignored in standby
+  // Display mode, like radio buttons: active, screensaver or standby (exactly one is on)
+  server->on(AsyncURIMatcher::exact("/api/mode"), HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (!require_login(request)) return;
+    String mode = form_value(request, "mode");
+    if (mode == "active") {
+      power_request_mode(POWER_ACTIVE);
+    } else if (mode == "screensaver") {
+      power_request_mode(POWER_SCREENSAVER);
+    } else if (mode == "standby") {
+      power_request_mode(POWER_STANDBY);
+    } else {
+      request->send(400, "text/plain", "mode must be active, screensaver or standby");
+      return;
+    }
+    request->send(200, "text/plain", "Mode: " + mode);
+  });
+
+  // Screensaver start (on=1) / dismiss (on=0); applied by loop()
   server->on(AsyncURIMatcher::exact("/api/screensaver"), HTTP_POST, [](AsyncWebServerRequest *request) {
     if (!require_login(request)) return;
     bool on = form_value(request, "on") == "1";

@@ -502,8 +502,20 @@
             </div>
 
             <button class="btn-primary" onclick="applySpeed()">Apply Speed</button>
-            <button class="btn-secondary" style="margin-left: 10px;" id="standby-btn" onclick="standbyMode()">Standby</button>
-            <button class="btn-secondary" style="margin-left: 10px;" id="saver-btn" onclick="toggleScreensaver()">Screensaver</button>
+
+            <div class="status-card" style="margin-top: 20px;">
+                <h3>Display Mode</h3>
+                <p style="color: #a0a0a0; margin-bottom: 12px; font-size: 0.9rem;">
+                    One at a time, like radio buttons. Screensaver: the eye, fan keeps running.
+                    Standby: fan off, external power off.
+                </p>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <button type="button" class="btn-secondary" id="mode-active" onclick="setMode('active')">Active</button>
+                    <button type="button" class="btn-secondary" id="mode-screensaver" onclick="setMode('screensaver')">Screensaver</button>
+                    <button type="button" class="btn-secondary" id="mode-standby" onclick="setMode('standby')">Standby</button>
+                </div>
+                <small id="mode-note" style="color: #ffd700; display: block; margin-top: 10px;"></small>
+            </div>
 
             <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid rgba(255, 215, 0, 0.2);">
                 <a href="https://github.com/sergeant82d/Wifi_Fan_Knob" target="_blank" style="color: #ffd700; text-decoration: none; font-size: 0.9rem;">
@@ -775,6 +787,16 @@
                             <input type="number" id="screensaver-sec" min="0" max="3600" value="30" required>
                             <small style="color: #606060;">Seconds with no knob, touch or speed change. 0 = off</small>
                         </div>
+                        <div class="form-group">
+                            <label for="standby-after-min">Standby after screensaver (minutes)</label>
+                            <input type="number" id="standby-after-min" min="0" max="1440" value="10" required>
+                            <small style="color: #606060;">Screensaver on this long: the LCD asks whether to keep the fan running (straight to standby if the fan is off). Up to 1440 (24 h). 0 = never</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="standby-prompt-sec">Standby prompt timeout (seconds)</label>
+                            <input type="number" id="standby-prompt-sec" min="5" max="300" value="30" required>
+                            <small style="color: #606060;">No answer on the LCD this long: standby. 5-300 (5 minutes)</small>
+                        </div>
                     </div>
                 </div>
 
@@ -901,15 +923,25 @@
             applySpeed(rpm);
         }
 
-        // Start the screensaver, or wake the display from it
-        let saverOn = false;
-        async function toggleScreensaver() {
+        // Display mode (radio buttons): active, screensaver or standby
+        async function setMode(mode) {
             try {
-                await postForm('/api/screensaver', { on: saverOn ? '0' : '1' });
-                loadStatus();
+                await postForm('/api/mode', { mode });
+                setTimeout(loadStatus, 300);  // Device applies it on its next loop pass
             } catch (e) {
-                alert('Screensaver failed: ' + e.message);
+                alert('Mode change failed: ' + e.message);
             }
+        }
+
+        function showMode(powerMode) {
+            const mode = powerMode === 'Standby' ? 'standby'
+                       : powerMode === 'Active (screensaver)' ? 'screensaver' : 'active';
+            ['active', 'screensaver', 'standby'].forEach(m => {
+                document.getElementById('mode-' + m).className = m === mode ? 'btn-primary' : 'btn-secondary';
+            });
+            document.getElementById('mode-note').textContent = powerMode === 'Active (standby prompt)'
+                ? 'The LCD is asking whether to keep the fan running. Active keeps it running; Standby stops it.'
+                : '';
         }
 
         // Immediate stop: target 0, no confirmation
@@ -923,16 +955,6 @@
             }
         }
 
-        // Toggle standby (dimmed LCD, standby screen, fan off)
-        let inStandby = false;
-        async function standbyMode() {
-            try {
-                await postForm('/api/standby', { on: inStandby ? '0' : '1' });
-                setTimeout(loadStatus, 300);  // Device applies it on its next loop pass
-            } catch (e) {
-                alert('Standby failed: ' + e.message);
-            }
-        }
 
         function updateBrightnessLabel(value) {
             document.getElementById('brightness-label').textContent = value;
@@ -1124,6 +1146,8 @@
                 document.getElementById('brightness').value = c.display.brightness;
                 document.getElementById('screensaver-sec').value = c.display.screensaverSec;
                 document.getElementById('standby-brightness').value = c.display.standbyBrightness;
+                document.getElementById('standby-after-min').value = c.display.standbyAfterMin;
+                document.getElementById('standby-prompt-sec').value = c.display.standbyPromptSec;
                 const eyeSelect = document.getElementById('eye-style');
                 eyeSelect.innerHTML = '';
                 c.eyeStyles.forEach(st => {
@@ -1169,11 +1193,7 @@
                                   : (s.target_rpm > 0 ? 'Running' : 'Stopped'));
                 set('power-mode', s.power_mode);
                 set('periph-power', s.periph_power ? 'On' : 'Off');
-                inStandby = s.power_mode === 'Standby';
-                set('standby-btn', inStandby ? 'Wake' : 'Standby');
-                saverOn = s.power_mode === 'Active (screensaver)';
-                set('saver-btn', saverOn ? 'Wake display' : 'Screensaver');
-                document.getElementById('saver-btn').disabled = inStandby;  // Standby shows the eye itself
+                showMode(s.power_mode);
                 set('mqtt-status', s.mqtt_connected ? 'Yes' : 'No');
                 set('speed-range', s.min_rpm + '-' + s.max_rpm);
                 const slider = document.getElementById('speed-slider');
@@ -1347,6 +1367,8 @@
                     mqtt_discovery: document.getElementById('mqtt-discovery').checked ? '1' : '0',
                     screensaver_sec: v('screensaver-sec'),
                     standby_brightness: v('standby-brightness'),
+                    standby_after_min: v('standby-after-min'),
+                    standby_prompt_sec: v('standby-prompt-sec'),
                     eye_style: v('eye-style'),
                     power_level: v('power-level')
                 }));

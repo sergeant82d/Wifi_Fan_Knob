@@ -5,6 +5,7 @@
 
 bool fan_init();                        // Probe EMC2101 on Wire (after Wire.begin + peripheral power on)
 bool fan_controller_present();          // EMC2101 answered at last power-up
+void fan_stop_now();                    // loop() only: target 0 and Fan Setting 0 written at once
 void fan_power_lost();                  // Peripheral power cut: EMC2101 unavailable until fan_init()
 
 // Target RPM, clamped to config.fan.minRpm..maxRpm. Safe to call from any task;

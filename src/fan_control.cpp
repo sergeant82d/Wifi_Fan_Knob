@@ -188,6 +188,17 @@ bool fan_controller_present() {
   return controller_present;
 }
 
+// Standby calls this before cutting the external power: fan_update() would only write the
+// new setting on its next pass, by which time the chip is already unpowered.
+void fan_stop_now() {
+  target_rpm = 0;
+  if (ac_running) ac_finish("Cancelled (standby)");
+  if (!controller_present) return;
+  bool ok = write_fan_setting(0);
+  applied_setting = ok ? 0 : -1;
+  Serial.printf("[FAN] Stopped (setting 0)%s\n", ok ? "" : " WRITE FAILED");
+}
+
 void fan_power_lost() {
   controller_present = false;
   measured_rpm = 0;

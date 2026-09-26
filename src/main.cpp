@@ -469,12 +469,16 @@ void applyPowerSettings() {
 // STANDBY (knob long-press, web Standby button; any input wakes)
 // ============================================================================
 
-static volatile int8_t standby_request = -1;  // -1 none, 0 wake, 1 standby
+static volatile int8_t mode_request = -1;     // -1 none, else a PowerMode; loop() applies it
 static bool standby_touch_armed = false;      // Set once no touch is seen in standby
 static int wake_taps = 0;                     // Taps since the eye was stirred from sleep
 
+void power_request_mode(PowerMode mode) {
+  mode_request = mode;
+}
+
 void power_request_standby(bool standby) {
-  standby_request = standby ? 1 : 0;
+  power_request_mode(standby ? POWER_STANDBY : POWER_ACTIVE);
 }
 
 bool power_is_standby() {
@@ -486,10 +490,26 @@ bool power_is_standby() {
 // Unlike standby, the fan and peripherals keep running and brightness is unchanged.
 // A touch, knob turn or short press only dismisses it; a long press still goes to
 // standby. A fan speed change (web, MQTT) also dismisses it so the new speed shows.
+// After config.display.standbyAfterMin minutes of screensaver (0 = never) the LCD asks
+// "Keep the fan running?"; unanswered for standbyPromptSec seconds, it goes to standby.
+// With the fan already off there is nothing to ask: straight to standby.
 // ============================================================================
 
 static bool saver_on = false;
+static unsigned long saver_since = 0;       // When the screensaver started
 static unsigned long last_activity = 0;
+static bool prompt_on = false;              // "Keep the fan running?" showing
+static unsigned long prompt_deadline = 0;
+
+static void prompt_close() {
+  if (!prompt_on) return;
+  prompt_on = false;
+  ui_prompt_hide();
+}
+
+bool power_standby_prompt_on() {
+  return prompt_on;
+}
 
 static void note_activity() {
   last_activity = millis();
@@ -499,10 +519,8 @@ bool power_screensaver_on() {
   return saver_on;
 }
 
-static volatile int8_t saver_request = -1;  // -1 none, 0 dismiss, 1 start (web); loop() applies
-
 void power_request_screensaver(bool on) {
-  saver_request = on ? 1 : 0;
+  power_request_mode(on ? POWER_SCREENSAVER : POWER_ACTIVE);
 }
 
 static bool eye_showing() {
@@ -513,6 +531,10 @@ static bool eye_showing() {
 static void set_saver(bool on) {
   if (on == saver_on) return;
   saver_on = on;
+  if (on) {
+    saver_since = millis();
+    prompt_close();
+  }
   note_activity();
   if (on) standby_touch_armed = false;  // Wake needs a new touch
   ui_set_standby(on);                   // LVGL steps aside for the eye; back to Main after
@@ -524,10 +546,11 @@ static void set_standby(bool standby) {
   if (standby == power_is_standby()) return;
   current_state = standby ? STATE_STANDBY : STATE_ACTIVE;
   saver_on = false;   // Standby shows the eye itself
+  prompt_close();
   note_activity();    // Idle timer restarts after standby or wake
   if (standby) {
     standby_touch_armed = false;  // Ignore the touch that came with the knob press
-    fan_set_target(0);  // Standby stops the fan; waking leaves it at 0
+    fan_stop_now();     // Standby stops the fan (written to the EMC2101 before its power goes)
     set_peripheral_power(false);
     fan_power_lost();
   } else {
@@ -700,7 +723,9 @@ void loop() {
     if (saver_on) set_saver(false);
     delta = 0;
   }
-  if (delta != 0 && power_is_standby()) {
+  if (delta != 0 && prompt_on) {
+    ui_prompt_turn(delta);  // Choose Keep running / Standby; RPM unchanged
+  } else if (delta != 0 && power_is_standby()) {
     Serial.printf("Stir: knob (%ld)\n", (long)delta);
     if (!eye_stirred()) wake_taps = 0;  // Stirred from sleep: taps count from zero
     eye_stir(STIR_MS);  // Turning the knob stirs the eye; it glances the way it turned
@@ -741,6 +766,9 @@ void loop() {
       Serial.println("Button: cancel auto configure");
       fan_autoconfig_cancel();
       press_handled = true;  // This press only cancels (no menu, no standby)
+    } else if (prompt_on) {
+      ui_prompt_press();     // Picks the highlighted answer (applied below)
+      press_handled = true;  // No menu, no long-press standby
     }
     if (power_is_standby()) {
       Serial.println("Wake: button");
@@ -766,15 +794,46 @@ void loop() {
     }
   }
 
-  // Apply standby/wake requested by button, knob, touch or web
-  if (standby_request >= 0) {
-    set_standby(standby_request == 1);
-    standby_request = -1;
+  // Mode requested by button, knob, touch, web or Home Assistant: exactly one mode ends up on
+  if (mode_request >= 0) {
+    PowerMode mode = (PowerMode)mode_request;
+    mode_request = -1;
+    prompt_close();  // Any mode choice also answers the standby prompt
+    if (mode == POWER_STANDBY) {
+      set_standby(true);
+    } else {
+      set_standby(false);
+      set_saver(mode == POWER_SCREENSAVER);
+    }
   }
-  // Screensaver started/dismissed from the web (standby shows the eye itself)
-  if (saver_request >= 0) {
-    if (!power_is_standby()) set_saver(saver_request == 1);
-    saver_request = -1;
+
+  // Screensaver has run long enough: ask before standby (or go straight there if the fan is off)
+  if (saver_on && config.display.standbyAfterMin > 0 &&
+      millis() - saver_since >= config.display.standbyAfterMin * 60000UL) {
+    if (fan_get_target() == 0) {
+      Serial.println("Auto standby: screensaver time up, fan off");
+      set_standby(true);
+    } else {
+      Serial.println("Standby prompt: keep the fan running?");
+      set_saver(false);
+      prompt_on = true;
+      prompt_deadline = millis() + config.display.standbyPromptSec * 1000UL;
+      ui_prompt_show();
+    }
+  }
+  if (prompt_on) {
+    note_activity();  // No screensaver while asking
+    long left = (long)(prompt_deadline - millis());
+    int answer = ui_prompt_take_answer();
+    if (answer == UI_PROMPT_KEEP) {
+      Serial.println("Standby prompt: keep running (back to the screensaver)");
+      set_saver(true);  // Closes the prompt; the standby countdown starts again
+    } else if (answer == UI_PROMPT_STANDBY || left <= 0) {
+      Serial.println(answer == UI_PROMPT_STANDBY ? "Standby prompt: standby chosen" : "Standby prompt: no answer");
+      set_standby(true);
+    } else {
+      ui_prompt_countdown((left + 999) / 1000);
+    }
   }
 
   // Refresh clock + status box once a second

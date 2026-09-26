@@ -155,6 +155,8 @@ bool loadConfig() {
   config.display.screenTimeout = doc["display"]["screenTimeout"] | 0;
   config.display.screensaverSec = doc["display"]["screensaverSec"] | 30;
   config.display.standbyBrightness = doc["display"]["standbyBrightness"] | 10;
+  config.display.standbyAfterMin = doc["display"]["standbyAfterMin"] | 10;
+  config.display.standbyPromptSec = doc["display"]["standbyPromptSec"] | 30;
 
   // Fan
   config.fan.minRpm = doc["fan"]["minRpm"] | 0;
@@ -238,6 +240,8 @@ bool saveConfig() {
   doc["display"]["screenTimeout"] = config.display.screenTimeout;
   doc["display"]["screensaverSec"] = config.display.screensaverSec;
   doc["display"]["standbyBrightness"] = config.display.standbyBrightness;
+  doc["display"]["standbyAfterMin"] = config.display.standbyAfterMin;
+  doc["display"]["standbyPromptSec"] = config.display.standbyPromptSec;
 
   // Fan
   doc["fan"]["minRpm"] = config.fan.minRpm;
@@ -339,6 +343,8 @@ void setDefaultConfig() {
   config.display.screenTimeout = 0;
   config.display.screensaverSec = 30;
   config.display.standbyBrightness = 10;
+  config.display.standbyAfterMin = 10;
+  config.display.standbyPromptSec = 30;
 
   // Fan
   config.fan.minRpm = 0;
@@ -443,6 +449,8 @@ String getConfigAsJson() {
   doc["display"]["brightness"] = config.display.brightness;
   doc["display"]["screensaverSec"] = config.display.screensaverSec;
   doc["display"]["standbyBrightness"] = config.display.standbyBrightness;
+  doc["display"]["standbyAfterMin"] = config.display.standbyAfterMin;
+  doc["display"]["standbyPromptSec"] = config.display.standbyPromptSec;
   doc["display"]["eyeStyle"] = config.display.eyeStyle;
   JsonArray styles = doc.createNestedArray("eyeStyles");
   for (int i = 0; i < EYE_STYLE_COUNT; i++) {
