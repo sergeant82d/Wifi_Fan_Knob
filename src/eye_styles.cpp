@@ -35,6 +35,46 @@ namespace eye_dragon2 {
 PHOTO_STYLE_DEF("dragon2", "Dragon 2")
 }
 
+namespace eye_dragon3 {
+#include "eyes/dragon3Photo.h"
+PHOTO_STYLE_DEF("dragon3", "Dragon 3")
+}
+
+namespace eye_dragon4 {
+#include "eyes/dragon4Photo.h"
+PHOTO_STYLE_DEF("dragon4", "Dragon 4")
+}
+
+namespace eye_dragon5 {
+#include "eyes/dragon5Photo.h"
+PHOTO_STYLE_DEF("dragon5", "Dragon 5")
+}
+
+namespace eye_dragon6 {
+#include "eyes/dragon6Photo.h"
+PHOTO_STYLE_DEF("dragon6", "Dragon 6")
+}
+
+namespace eye_dragon7 {
+#include "eyes/dragon7Photo.h"
+PHOTO_STYLE_DEF("dragon7", "Dragon 7")
+}
+
+namespace eye_dragon8 {
+#include "eyes/dragon8Photo.h"
+PHOTO_STYLE_DEF("dragon8", "Dragon 8")
+}
+
+namespace eye_dragon9 {
+#include "eyes/dragon9Photo.h"
+PHOTO_STYLE_DEF("dragon9", "Dragon 9")
+}
+
+namespace eye_dragon10 {
+#include "eyes/dragon10Photo.h"
+PHOTO_STYLE_DEF("dragon10", "Dragon 10")
+}
+
 namespace eye_default {
 #include "eyes/defaultEye.h"
 #include "eyes/eye_limits.h"
@@ -100,7 +140,9 @@ EYE_STYLE_DEF("terminator", "Terminator")
 
 // Order shown on the web page; the first is the default
 const EyeStyle *const EYE_STYLES[] = {
-  &eye_dragon::style, &eye_dragon2::style, &eye_default::style, &eye_cat::style, &eye_goat::style,
+  &eye_dragon::style, &eye_dragon2::style, &eye_dragon3::style, &eye_dragon4::style,
+  &eye_dragon5::style, &eye_dragon6::style, &eye_dragon7::style, &eye_dragon8::style,
+  &eye_dragon9::style, &eye_dragon10::style, &eye_default::style, &eye_cat::style, &eye_goat::style,
   &eye_owl::style, &eye_doe::style, &eye_newt::style, &eye_nauga::style,
   &eye_nosclera::style, &eye_terminator::style,
 };

@@ -14,27 +14,33 @@
 
 struct PhotoEye {
   const uint16_t *open;       // 240x240 RGB565, iris taken out (the socket it moves over)
-  const uint16_t *closed;     // 240x240 RGB565, eye shut
+  // Eye shut, RGB565, only where a lid can cover: row y holds x closed_x0[y] to
+  // closed_x1[y] - 1, starting at closed_px[closed_off[y]]
+  const uint16_t *closed_px;
+  const uint16_t *closed_off;
+  const uint8_t *closed_x0, *closed_x1;
   // Per column, 1/16 px, -1 = none. Upper lid: up_start (where it starts to change) ->
   // up_edge (edge of the open eye) -> seam (where the lids meet); lower lid likewise.
   const int16_t *up_start, *up_edge, *seam, *lo_edge, *lo_start;
   const int16_t *eye_top, *eye_bot;  // Where the eyeball shows (the iris is drawn only there)
   const uint16_t *iris_tex;   // PHOTO_ANGLES x PHOTO_TEX_R RGB565
-  const uint16_t *iris_rim;   // PHOTO_ANGLES: ring outer edge from the pupil centre, 1/4 px
-  const uint16_t *pix_ang;    // table x table around the pupil centre: angle (0-511)
-  const uint8_t *pix_rad;     //   and distance (1/4 px, 255 = outside)
-  uint16_t table;
+  const uint16_t *iris_rim;   // PHOTO_ANGLES: ring outer edge from the pupil centre, 1/2 px
+  uint16_t table;             // Per-pixel iris table (photo_eye_prepare()) is table x table
   int16_t table_x, table_y;   // Screen position of the table's top-left pixel (eye centred)
   const uint16_t *hl_rgb;     // Highlight patch (cornea reflections): colour
   const uint8_t *hl_alpha;    //   and opacity, hl_w x hl_h at hl_x, hl_y
   uint8_t hl_x, hl_y, hl_w, hl_h;
   float pupil_x, pupil_y, pupil_w, pupil_h;  // Pupil as drawn: centre, half width, half height
+  float tilt;                 // Slit lean (radians, + = bottom to the right)
   float w_min, w_max, h_min, h_max;          // Pupil half width / half height range
   float range_x, range_y;     // How far the iris moves (px)
   float droop;                // Upper lid lowers this much (of edge -> seam) looking fully down
 };
 
-// Draw one frame. gx, gy: iris offset (px, + = right/down); cu, cl: upper/lower lid
+// Build the per-pixel iris table for this eye (PSRAM). false if out of memory.
+bool photo_eye_prepare(const PhotoEye *e);
+
+// Draw one frame (after photo_eye_prepare() for this eye). gx, gy: iris offset (px, + = right/down); cu, cl: upper/lower lid
 // closure 0 (open) - 1 (shut); droop 0-1 (upper lid follows the iris down); pupil 0
 // (narrow slit) - 1 (wide). row_x0/x1: visible span of each row on the round screen.
 void photo_eye_draw(lgfx::LGFX_Device *tft, const PhotoEye *e, int gx, int gy, float cu, float cl,

@@ -17,7 +17,7 @@ PlatformIO and press **Upload**. You don't need to know LVGL, the graphics libra
 | Almost everything on the screen | `src/ui.cpp` |
 | Which font sizes are available | `include/lv_conf.h` |
 | Standby brightness, how the screensaver starts and stops | `src/main.cpp` |
-| The eye itself, and the list of eye styles | `src/dragon_eye.cpp`, `src/eye_styles.cpp`, `include/eyes/` |
+| The eye itself, and the list of eye styles | `src/dragon_eye.cpp`, `src/eye_styles.cpp`, `include/eyes/`; photo eyes: `src/photo_eye.cpp`, `docs/PHOTO_EYES.md` |
 
 Some things need no code at all. They're on the web page:
 
@@ -421,6 +421,13 @@ The eye styles come from Adafruit's "Uncanny Eyes". Each one is a data file in
 to this screen's 240 pixels, so it's smooth but not more detailed than the original art.
 To remove a style from the web list, delete its line in `EYE_STYLES`. To add one, copy a
 block in `src/eye_styles.cpp` (the file explains how).
+
+**Dragon 2 to Dragon 10** are "photo eyes": your artist's open and shut pictures, animated.
+The iris moves, the slit pupil widens and narrows as if reacting to light, the reflections
+stay put, and the lids close through the shut picture. They sleep, twitch, peek and wake
+like the other styles. How to add or tune one: `docs/PHOTO_EYES.md`. Each takes about
+200-240 KB of firmware space; to drop one, delete both its block and its `EYE_STYLES` entry
+in `src/eye_styles.cpp`.
 
 The screensaver shows the eye while the fan keeps running. A touch, knob turn or
 short press only dismisses it. In standby the eye goes to sleep: it closes, stays shut,

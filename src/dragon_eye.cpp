@@ -173,7 +173,11 @@ bool eye_set_style(const char *id) {
     return false;
   }
   if (s == eye.style) return true;
-  if (s->photo) {  // Photo eye: drawn straight from flash, no tables to build
+  if (s->photo) {  // Photo eye: drawn from flash, plus a small iris table in PSRAM
+    if (!photo_eye_prepare(s->photo)) {
+      Serial.printf("[EYE] Not enough PSRAM for style %s\n", s->name);
+      return false;
+    }
     free_tables(eye);
     eye.style = s;
     Serial.printf("[EYE] Style %s ready\n", s->name);
