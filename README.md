@@ -1,5 +1,8 @@
 # WiFi Fan Knob
 
+https://github.com/user-attachments/assets/addfebd7-e481-4c5c-bfac-5fc20ed92344
+
+
 ESP32-S3 fan controller for a solder fume extractor, built on the Elecrow CrowPanel 1.28" rotary display. It has WiFi setup, a web page, OTA updates and Home Assistant integration (MQTT).
 
 ## Documentation
@@ -16,3 +19,4 @@ ESP32-S3 fan controller for a solder fume extractor, built on the Elecrow CrowPa
 2. Open `Wifi_Fan_Knob.code-workspace` in VS Code with PlatformIO.
 3. Connect the board by USB.
 4. Run `pio run --target upload`.
+
