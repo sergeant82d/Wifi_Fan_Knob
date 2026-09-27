@@ -52,14 +52,18 @@ For the technical details of each feature, see `../CLAUDE.md`. For changing the 
 
 ## Waiting on you
 
-- **Build and flash**, then cycle through Dragons 2-10 (Config -> Display & Interface) and report size, fps and looks.
-- **One more eye picture pair** from the artist.
-- **Display Mode card** check on the web and in Home Assistant.
-- From earlier: power supply for the industrial fans, GPIO 4 pull-down resistor, NF-A20 Auto Configure re-run.
+*Updated 2026-09-27 from your notes:*
+
+- ~~Build and flash, then cycle through Dragons 2-10~~ **Done:** flashed last night; all eight new eyes (Dragons 3-10) look fine on the board.
+- ~~One more eye picture pair from the artist~~ **Received** (`23-4.png` / `24-4.png`); it became **Dragon 11** on 2026-09-27.
+- ~~Display Mode card check~~ **Done:** in place and looks good.
+- ~~Power supply for the industrial fans~~ **Done:** the industrial fan is rewired and works great.
+- ~~NF-A20 Auto Configure re-run~~ **Done:** re-run and tested, then deleted as not for this project.
+- **Still open:** GPIO 4 pull-down resistor (waits on the FPC breakout for GPIO 4 access).
 
 ## Next steps
 
-1. Photo eyes on the board: fix anything the first run shows; add the last pair (Dragon 11).
-2. BME688 air sensor and Auto mode when the sensor arrives (plan in `CLAUDE.md`).
+1. ~~Photo eyes on the board; add the last pair (Dragon 11)~~ Done 2026-09-27.
+2. ~~BME688~~ **SGP41 + SHT41** air sensors and Auto mode when they arrive (plan in `CLAUDE.md`; changed 2026-09-27).
 3. Move PWM and tach to the UART0 connector after the FPC breakout arrives.
 4. Industrial fans: power, Auto Configure, field testing.

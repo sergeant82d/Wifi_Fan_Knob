@@ -1,7 +1,7 @@
 # Photo Eyes (artist pictures, animated)
 
 A photo eye turns two pictures from the artist, eye **open** and eye **shut**, into an
-animated eye style (**Dragon 2** to **Dragon 10**). It is chosen on the web page like the
+animated eye style (**Dragon 2** to **Dragon 11**). It is chosen on the web page like the
 Uncanny Eyes styles and uses the same motion, blinks, sleep, stir and glance behaviour.
 
 What moves:
@@ -29,9 +29,9 @@ What moves:
 ## Flash space
 
 Each photo eye adds about 200-240 KB to the firmware (the open picture, the shut picture
-where a lid can cover, the iris texture). Nine eyes are about 2 MB. The firmware's app slot
-is 6.25 MB; before the photo eyes it was 3.3 MB, so there is room for about three more
-(check the size PlatformIO prints after a build). To make room, remove a style: delete its
+where a lid can cover, the iris texture). With ten photo eyes (Dragons 2-11) the firmware is
+5.6 MB, 85.5 % of the 6.25 MB app slot (measured 2026-09-27; it was 3.3 MB before the photo
+eyes), so there is room for about four more (check the size PlatformIO prints after a build). To make room, remove a style: delete its
 `namespace eye_dragonN { ... }` block and its `EYE_STYLES` entry in `src/eye_styles.cpp`
 (its header is then not compiled in). A board set to a removed style falls back to the first
 style. A bigger app slot would need a custom partition table (flashed over USB; it moves

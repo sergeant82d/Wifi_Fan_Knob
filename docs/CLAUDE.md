@@ -61,7 +61,7 @@ cd Wifi_Fan_Knob
 | `include/ui.h` / `src/ui.cpp` | ✅ Working | LVGL tileview pages (Main / Settings), segments, knob menu |
 | `include/dragon_eye.h` / `src/dragon_eye.cpp` | ✅ Working | Animated eye (standby + screensaver), native 240x240 |
 | `include/eye_styles.h` / `src/eye_styles.cpp` | ✅ Working | The eye styles: 10 Uncanny Eyes (`include/eyes/*Eye.h` = Adafruit tables) + photo eyes |
-| `include/photo_eye.h` / `src/photo_eye.cpp` | 🧪 Untested on board | Photo eye renderer (artist open/shut pictures: moving iris, reactive slit pupil, lids); data `include/eyes/*Photo.h` from `tools/photo_eye.py` |
+| `include/photo_eye.h` / `src/photo_eye.cpp` | ✅ Working | Photo eye renderer (artist open/shut pictures: moving iris, reactive slit pupil, lids); data `include/eyes/*Photo.h` from `tools/photo_eye.py` |
 
 ### Documentation (`docs/`)
 
@@ -84,10 +84,11 @@ cd Wifi_Fan_Knob
 the next number (one per session day), and get a row in the table above.
 
 **Eye artwork** (source art that ends up in the firmware) lives in `assets/eye_art/`, not
-`docs/`: the purchased `*_dragon-eyes-8.5x11.jpg` sheets (300 dpi), and the artist's open/shut
-pairs used by the photo eyes (`assets/eye_photos/dragonN/eye.json` names its pair):
+`docs/`: the artist's open/shut pairs used by the photo eyes (`assets/eye_photos/dragonN/eye.json` names its pair):
 Dragon 2 = `5-1`/`6`, 3 = `01A`/`01B`, 4 = `02A`/`02B`, 5 = `7`/`8`, 6 = `9`/`9B`,
-7 = `15`/`16`, 8 = `17`/`18`, 9 = `19`/`20`, 10 = `21`/`22`.
+7 = `15`/`16`, 8 = `17`/`18`, 9 = `19`/`20`, 10 = `21`/`22`, 11 = `23-4`/`24-4`. Reference and archive material
+(not used by the build) is in `assets/eye_art/image_sheets/`: the purchased
+`*_dragon-eyes-8.5x11.jpg` sheets (300 dpi). Moved there by the user 2026-09-27.
 
 Pin reference lives in this file and at the top of `src/main.cpp`; there is no separate pin-mapping doc.
 
@@ -260,7 +261,7 @@ See `platformio.ini`. Libraries:
   no leaks). Standby draws at most `STANDBY_EYE_FPS` (15; measured 14), screensaver flat out.
   Firmware 3.3 MB of the 6.5 MB OTA slot (before the photo eyes). In standby/screensaver `loop()` renders eye frames
   instead of running LVGL and polls touch directly.
-  Photo eyes (Dragon 2-10): see "Implemented, not yet verified".
+  Photo eyes (Dragon 2-11): see the photo eyes entry below.
   Sleeping eye (standby only, `eye_set_sleeping()` from `set_standby()`): lids close over 2 s,
   stay shut 3.5-10 s, then a twitch (50%: opens 20-45% for 0.4-0.7 s) or a peek (opens
   50-85%, holds 1.5-4 s, closes slowly; tuned 2026-09-24 after hardware review). While fully shut nothing is redrawn: measured 12-69 draws per
@@ -398,13 +399,16 @@ See `platformio.ini`. Libraries:
   message if there is no RPM at full speed (nothing saved; fan returns to its target).
   Measured: NF-P12 1626 → 149 RPM, stops at setting 1, presets 400/800/1200/1600. NF-A20
   1011 → 421 RPM and **never stops** (still 421 RPM at 0 %), so Off can't stop it; only
-  standby (external power off) does. Tuned after that run, **not yet re-tested**: each step
+  standby (external power off) does. Tuned after that run (re-run and tested by the user
+  2026-09-27, then the NF-A20 profile was deleted: not for this project): each step
   now waits until two tach reads 500 ms apart agree within 1 % (min 2 s, max 10 s; full speed
   min 3 s, max 20 s) because the NF-A20 was still speeding up at the fixed 6 s full-speed wait;
   and the even-spread preset rule (it gave 500/500/800/1000 before).
 
 ### 🔧 Implemented, not yet verified
-- Photo eyes, Dragon 2-10 (2026-09-26; `docs/PHOTO_EYES.md`): the artist's open/shut pairs
+- Photo eyes, Dragon 2-11 (2026-09-26; **verified on the board 2026-09-27**: user, Dragons 3-10
+  all fine; Dragon 11 added 2026-09-27 from `23-4.png` / `24-4.png`, firmware then 5.6 MB =
+  85.5 % of the app slot, room for about 4 more; `docs/PHOTO_EYES.md`): the artist's open/shut pairs
   (`assets/eye_art/`) animated by `photo_eye.cpp`: iris moves over the socket, slit pupil
   reacts "to light" (wide when shut, narrows on peeks, snaps narrow on stir/screensaver start,
   drifts and flinches awake), cornea highlights fixed, lids blink/sleep through the shut
@@ -413,8 +417,8 @@ See `platformio.ini`. Libraries:
   hand-measured `eye.json` per eye; ~200-240 KB flash each (~2 MB for nine) plus a 77 KB
   PSRAM iris table built by `photo_eye_prepare()` when one is selected. Checked only on the
   PC: files compile with g++ against stub headers, and the renderer's host output matches the
-  converter's preview (Dragon 2 pixel-identical after the flash-saving rework). **Not built
-  with PlatformIO or run on the board** (the cloud session couldn't download the platform).
+  converter's preview (Dragon 2 pixel-identical after the flash-saving rework). First written in
+  a cloud session without PlatformIO; since built and run on the board (above).
   To check: build size (estimate ~5.5 MB of the 6.25 MB slot; room for ~3 more eyes, and
   removing a style's block in `eye_styles.cpp` frees its flash), fps per eye (`[EYE] n fps`),
   looks. `/api/config` now lists 19 styles (~1.9 KB of its 3 KB JSON document).
@@ -422,8 +426,10 @@ See `platformio.ini`. Libraries:
   per configured zone (`configTzTime`; plain `configTime` would reset TZ to UTC).
 
 ### ⬜ Not started
-- Noctua industrial 3000 RPM fans: Auto Configure failed ("no RPM at full speed") because the
-  bench supply can't power them yet. User to re-test after wiring up their power supply.
+- (Done) Noctua industrial 3000 RPM fan: first Auto Configure failed ("no RPM at full speed") on
+  the bench supply; user rewired its power 2026-09-27. Profiles on the board now: "Noctua 140mm -
+  1" (the industrial fan: top 2981 RPM, slowest 361, max 2900; active) and "Noctua 120mm - 1"
+  (the NF-P12: top 1626, slowest 149).
 - Manual calibration mode (knob steps one Fan Setting, press to accept): superseded by Auto
   Configure unless the user asks for it.
 
@@ -578,22 +584,33 @@ STANDBY (1)
 4. Field testing, including the industrial fans once they have power.
 
 ### Later (user notes)
-- **Air quality sensor + Auto mode (upcoming hardware, user 2026-09-26)**: Adafruit BME688
-  (product 5046) on the main I2C bus (0x77, or 0x76 via jumper; no clash with EMC2101 0x4C),
-  Adafruit BME680 library (temperature, humidity, pressure, gas resistance). Works the same
+- **Air quality sensors + Auto mode (upcoming hardware)**: **SGP41** (VOC + NOx) with an **SHT41**
+  (temperature + humidity) on the main I2C bus (user 2026-09-27; replaces the BME688 plan of
+  2026-09-26). Addresses 0x59 (SGP41) and 0x44 (SHT41): no clash with EMC2101 0x4C or APDS9999
+  0x52. Libraries: Sensirion I2C SGP41 + Sensirion Gas Index Algorithm (open source) + an SHT4x
+  library. The SHT41's readings are passed to every SGP41 measurement (humidity/temperature
+  compensation). The Gas Index Algorithm gives a **VOC Index** (1-500; 100 = this room's normal,
+  learned over time; fumes push it up) and a NOx Index. Needs a 1 s sample rate; after start the
+  first readings take about a minute and the baseline keeps learning for hours. Works the same
   whether the fan stays on the EMC2101 or moves to direct PWM (Auto only sets the target RPM).
   - LCD: a 6th Main segment, **green "Auto"**, right of Max (6 x 40 deg instead of 5 x 48;
     see DISPLAY_GUIDE "Adding or removing a segment"); lit green while Auto is on. Knob or any
-    other segment = manual override (Auto off). Web + HA: Auto switch; the four readings as HA
-    sensors (history graphs help pick thresholds).
-  - Step 1, binary: bad air -> fan High; good air -> off. Detect by gas resistance dropping
-    below a learned clean-air baseline (e.g. 30 %), not a fixed value; separate on/off
-    thresholds + minimum run time (e.g. 2 min after clearing) so it doesn't flap; ignore the
-    sensor during heater warm-up (a few minutes). Bosch BSEC (IAQ index) is the alternative:
-    closed-source, more work.
-  - Step 2, later: fan speed scaled from how bad the air is (Low..Max), smoothed.
+    other segment = manual override (Auto off). Web + HA: Auto switch; VOC Index, NOx Index,
+    temperature and humidity as HA sensors (history graphs help pick thresholds).
+  - Step 1, binary: VOC Index above an on-threshold -> fan High; below a lower off-threshold ->
+    off (e.g. on > 150, off < 120); plus a minimum run time (e.g. 2 min after clearing) so it
+    doesn't flap. Ignore the index until the SGP41 has settled.
+  - Step 2, later: fan speed scaled from the VOC Index (Low..Max), smoothed.
   - Placement matters: in the fan's airflow the readings depend on the fan running; near the
     work it reads the air the user breathes.
+  - With the Auto segment the RPM arc can reach lower again (towards a 270 deg sweep): the IP
+    box moved to Settings (TODO.md item, do it together with the Auto button).
+- **Presence sensor (possible future hardware, user 2026-09-27)**: APDS9999 (proximity, lux,
+  colour), I2C 0x52. Its interrupt pin is optional (polling a few times a second is enough), so
+  no GPIO needs reserving now. **User's rule: presence for longer than X seconds wakes the
+  screen (leaves the screensaver/standby as a wake) AND starts the SGP41 settle time**, so the
+  air sensor is ready when work starts (X settable). Other ideas: the eye looks up at the user;
+  no presence for a while -> screensaver sooner; lux -> automatic LCD brightness.
 - **Short term, after the FPC breakout (GPIO 4 / 12) arrives: replace the EMC2101 with
   "real" 25 kHz PWM + tach on the UART0 connector** (user, 2026-09-26). Serial is on native
   USB (`ARDUINO_USB_CDC_ON_BOOT=1`), so both UART connectors are free GPIOs. UART0 is almost

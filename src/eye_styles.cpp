@@ -75,6 +75,11 @@ namespace eye_dragon10 {
 PHOTO_STYLE_DEF("dragon10", "Dragon 10")
 }
 
+namespace eye_dragon11 {
+#include "eyes/dragon11Photo.h"
+PHOTO_STYLE_DEF("dragon11", "Dragon 11")
+}
+
 namespace eye_default {
 #include "eyes/defaultEye.h"
 #include "eyes/eye_limits.h"
@@ -142,7 +147,7 @@ EYE_STYLE_DEF("terminator", "Terminator")
 const EyeStyle *const EYE_STYLES[] = {
   &eye_dragon::style, &eye_dragon2::style, &eye_dragon3::style, &eye_dragon4::style,
   &eye_dragon5::style, &eye_dragon6::style, &eye_dragon7::style, &eye_dragon8::style,
-  &eye_dragon9::style, &eye_dragon10::style, &eye_default::style, &eye_cat::style, &eye_goat::style,
+  &eye_dragon9::style, &eye_dragon10::style, &eye_dragon11::style, &eye_default::style, &eye_cat::style, &eye_goat::style,
   &eye_owl::style, &eye_doe::style, &eye_newt::style, &eye_nauga::style,
   &eye_nosclera::style, &eye_terminator::style,
 };
