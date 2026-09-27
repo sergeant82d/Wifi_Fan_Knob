@@ -2,23 +2,24 @@
 
 ## 20260927
 
-- [ ] Update to STATUS_REPORT_05 - Waiting on you:
+- [x] Update to STATUS_REPORT_05 - Waiting on you: (done 2026-09-27, 199b230)
 	- Uploaded last night's firmware with the eight new eyes (Dragon 3 - 10). They are all fine. I received the final image today and it is uploaded and ready to be processed and take it's place as Dragon 11.
 	- Display Mode card is in place and looks good.
 	- Industrial Fan is rewired and works great.
 	- NF-A20 Fan Auto Configure re-run complete - tested - deleted as not for this project.
 	- Received the final artwork from the artist
 
-- [ ] Future BME688 sensor changed to future SGP41 sensor, combined with SHT41 Temp/Hum sensor to improve the Gas sensor's accuracy.
+- [x] Future BME688 sensor changed to future SGP41 sensor, combined with SHT41 Temp/Hum sensor to improve the Gas sensor's accuracy. (plan updated in docs/CLAUDE.md(done 2026-09-27, 199b230)
 
-- [ ] Notice of possible future hardware - APDS9999 Proximity, Lux Light & Color sensor for presence/motion sensing and control. Possibly incorporate into future firmware, so plan with that in mind if it needs something from other parts of the system.
+- [x] Notice of possible future hardware - APDS9999 Proximity, Lux Light & Color sensor for presence/motion sensing and control. Possibly incorporate into future firmware, so plan with that in mind if it needs something from other parts of the system. (noted in docs/CLAUDE.md with the presence rule(done 2026-09-27, 199b230)
 
-- [ ] Webserver - Config tab - Move "Save Configuration" button from bottom to in between the Display & Interface card, and the Clock card. Most settings on Config will be "set and forget", but the eye selection will change fairly often.
+- [x] Webserver - Config tab - Move "Save Configuration" button from bottom to in between the Display & Interface card, and the Clock card. Most settings on Config will be "set and forget", but the eye selection will change fairly often. (second button added, bottom one kept(done 2026-09-27, 199b230)
 
-- [ ] Added eye_blinking.mp4 video from the eye artist in /docs/images as a reference.
+- [x] Added eye_blinking.mp4 video from the eye artist in /docs/images as a reference. (README video uploaded by the user on github.com, 2026-09-27)
 	- Question: Can this .mp4 be put in the README.md, and be visible on the web when arriving at the GitHub repo?
+	  Answer: not from a file in the repo (GitHub only shows a link); uploading it in the README editor on github.com gives a player. Done by the user.
 
-- [ ] Repo organization: Created sub-directory - /assets/eye_art/image_sheets
+- [x] Repo organization: Created sub-directory - /assets/eye_art/image_sheets (recorded as a move, doc paths fixed(done 2026-09-27, 199b230)
 	- Moved the sheets of multiple images there as reference/archival storage, to leave -eye_art- as only the active files used in the build. Discuss if there are better options.
 
 - [ ] 
