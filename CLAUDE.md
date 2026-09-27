@@ -27,5 +27,8 @@ Read it before starting work.
 - `docs/DISPLAY_GUIDE.md`: how to change the LCD (for the user). Keep it current with LCD changes.
 - Status reports: `docs/Status_Reports/STATUS_REPORT_NN.md`. The user asks for the previous
   day's report before starting a new day's work; write it only when asked.
+- **Flash space:** after any major change, read the `Flash:` line of the build and tell the
+  user the figure (85.5 % on 2026-09-27; warn past ~90 %). Details: `docs/CLAUDE.md`,
+  "Possible future mods".
 - Commit and push when the user confirms a change works on the board; mark anything
   untested as such in commit messages and docs.

@@ -407,7 +407,8 @@ See `platformio.ini`. Libraries:
 
 ### 🔧 Implemented, not yet verified
 - Photo eyes, Dragon 2-11 (2026-09-26; **verified on the board 2026-09-27**: user, Dragons 3-10
-  all fine; Dragon 11 added 2026-09-27 from `23-4.png` / `24-4.png`, firmware then 5.6 MB =
+  all fine; Dragon 11 added 2026-09-27 from `23-4.png` / `24-4.png`, confirmed "works great";
+  firmware then 5.6 MB =
   85.5 % of the app slot, room for about 4 more; `docs/PHOTO_EYES.md`): the artist's open/shut pairs
   (`assets/eye_art/`) animated by `photo_eye.cpp`: iris moves over the socket, slit pupil
   reacts "to light" (wide when shut, narrows on peeks, snaps narrow on stir/screensaver start,
@@ -642,11 +643,24 @@ STANDBY (1)
    connected, then calibrate (see Next Steps 3). Kept in 0-255 duty units; the firmware
    converts to Fan Settings. Set to Min 16 (≈6 %, where the fan starts) / Max 255 for now.
 2. ✅ 12 kHz PWM: no audible whine (user, 2026-09-25).
-3. Off can't stop fans that keep turning at 0 % PWM (e.g. NF-A20). Option if wanted: Off also
-   cuts the GPIO 4 external power (also switches off anything else on that rail).
 
 Decided: Home Assistant fan speed stays in RPM (2026-09-24). The eye is drawn procedurally
 with LovyanGFX (Uncanny Eyes), not pre-rendered frames or LVGL.
+
+## Possible future mods
+
+Not issues now; kept so they can be looked at again later (user, 2026-09-27).
+
+1. **Off for fans that never stop.** Some fans keep turning at 0 % PWM (the NF-A20 ran at
+   421 RPM), so Off can't stop them. Both fans in use now stop at 0 % (profiles show
+   `stops: true`). Option if needed: Off also cuts the GPIO 4 external power (which also
+   switches off anything else on that rail).
+2. **Flash space.** The app slot is 6.25 MB (6,553,600 bytes). Firmware was 5.6 MB = 85.5 %
+   on 2026-09-27 (ten photo eyes; each adds ~225 KB, so about 4 more fit). **After any major
+   change, check the `Flash:` line PlatformIO prints and tell the user the new figure,
+   especially past ~90 %.** Ways to make room: remove unused eye styles in
+   `src/eye_styles.cpp` (photo or Uncanny), or a custom partition table with a bigger app
+   slot (flashed over USB; moves SPIFFS, so config and fan profiles are reset).
 
 ---
 
