@@ -83,8 +83,10 @@ cd Wifi_Fan_Knob
 the next number (one per session day), and get a row in the table above.
 
 **Eye artwork** (source art that ends up in the firmware) lives in `assets/eye_art/`, not
-`docs/`: the purchased `*_dragon-eyes-8.5x11.jpg` sheets (300 dpi), and the artist's eyelid
-images when they arrive.
+`docs/`: the purchased `*_dragon-eyes-8.5x11.jpg` sheets (300 dpi), and the artist's open/shut
+pairs used by the photo eyes (`assets/eye_photos/dragonN/eye.json` names its pair):
+Dragon 2 = `5-1`/`6`, 3 = `01A`/`01B`, 4 = `02A`/`02B`, 5 = `7`/`8`, 6 = `9`/`9B`,
+7 = `15`/`16`, 8 = `17`/`18`, 9 = `19`/`20`, 10 = `21`/`22`.
 
 Pin reference lives in this file and at the top of `src/main.cpp`; there is no separate pin-mapping doc.
 
@@ -255,8 +257,12 @@ See `platformio.ini`. Libraries:
   more detailed. Pixels outside the round screen are skipped. Iris formula and per-style pupil
   limits are the original's (Bodmer's differed). Measured 37-52 fps (all 10 styles cycled twice,
   no leaks). Standby draws at most `STANDBY_EYE_FPS` (15; measured 14), screensaver flat out.
-  Firmware 3.3 MB of the 6.5 MB OTA slot. In standby/screensaver `loop()` renders eye frames
+  Firmware 3.3 MB of the 6.5 MB OTA slot (before the photo eyes). In standby/screensaver `loop()` renders eye frames
   instead of running LVGL and polls touch directly.
+  Photo eyes (Dragon 2-10, untested on board; `docs/PHOTO_EYES.md`): artist open/shut pairs
+  animated by `photo_eye.cpp` with the same motion/blink/sleep. ~200-240 KB flash each (~2 MB
+  for nine; firmware size not yet measured, estimate ~5.5 MB of 6.25 MB), plus a 77 KB PSRAM
+  iris table built when one is selected.
   Sleeping eye (standby only, `eye_set_sleeping()` from `set_standby()`): lids close over 2 s,
   stay shut 3.5-10 s, then a twitch (50%: opens 20-45% for 0.4-0.7 s) or a peek (opens
   50-85%, holds 1.5-4 s, closes slowly; tuned 2026-09-24 after hardware review). While fully shut nothing is redrawn: measured 12-69 draws per

@@ -5,7 +5,8 @@
     python tools/photo_eye.py assets/eye_photos/dragon2 --preview  # also preview PNG + GIF
 
 The folder holds open.png, closed.png (same artwork, eye open and shut, round picture on
-a transparent or black square) and eye.json (geometry, in 240 px screen coordinates;
+a transparent or black square; or eye.json "open"/"closed" give their paths, relative to
+the folder) and eye.json (geometry, in 240 px screen coordinates;
 see docs/PHOTO_EYES.md). Output: include/eyes/<id>Photo.h, used by src/eye_styles.cpp,
 drawn by src/photo_eye.cpp. Needs Pillow and numpy.
 """
@@ -22,8 +23,8 @@ OUT = 240        # Screen size
 HI = 3           # Analysis resolution = OUT * HI
 ANGLES = 512     # Iris texture angles (must match photo_eye.cpp)
 TEX_R = 64       # Iris texture radial samples, pupil edge -> ring outer edge
-TABLE = 120      # Per-pixel iris table size (pixels around the pupil centre)
-Q = 4            # Radius units per pixel in the per-pixel table (quarter pixels)
+TABLE = 160      # Per-pixel iris table size (pixels around the pupil centre)
+Q = 2            # Radius units per pixel in the per-pixel table (half pixels, max 127 px)
 FX = 16          # Column positions in 1/16 px
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -76,9 +77,12 @@ def bilinear(img, u, v):
 # Geometry (the lens and ellipse formulas must match photo_eye.cpp)
 # ----------------------------------------------------------------------------
 
-def lens_radius(w, h, c, s):
+def lens_radius(w, h, c, s, tilt=0.0):
     """Distance from the pupil centre to the edge of a slit pupil (|x| <= w(1-(y/h)^2))
-    along direction (c, s)."""
+    along direction (c, s). tilt (radians): the slit's long axis points (sin, cos), so
+    positive leans the bottom right."""
+    ct, st = math.cos(tilt), math.sin(tilt)
+    c, s = c * ct - s * st, c * st + s * ct
     a = w * s * s / (h * h)
     return 2 * w / (np.abs(c) + np.sqrt(c * c + 4 * a * w))
 
@@ -100,9 +104,11 @@ def ellipse_radius(px, py, ex, ey, rx, ry, c, s):
 def build(folder):
     cfg = json.load(open(os.path.join(folder, 'eye.json')))
     inset = cfg.get('crop_inset', 5)
-    op240 = np.array(load_crop(os.path.join(folder, 'open.png'), inset, OUT)).astype(float)
-    cl240 = np.array(load_crop(os.path.join(folder, 'closed.png'), inset, OUT)).astype(float)
-    opHI = np.array(load_crop(os.path.join(folder, 'open.png'), inset, OUT * HI)).astype(float)
+    open_png = os.path.join(folder, cfg.get('open', 'open.png'))
+    closed_png = os.path.join(folder, cfg.get('closed', 'closed.png'))
+    op240 = np.array(load_crop(open_png, inset, OUT)).astype(float)
+    cl240 = np.array(load_crop(closed_png, inset, OUT)).astype(float)
+    opHI = np.array(load_crop(open_png, inset, OUT * HI)).astype(float)
 
     up_edge = polyline(cfg['upper_edge'])
     lo_edge = polyline(cfg['lower_edge'])
@@ -149,7 +155,8 @@ def build(folder):
     # Iris texture: unwrap from the pupil edge (as drawn) out to the ring's outer edge
     ang = (np.arange(ANGLES) + 0.5) * 2 * math.pi / ANGLES
     c, s = np.cos(ang), np.sin(ang)
-    pb0 = lens_radius(pupil['w'], pupil['h'], c, s)
+    tilt = math.radians(pupil.get('tilt', 0))
+    pb0 = lens_radius(pupil['w'], pupil['h'], c, s, tilt)
     rim = ellipse_radius(pcx, pcy, iris['cx'], iris['cy'], iris['rx'], iris['ry'], c, s)
     frac = (np.arange(TEX_R) + 0.5) / TEX_R
     r = pb0[:, None] + frac[None, :] * (rim - pb0)[:, None]
@@ -177,7 +184,7 @@ def build(folder):
         dist = np.minimum(np.abs(good - a), ANGLES - np.abs(good - a))
         tex[a] = tex[good[dist.argmin()]]
 
-    # Per-pixel table around the pupil centre: angle and radius (quarter px)
+    # Per-pixel table around the pupil centre: angle and radius (half px)
     tx0 = int(round(pcx)) - TABLE // 2
     ty0 = int(round(pcy)) - TABLE // 2
     gx, gy = np.meshgrid(np.arange(TABLE) + tx0 + 0.5 - pcx, np.arange(TABLE) + ty0 + 0.5 - pcy)
@@ -191,9 +198,14 @@ def build(folder):
     u240, v240 = np.meshgrid(np.arange(OUT) + 0.5, np.arange(OUT) + 0.5)
     e = ((u240 - iris['cx']) / iris['rx']) ** 2 + ((v240 - iris['cy']) / iris['ry']) ** 2
     inside = in_eye(u240, v240)
-    band = inside & (e > 0.85) & (e < 1.0)
-    fill_rgb = np.median(op240[band], axis=0) if band.any() else np.array([12, 18, 22])
-    base[inside & (e < 1.0)] = fill_rgb
+    # Each pixel takes the colour just outside the ring along the ray from the iris centre,
+    # so the sclera or dark socket carries on behind the iris
+    fill = inside & (e < 1.0)
+    k = 1.06 / np.sqrt(np.maximum(e[fill], 1e-6))
+    fu = iris['cx'] + (u240[fill] - iris['cx']) * k
+    fv = iris['cy'] + (v240[fill] - iris['cy']) * k
+    soft240 = np.array(Image.fromarray(op240.astype(np.uint8)).filter(ImageFilter.GaussianBlur(1.5))).astype(float)
+    base[fill] = bilinear(soft240, fu, fv)
 
     # Highlight patch (bounding box)
     ys, xs = np.nonzero(hl240)
@@ -217,12 +229,32 @@ def build(folder):
         pix_ang=pix_ang, pix_rad=pix_rad, tx0=tx0, ty0=ty0,
         hl=(hx0, hy0, hw, hh, hl_rgb, hl_a),
         params=dict(
-            pupil_x=pcx, pupil_y=pcy, pupil_w=pupil['w'], pupil_h=pupil['h'],
+            pupil_x=pcx, pupil_y=pcy, pupil_w=pupil['w'], pupil_h=pupil['h'], tilt=tilt,
             w_min=pr_cfg.get('w_min', 1.2), w_max=pr_cfg.get('w_max', 16.0),
             h_min=pr_cfg.get('h_min', pupil['h'] * 0.95), h_max=pr_cfg.get('h_max', pupil['h'] * 1.15),
             range_x=cfg.get('gaze_x', 6), range_y=cfg.get('gaze_y', 4), droop=cfg.get('droop', 0.12)),
         preview_src=(op240, cl240),
     )
+
+
+def closed_spans(d):
+    """Per row, the x range where a lid can cover (y16 within up_start..lo_start, the
+    same test as photo_eye.cpp), and those closed-picture pixels packed row by row."""
+    cols = d['seam'] >= 0
+    x0 = np.zeros(OUT, np.uint8); x1 = np.zeros(OUT, np.uint8)
+    off = np.zeros(OUT, np.uint16); px = []
+    closed = d['closed'].reshape(OUT, OUT)
+    n = 0
+    for y in range(OUT):
+        y16 = y * FX + FX // 2
+        xs = np.nonzero(cols & (y16 >= d['up_start']) & (y16 <= d['lo_start']))[0]
+        off[y] = n
+        if len(xs):
+            x0[y], x1[y] = xs.min(), xs.max() + 1
+            px.append(closed[y, x0[y]:x1[y]])
+            n += int(x1[y]) - int(x0[y])
+    assert n < 65536
+    return x0, x1, off, np.concatenate(px) if px else np.zeros(1, np.uint16)
 
 
 # ----------------------------------------------------------------------------
@@ -251,31 +283,33 @@ def write_header(folder, d):
                '// Artwork: %s. Included inside a namespace by src/eye_styles.cpp.\n\n'
                % (cfg['name'], rel, cfg.get('credit', 'commissioned by the project owner')))
     out.append(c_array('uint16_t', 'open_img', d['open'], 16, h16))
-    out.append(c_array('uint16_t', 'closed_img', d['closed'], 16, h16))
+    cx0, cx1, coff, cpx = d['closed_spans']
+    out.append(c_array('uint16_t', 'closed_px', cpx, 16, h16))
+    out.append(c_array('uint16_t', 'closed_off', coff, 16, dec))
+    out.append(c_array('uint8_t', 'closed_x0', cx0, 24, dec))
+    out.append(c_array('uint8_t', 'closed_x1', cx1, 24, dec))
     for n in ('up_start', 'up_edge', 'seam', 'lo_edge', 'lo_start', 'eye_top', 'eye_bot'):
         out.append(c_array('int16_t', n, d[n], 16, dec))
     out.append(c_array('uint16_t', 'iris_tex', d['tex'], 16, h16))
     out.append(c_array('uint16_t', 'iris_rim', d['rim'], 16, dec))
-    out.append(c_array('uint16_t', 'pix_ang', d['pix_ang'], 20, dec))
-    out.append(c_array('uint8_t', 'pix_rad', d['pix_rad'], 24, dec))
     out.append(c_array('uint16_t', 'hl_rgb', hl_rgb, 16, h16))
     out.append(c_array('uint8_t', 'hl_alpha', hl_a, 24, dec))
     out.append('\nstatic const PhotoEye photo = {\n'
-               '  open_img, closed_img, up_start, up_edge, seam, lo_edge, lo_start, eye_top, eye_bot,\n'
-               '  iris_tex, iris_rim, pix_ang, pix_rad, %d, %d, %d,\n'
+               '  open_img, closed_px, closed_off, closed_x0, closed_x1, up_start, up_edge, seam, lo_edge, lo_start, eye_top, eye_bot,\n'
+               '  iris_tex, iris_rim, %d, %d, %d,\n'
                '  hl_rgb, hl_alpha, %d, %d, %d, %d,\n'
-               '  %.2ff, %.2ff, %.2ff, %.2ff,  // Pupil centre x, y; half width, half height as drawn\n'
+               '  %.2ff, %.2ff, %.2ff, %.2ff, %.4ff,  // Pupil centre x, y; half width, half height as drawn; tilt (rad)\n'
                '  %.2ff, %.2ff, %.2ff, %.2ff,  // Pupil half width min/max, half height min/max\n'
                '  %.1ff, %.1ff, %.2ff,           // Gaze range x, y (px); upper lid droop looking down\n'
                '};\n'
                % (TABLE, d['tx0'], d['ty0'], hx0, hy0, hw, hh,
-                  p['pupil_x'], p['pupil_y'], p['pupil_w'], p['pupil_h'],
+                  p['pupil_x'], p['pupil_y'], p['pupil_w'], p['pupil_h'], p['tilt'],
                   p['w_min'], p['w_max'], p['h_min'], p['h_max'],
                   p['range_x'], p['range_y'], p['droop']))
     with open(path, 'w', newline='\n') as f:
         f.write(''.join(out))
     print('Wrote', os.path.relpath(path, REPO), '(%d KB of data)' % (
-        (d['open'].size * 4 + d['tex'].size * 2 + d['pix_ang'].size * 3 + 5 * OUT * 2) // 1024))
+        (d['open'].size * 2 + cpx.size * 2 + d['tex'].size * 2 + hl_a.size * 3 + 8 * OUT * 2) // 1024))
 
 
 # ----------------------------------------------------------------------------
@@ -301,7 +335,7 @@ def render(d, gx, gy, cu, cl, pupil):
     w = p['w_min'] + (p['w_max'] - p['w_min']) * pupil
     h = p['h_min'] + (p['h_max'] - p['h_min']) * pupil
     ang = (np.arange(ANGLES) + 0.5) * 2 * math.pi / ANGLES
-    pb = np.round(lens_radius(w, h, np.cos(ang), np.sin(ang)) * Q).astype(int)
+    pb = np.round(lens_radius(w, h, np.cos(ang), np.sin(ang), p['tilt']) * Q).astype(int)
     rim = d['rim'].astype(int)
     droop = p['droop'] * max(0.0, gy / p['range_y']) if p['range_y'] else 0.0
     out = d['open'].copy()
@@ -383,6 +417,7 @@ if __name__ == '__main__':
         sys.exit(1)
     folder = os.path.abspath(sys.argv[1])
     data = build(folder)
+    data['closed_spans'] = closed_spans(data)
     write_header(folder, data)
     if '--preview' in sys.argv:
         preview(folder, data)
