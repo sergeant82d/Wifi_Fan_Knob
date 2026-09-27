@@ -26,6 +26,17 @@ What moves:
 | `src/photo_eye.cpp`, `include/photo_eye.h` | Renderer |
 | `src/eye_styles.cpp` | Style list (`PHOTO_STYLE_DEF`) |
 
+## Flash space
+
+Each photo eye adds about 200-240 KB to the firmware (the open picture, the shut picture
+where a lid can cover, the iris texture). Nine eyes are about 2 MB. The firmware's app slot
+is 6.25 MB; before the photo eyes it was 3.3 MB, so there is room for about three more
+(check the size PlatformIO prints after a build). To make room, remove a style: delete its
+`namespace eye_dragonN { ... }` block and its `EYE_STYLES` entry in `src/eye_styles.cpp`
+(its header is then not compiled in). A board set to a removed style falls back to the first
+style. A bigger app slot would need a custom partition table (flashed over USB; it moves
+SPIFFS, so the config and fan profiles are reset).
+
 ## Adding a new eye
 
 1. Put the pair in `assets/eye_art/`. Any square size; the round picture is found from its
