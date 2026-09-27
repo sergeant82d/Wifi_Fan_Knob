@@ -1,7 +1,7 @@
 # Photo Eyes (artist pictures, animated)
 
 A photo eye turns two pictures from the artist, eye **open** and eye **shut**, into an
-animated eye style (first one: **Dragon 2**). It is chosen on the web page like the
+animated eye style (**Dragon 2** to **Dragon 10**). It is chosen on the web page like the
 Uncanny Eyes styles and uses the same motion, blinks, sleep, stir and glance behaviour.
 
 What moves:
@@ -18,34 +18,46 @@ What moves:
 
 | File | Purpose |
 |------|---------|
-| `assets/eye_photos/<id>/open.png`, `closed.png` | The artist's pictures (same artwork, same size and position) |
+| `assets/eye_art/*.png` | The artist's pictures, in open/shut pairs (same artwork, same size and position) |
 | `assets/eye_photos/<id>/eye.json` | Geometry, in 240 px screen coordinates |
 | `assets/eye_photos/<id>/preview.png` | Made by the converter: rest, looks, pupil, blink stages, shut, original |
 | `tools/photo_eye.py` | Converter (Python 3 + Pillow + numpy) |
-| `include/eyes/<id>Photo.h` | Generated firmware data (~330 KB flash per eye) |
+| `include/eyes/<id>Photo.h` | Generated firmware data (~200-240 KB flash per eye; the shut picture is stored only where a lid can cover) |
 | `src/photo_eye.cpp`, `include/photo_eye.h` | Renderer |
 | `src/eye_styles.cpp` | Style list (`PHOTO_STYLE_DEF`) |
 
+## Flash space
+
+Each photo eye adds about 200-240 KB to the firmware (the open picture, the shut picture
+where a lid can cover, the iris texture). Nine eyes are about 2 MB. The firmware's app slot
+is 6.25 MB; before the photo eyes it was 3.3 MB, so there is room for about three more
+(check the size PlatformIO prints after a build). To make room, remove a style: delete its
+`namespace eye_dragonN { ... }` block and its `EYE_STYLES` entry in `src/eye_styles.cpp`
+(its header is then not compiled in). A board set to a removed style falls back to the first
+style. A bigger app slot would need a custom partition table (flashed over USB; it moves
+SPIFFS, so the config and fan profiles are reset).
+
 ## Adding a new eye
 
-1. Make `assets/eye_photos/dragon3/` with `open.png` and `closed.png`. Any square size;
-   the round picture is found from its transparent/black surround and scaled to 240.
-2. Copy `eye.json` from `dragon2` and set `id` (config value, max 15 chars) and `name`
-   (shown on the web page).
+1. Put the pair in `assets/eye_art/`. Any square size; the round picture is found from its
+   transparent/black surround and scaled to 240.
+2. Make `assets/eye_photos/dragon11/`, copy an `eye.json` into it and set `id` (config value,
+   max 15 chars), `name` (shown on the web page), and `open` / `closed` (paths relative to
+   the folder, e.g. `../../eye_art/23.png`).
 3. Measure the geometry (below) and run:
    ```
-   python tools/photo_eye.py assets/eye_photos/dragon3 --preview
+   python tools/photo_eye.py assets/eye_photos/dragon11 --preview
    ```
    Check `preview.png` (and `preview.gif`, not committed: look around, pupil, blink).
    Adjust `eye.json` and repeat.
 4. In `src/eye_styles.cpp` add
    ```cpp
-   namespace eye_dragon3 {
-   #include "eyes/dragon3Photo.h"
-   PHOTO_STYLE_DEF("dragon3", "Dragon 3")
+   namespace eye_dragon11 {
+   #include "eyes/dragon11Photo.h"
+   PHOTO_STYLE_DEF("dragon11", "Dragon 11")
    }
    ```
-   and `&eye_dragon3::style` to `EYE_STYLES`.
+   and `&eye_dragon11::style` to `EYE_STYLES`.
 5. Build, flash, pick it on the web page (Config -> Display & Interface).
 
 ## eye.json
@@ -61,7 +73,8 @@ points off it.
 | `upper_sweep` | Optional: where the upper lid region starts changing (brow moves too). Default: `sweep_up` px above `upper_edge` |
 | `sweep_up`, `sweep_lo` | Default sweep margins above/below the lid edges (px) |
 | `iris` | Ellipse `cx, cy, rx, ry` around the iris **including** its dark outer ring |
-| `pupil` | Pupil as drawn: centre `cx, cy`, half width `w`, half height `h` |
+| `open`, `closed` | Paths of the pictures, relative to the folder (default `open.png`, `closed.png` in it) |
+| `pupil` | Pupil as drawn: centre `cx, cy`, half width `w`, half height `h`; optional `tilt` in degrees (+ = bottom leans right) |
 | `pupil_range` | Half width `w_min`..`w_max` and half height `h_min`..`h_max` over slit..wide |
 | `gaze_x`, `gaze_y` | How far the iris moves (px) |
 | `droop` | Upper lid lowering when looking fully down (share of edge -> seam) |

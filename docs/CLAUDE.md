@@ -7,7 +7,7 @@
 **Repo root**: `D:\GitHub\VSCodeProjects\Wifi_Bench_Fan\Wifi_Fan_Knob`  
 **PlatformIO project**: the repo root (`platformio.ini` is at the top level)  
 **Status**: Hardware bring-up in progress — display, WiFi AP, SPIFFS and webserver verified on the board  
-**Last updated**: 2026-09-26
+**Last updated**: 2026-09-26 (photo eyes, evening)
 
 
 1. Don’t assume. Don’t hide confusion. Surface tradeoffs.
@@ -74,6 +74,7 @@ cd Wifi_Fan_Knob
 | `Status_Reports/STATUS_REPORT_02.md` | End-of-day report, 2026-09-23 (first hardware session) |
 | `Status_Reports/STATUS_REPORT_03.md` | End-of-day report, 2026-09-24 (second hardware session) |
 | `Status_Reports/STATUS_REPORT_04.md` | End-of-day report, 2026-09-25 (third hardware session: fan control, profiles, Auto Configure, LCD theme) |
+| `Status_Reports/STATUS_REPORT_05.md` | End-of-day report, 2026-09-26 (web page and LCD to-do items, display modes, standby prompt, photo eyes Dragon 2-10) |
 | `MQTT_SCHEMA.md` | Original HA discovery design (superseded; see MQTT below) |
 | `SPIFFS_CONFIG_SCHEMA.md` | JSON config structure |
 | `images/` | Pictures used by the docs: board photo, display layout diagram, arc-button design reference |
@@ -83,8 +84,10 @@ cd Wifi_Fan_Knob
 the next number (one per session day), and get a row in the table above.
 
 **Eye artwork** (source art that ends up in the firmware) lives in `assets/eye_art/`, not
-`docs/`: the purchased `*_dragon-eyes-8.5x11.jpg` sheets (300 dpi), and the artist's eyelid
-images when they arrive.
+`docs/`: the purchased `*_dragon-eyes-8.5x11.jpg` sheets (300 dpi), and the artist's open/shut
+pairs used by the photo eyes (`assets/eye_photos/dragonN/eye.json` names its pair):
+Dragon 2 = `5-1`/`6`, 3 = `01A`/`01B`, 4 = `02A`/`02B`, 5 = `7`/`8`, 6 = `9`/`9B`,
+7 = `15`/`16`, 8 = `17`/`18`, 9 = `19`/`20`, 10 = `21`/`22`.
 
 Pin reference lives in this file and at the top of `src/main.cpp`; there is no separate pin-mapping doc.
 
@@ -255,8 +258,9 @@ See `platformio.ini`. Libraries:
   more detailed. Pixels outside the round screen are skipped. Iris formula and per-style pupil
   limits are the original's (Bodmer's differed). Measured 37-52 fps (all 10 styles cycled twice,
   no leaks). Standby draws at most `STANDBY_EYE_FPS` (15; measured 14), screensaver flat out.
-  Firmware 3.3 MB of the 6.5 MB OTA slot. In standby/screensaver `loop()` renders eye frames
+  Firmware 3.3 MB of the 6.5 MB OTA slot (before the photo eyes). In standby/screensaver `loop()` renders eye frames
   instead of running LVGL and polls touch directly.
+  Photo eyes (Dragon 2-10): see "Implemented, not yet verified".
   Sleeping eye (standby only, `eye_set_sleeping()` from `set_standby()`): lids close over 2 s,
   stay shut 3.5-10 s, then a twitch (50%: opens 20-45% for 0.4-0.7 s) or a peek (opens
   50-85%, holds 1.5-4 s, closes slowly; tuned 2026-09-24 after hardware review). While fully shut nothing is redrawn: measured 12-69 draws per
@@ -400,6 +404,20 @@ See `platformio.ini`. Libraries:
   and the even-spread preset rule (it gave 500/500/800/1000 before).
 
 ### 🔧 Implemented, not yet verified
+- Photo eyes, Dragon 2-10 (2026-09-26; `docs/PHOTO_EYES.md`): the artist's open/shut pairs
+  (`assets/eye_art/`) animated by `photo_eye.cpp`: iris moves over the socket, slit pupil
+  reacts "to light" (wide when shut, narrows on peeks, snaps narrow on stir/screensaver start,
+  drifts and flinches awake), cornea highlights fixed, lids blink/sleep through the shut
+  picture; same motion/blink/sleep/stir/glance as the Uncanny styles (`dragon_eye.cpp`
+  dispatches on `EyeStyle::photo`). Data from `tools/photo_eye.py` (Pillow + numpy) and a
+  hand-measured `eye.json` per eye; ~200-240 KB flash each (~2 MB for nine) plus a 77 KB
+  PSRAM iris table built by `photo_eye_prepare()` when one is selected. Checked only on the
+  PC: files compile with g++ against stub headers, and the renderer's host output matches the
+  converter's preview (Dragon 2 pixel-identical after the flash-saving rework). **Not built
+  with PlatformIO or run on the board** (the cloud session couldn't download the platform).
+  To check: build size (estimate ~5.5 MB of the 6.25 MB slot; room for ~3 more eyes, and
+  removing a style's block in `eye_styles.cpp` frees its flash), fps per eye (`[EYE] n fps`),
+  looks. `/api/config` now lists 19 styles (~1.9 KB of its 3 KB JSON document).
 - NTP: background SNTP started when WiFi STA connects, re-syncs every 60 min, local time
   per configured zone (`configTzTime`; plain `configTime` would reset TZ to UTC).
 
@@ -589,22 +607,9 @@ STANDBY (1)
 - **Eye upgrades** — done: native 240x240, 10 styles selectable on the web, 15 fps in
   standby, sleeping eye in standby, standby brightness setting, wake gestures. Declined:
   light sleep between frames (small saving with WiFi on; revisit only for battery power). Left:
-  - **Standalone eye project** (later, after M4 Eyes)
-  - **Eyelid images** (user is looking for closed-dragon-eye imagery; belongs with the
-    standalone eye project). Today every lid-covered pixel is drawn black (`p = 0` in
-    `draw_eye()`), so a shut eye is a black screen and blinks/twitches/peeks show black lids.
-    Two options discussed 2026-09-24:
-    1. Show the image only when fully shut (simple; lids stay black while opening/closing, so
-       the image pops in and out).
-    2. **Recommended:** use the image as the eyelid texture: each lid-covered pixel takes its
-       colour from the image instead of 0, so the shut eye shows the whole image and
-       twitches/peeks/blinks open through it. Same cost as 1 (one lookup per lid pixel).
-    Images: 240x240, cropped to the round screen, closed eye centred; any common format,
-    converted to RGB565 (~115 KB each). Either built into the firmware at build time
-    (simpler) or uploaded via the web page to SPIFFS (swappable without reflashing). With
-    several: random per sleep, or matched to eye styles (e.g. dragon lid for Dragon). Only
-    images the user has rights to (the repo is public). User to choose: option 1 or 2,
-    built-in or uploaded, random or per style. — break out all dragon eye code, display config, and setup steps
+  - **Eyelid images** — done differently (2026-09-26): the artist delivered open/shut pairs,
+    which became the photo eyes (Dragon 2-10). The Uncanny Eyes styles still draw black lids.
+  - **Standalone eye project** (later, after M4 Eyes) — break out all dragon eye code, display config, and setup steps
   into a semi-universal project that works with any LovyanGFX-compatible display. Document the
   GC9A01 example and how to adapt it to other boards.
 - **Adafruit "M4 Eyes" (user wants this, after the fan hardware is done)** — eyes with art
