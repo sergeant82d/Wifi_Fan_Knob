@@ -1,5 +1,13 @@
 # A running list of things to attend to during active sessions.
 
+## 20260927
+
+- [ ] 
+
+- [ ] 
+
+
+---
 ## 20260926
 
 - [x] Webserver - Main page - Quick Start Preset buttons - need to change color and act like Radio buttons, similar to those at the bottom of the page in the "Display Mode" section. (done 2026-09-26, 7190fb5)
