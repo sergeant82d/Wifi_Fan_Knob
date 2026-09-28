@@ -765,7 +765,7 @@ void loop() {
   } else if (delta != 0 && ui_menu_open()) {
     ui_menu_turn(delta);  // Menu open: knob chooses a page, RPM unchanged
   } else if (delta != 0 && !ui_on_main_page()) {
-    if (delta > 0) ui_show_main();  // Settings (left of Main): a right turn returns; speed unchanged
+    ui_step_page(delta);  // Off Main, the knob moves one page the way it turns; speed unchanged
   } else if (delta < 0 && fan_get_target() == 0) {
     ui_show_settings();  // Fan stopped: a left turn can't slow it, so it opens Settings
   } else if (delta != 0) {

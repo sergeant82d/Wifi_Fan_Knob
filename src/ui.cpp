@@ -13,8 +13,10 @@
 //             (gold, centre) · actual RPM (light, below) · clock (bottom gap)
 //   Settings: brightness slider (live; saved on release), Screensaver switch (pause, not
 //             saved), IP box, network/MQTT info
+//   QR code:  left of Settings. QR of the web page (http://<IP>/); on the hotspot, a QR that
+//             joins it first, and a tap on the code switches between the two
 // Auto Configure has its own gold screen (reversed theme), shown only while it runs.
-// Page dots sit in the arc's bottom gap. Knob turns and wake return to Main.
+// Page dots sit in the arc's bottom gap. Wake returns to Main; off Main, the knob steps pages.
 // Knob short press opens a menu of the pages: turn to choose, press or tap to go.
 // Double-tap on Main stops the fan (or pops up "Fan is not running").
 // On every other page, a tap on empty space slides back to Main.
@@ -65,6 +67,7 @@ static void create_config_screen();
 static void create_prompt(lv_obj_t *parent);
 static void create_main_page(lv_obj_t *tile);
 static void create_settings_page(lv_obj_t *tile);
+static void create_qr_page(lv_obj_t *tile);
 static void create_page_dots(lv_obj_t *parent);
 static void tap_back_cb(lv_event_t *);
 static void create_menu(lv_obj_t *parent);
@@ -77,11 +80,12 @@ struct Page {
   void (*create)(lv_obj_t *tile);   // Builds the page's widgets on its tile
 };
 static const Page PAGES[] = {
+  {"QR code", create_qr_page},
   {"Settings", create_settings_page},
   {"Main", create_main_page},
 };
-static const int SETTINGS_PAGE = 0;
-static const int MAIN_PAGE = 1;
+static const int SETTINGS_PAGE = 1;
+static const int MAIN_PAGE = 2;
 static const int PAGE_COUNT = sizeof(PAGES) / sizeof(PAGES[0]);
 static lv_obj_t *page_dots[PAGE_COUNT];
 
@@ -463,6 +467,11 @@ bool ui_on_main_page() {
   return current_page() == MAIN_PAGE;
 }
 
+void ui_step_page(int delta) {
+  int page = current_page() + (delta > 0 ? 1 : -1);
+  if (delta != 0 && page >= 0 && page < PAGE_COUNT) show_page(page);
+}
+
 static void page_changed_cb(lv_event_t *) {
   int page = current_page();
   for (int i = 0; i < PAGE_COUNT; i++) {
@@ -657,6 +666,89 @@ static void update_info() {
   if (text != lv_label_get_text(info_label)) {
     lv_label_set_text(info_label, text.c_str());
   }
+}
+
+// ============================================================================
+// QR CODE PAGE: scan to open the web page (by IP: many Android phones can't open .local
+// names; port 80 redirects to the web port). On the hotspot a phone has to join it first,
+// so that QR shows first and a tap on the code switches to the page link and back.
+// ============================================================================
+
+static const int QR_SIZE = 112;           // Plus a white border: fits inside the round screen
+static lv_obj_t *qr_title = nullptr;
+static lv_obj_t *qr_code = nullptr;
+static lv_obj_t *qr_label = nullptr;
+static bool qr_show_link = false;         // Hotspot: showing the page link instead of the join code
+static String qr_payload;                 // What the QR holds now ("" = hidden)
+
+// WiFi QR fields escape \ ; , : " with a backslash
+static String wifi_escape(const char *s) {
+  String out;
+  for (; *s; s++) {
+    if (strchr("\\;,:\"", *s)) out += '\\';
+    out += *s;
+  }
+  return out;
+}
+
+static void update_qr_page() {
+  const char *title;
+  String payload, label;
+  if (WiFi.status() == WL_CONNECTED) {
+    qr_show_link = false;  // Next time the hotspot comes on, start with its join code
+    title = "Open web page";
+    payload = "http://" + WiFi.localIP().toString() + "/";
+    label = WiFi.localIP().toString();
+  } else if (WiFi.getMode() & WIFI_AP) {
+    if (qr_show_link) {
+      title = "Open web page";
+      payload = "http://" + WiFi.softAPIP().toString() + "/";
+      label = WiFi.softAPIP().toString();
+    } else {
+      title = "Join hotspot";
+      payload = "WIFI:T:WPA;S:" + wifi_escape(WiFi.softAPSSID().c_str()) +
+                ";P:" + wifi_escape(config.wifi.apPassword) + ";;";
+      label = "Then tap the code";
+    }
+  } else {
+    title = "Not connected";
+  }
+
+  if (strcmp(title, lv_label_get_text(qr_title)) != 0) lv_label_set_text(qr_title, title);
+  if (label != lv_label_get_text(qr_label)) lv_label_set_text(qr_label, label.c_str());
+  if (payload == qr_payload) return;
+  qr_payload = payload;
+  if (payload.length() == 0) {
+    lv_obj_add_flag(qr_code, LV_OBJ_FLAG_HIDDEN);
+  } else {
+    lv_qrcode_update(qr_code, payload.c_str(), payload.length());
+    lv_obj_clear_flag(qr_code, LV_OBJ_FLAG_HIDDEN);
+  }
+}
+
+static void create_qr_page(lv_obj_t *tile) {
+  qr_title = page_title(tile, "");
+
+  qr_code = lv_qrcode_create(tile, QR_SIZE, lv_color_black(), lv_color_white());
+  lv_obj_set_style_border_color(qr_code, lv_color_white(), 0);  // Quiet zone on the dark page
+  lv_obj_set_style_border_width(qr_code, 6, 0);
+  lv_obj_align(qr_code, LV_ALIGN_CENTER, 0, 6);
+  lv_obj_add_flag(qr_code, LV_OBJ_FLAG_HIDDEN);
+  // Tap on the code: on the hotspot, switch join code <-> page link. Clickable, so the tap
+  // doesn't reach the tile (which would slide back to Main).
+  lv_obj_add_flag(qr_code, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_add_event_cb(qr_code, [](lv_event_t *) {
+    if (WiFi.status() != WL_CONNECTED && (WiFi.getMode() & WIFI_AP)) {
+      qr_show_link = !qr_show_link;
+      update_qr_page();
+    }
+  }, LV_EVENT_CLICKED, nullptr);
+
+  qr_label = lv_label_create(tile);
+  lv_obj_set_style_text_font(qr_label, &lv_font_montserrat_14, 0);
+  lv_obj_set_style_text_color(qr_label, lv_color_hex(THEME_TEXT), 0);
+  lv_label_set_text(qr_label, "");
+  lv_obj_align(qr_label, LV_ALIGN_CENTER, 0, 82);
 }
 
 static void create_standby_screen() {
@@ -890,6 +982,7 @@ void ui_update() {
   update_clock();
   update_status_box();
   update_info();
+  update_qr_page();
 }
 
 void ui_set_target_rpm(uint16_t rpm) {

@@ -304,6 +304,12 @@ See `platformio.ini`. Libraries:
   static IP settings; restarts). `WiFi.setHostname()` in `apply_ip_config()` (router list),
   `MDNS.begin()` + `_http._tcp` service after `init_wifi()`: `http://fanknob.local:8080`
   (tested from the PC). Some Android versions don't resolve `.local`.
+- QR code page (verified 2026-09-28, from `HANDOFF_FROM_ETH_Touch_PWM.md` item 3): left-most
+  LCD page (QR code | Settings | Main), LVGL's QR widget (`LV_USE_QRCODE`). On home WiFi it
+  opens `http://<IP>/` (port 80 redirects; IP because Android often can't open .local).
+  Hotspot: join code first, tap the code for the page link (**hotspot view untested**). Off
+  Main, the knob now steps one page per click the way it turns (`ui_step_page()`).
+  `docs/DISPLAY_GUIDE.md` section 4.
 - Display modes as radio buttons (2026-09-26): one `mode_request` (`power_request_mode()`,
   `PowerMode` in `power.h`) replaces the separate standby/screensaver requests; knob, touch,
   web (`POST /api/mode` active|screensaver|standby) and HA all go through it, so exactly one

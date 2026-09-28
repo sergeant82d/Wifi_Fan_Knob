@@ -11,6 +11,7 @@ void ui_set_standby(bool standby);       // Switch between main and standby scre
 void ui_show_main();                     // Slide back to the Main page
 void ui_show_settings();                 // Slide to the Settings page (left of Main)
 bool ui_on_main_page();
+void ui_step_page(int delta);            // One page left (delta < 0) or right (> 0), if there is one
 bool ui_menu_open();                     // Knob page menu showing?
 void ui_menu_button();                   // Short press: open menu, or go to the chosen page
 void ui_menu_turn(int delta);            // Knob turn while the menu is open

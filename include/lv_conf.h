@@ -9,5 +9,6 @@
 #define LV_FONT_MONTSERRAT_20 1     // Clock
 #define LV_FONT_MONTSERRAT_40 1     // RPM number
 #define LV_FONT_MONTSERRAT_48 1     // Standby clock (unused screen)
+#define LV_USE_QRCODE 1             // QR code page
 
 #endif

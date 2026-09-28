@@ -257,11 +257,12 @@ of `ui.cpp`:
 
 ```cpp
 static const Page PAGES[] = {
+  {"QR code", create_qr_page},
   {"Settings", create_settings_page},
   {"Main", create_main_page},
 };
-static const int SETTINGS_PAGE = 0;
-static const int MAIN_PAGE = 1;
+static const int SETTINGS_PAGE = 1;
+static const int MAIN_PAGE = 2;
 ```
 
 Each row is a **name** (shown in the knob menu) and a **function that builds the page**.
@@ -273,9 +274,10 @@ Everything else follows this table automatically:
 * tap-empty-space-to-return-to-Main, on every page except Main
 
 **Keep `MAIN_PAGE` and `SETTINGS_PAGE` pointing at the right rows** whenever you reorder:
-the board starts and wakes on `MAIN_PAGE`, and the knob uses both. Settings is left of Main:
-swipe right from Main to reach it. With the fan stopped, a left knob turn also opens Settings,
-and a right turn there returns to Main (speed unchanged).
+the board starts and wakes on `MAIN_PAGE`, and the knob uses both. The order is QR code,
+Settings, Main: swipe right from Main to reach Settings, and again for the QR code. With the fan stopped, a left knob turn also opens Settings.
+On any other page, each knob click moves one page the way it turns, like a swipe (left from
+Settings to the QR code, right back to Settings and Main), speed unchanged: `ui_step_page()`.
 
 ### Reordering, renaming or removing a page
 
@@ -286,7 +288,7 @@ and a right turn there returns to Main (speed unchanged).
 
 ### Adding a page: a worked example
 
-This adds an "About" page after Settings.
+This adds an "About" page right of Main.
 
 **Step 1.** Add a declaration next to the others near the top of `ui.cpp`:
 
@@ -299,6 +301,7 @@ static void create_about_page(lv_obj_t *tile);      // ← add
 
 ```cpp
 static const Page PAGES[] = {
+  {"QR code", create_qr_page},
   {"Settings", create_settings_page},
   {"Main", create_main_page},
   {"About", create_about_page},                     // ← add (right of Main)
@@ -321,7 +324,7 @@ static void create_about_page(lv_obj_t *tile) {
 }
 ```
 
-Upload. There's now a third dot, "About" is in the knob menu, and a tap on the page returns
+Upload. There's now a fourth dot, "About" is in the knob menu, and a tap on the page returns
 to Main.
 
 **A button on a new page** looks like this (copy it inside your page function):
@@ -359,6 +362,23 @@ In `create_settings_page()`, in the same dark blue and gold as Main:
   When the saved WiFi is lost it flashes red and white every half second (colours in
   `status_flash_cb()`, speed in `lv_timer_create(status_flash_cb, 500, ...)`).
 * network name and MQTT status at `y = 74`
+
+### The QR code page
+
+Left of Settings (the left-most page). A phone scans it to open the web page. In `create_qr_page()` and
+`update_qr_page()` (runs once a second from `ui_update()`; redraws only when something changed):
+* title at `y = -80`: "Open web page", "Join hotspot" or "Not connected"
+* the QR code at `y = 6`: `QR_SIZE` (112) pixels, black on white, with a 6-pixel white border
+  (the "quiet zone" scanners need on a dark background). LVGL's QR widget
+  (`LV_USE_QRCODE` in `include/lv_conf.h`) picks the code size and scales it to fit.
+  Much bigger and its corners leave the round screen.
+* text at `y = 82`: the IP address, or "Then tap the code"
+* **On home WiFi:** the code opens `http://<IP>/`. It uses the IP, not `fanknob.local`, because
+  many Android phones can't open `.local` names; port 80 forwards to the web port.
+* **On the hotspot:** the code first joins the hotspot (`WIFI:T:WPA;S:<name>;P:<password>;;`,
+  with `\ ; , : "` escaped by a backslash). A tap **on the code** switches to the page link
+  (`http://192.168.4.1/`) and back. A tap anywhere else returns to Main, as on every page.
+* **No network:** the code is hidden.
 
 The IP box and the information text are updated once a second (`update_status_box()`,
 `update_info()`).
