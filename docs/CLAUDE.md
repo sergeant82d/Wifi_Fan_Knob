@@ -7,7 +7,7 @@
 **Repo root**: `D:\GitHub\VSCodeProjects\Wifi_Bench_Fan\Wifi_Fan_Knob`  
 **PlatformIO project**: the repo root (`platformio.ini` is at the top level)  
 **Status**: Hardware bring-up in progress — display, WiFi AP, SPIFFS and webserver verified on the board  
-**Last updated**: 2026-09-26 (photo eyes, evening)
+**Last updated**: 2026-09-28 (handoff items 1-3: serial fix, QR code page, web LCD view)
 
 
 1. Don’t assume. Don’t hide confusion. Surface tradeoffs.
@@ -321,6 +321,8 @@ See `platformio.ini`. Libraries:
   a request, at most 1/s. Two 115 KB PSRAM buffers; publish skips while a frame is sending.
   Checked: Main, screensaver eye (open and mid-blink), shut standby eye; standby eye stays
   14 fps while captured. Not on the capture: LVGL's top layer (nothing uses it now).
+  On phones (max-width 768 px) the LCD card is first on the Home tab (`#home` becomes a flex
+  column, `#lcd-card { order: -1 }`); desktop order unchanged. Verified by the user.
 - Display modes as radio buttons (2026-09-26): one `mode_request` (`power_request_mode()`,
   `PowerMode` in `power.h`) replaces the separate standby/screensaver requests; knob, touch,
   web (`POST /api/mode` active|screensaver|standby) and HA all go through it, so exactly one

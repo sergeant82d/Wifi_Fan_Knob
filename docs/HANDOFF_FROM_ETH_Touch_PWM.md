@@ -1,5 +1,10 @@
 # Handoff: features from ETH_Touch_PWM worth adapting here
 
+**Progress (2026-09-28):** 1 done (`c12d170`; uses `setTxTimeoutMs(1)`, 0 hangs core 3.0.4),
+3 done (`2420c49`; the page is left of Settings, the user's choice), 2 done (`610fad2`, phone
+layout in the next commit; the eye is captured too). **Next: item 4, Notes box.** Details of
+each in `docs/CLAUDE.md` (Verified list).
+
 Written 2026-09-28 by the Claude session working on the sister project ETH_Touch_PWM
 (`D:\GitHub\VSCodeProjects\ETH_Touch_PWM`, a two-fan Ethernet controller with a 320x240
 LCD). The user asked which of that day's features fit this project. This file is the

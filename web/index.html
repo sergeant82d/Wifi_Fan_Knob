@@ -410,6 +410,22 @@
             .rpm-number {
                 font-size: 2.5rem;
             }
+
+            /* Home tab on phones: the LCD card first. A flex column can reorder; its margins
+               don't overlap like block margins, so the cards' top margins go (each card's
+               bottom margin still gives the 20 px gap). */
+            #home.active {
+                display: flex;
+                flex-direction: column;
+            }
+
+            #lcd-card {
+                order: -1;
+            }
+
+            #home > .status-card {
+                margin-top: 0 !important;
+            }
         }
     </style>
 </head>
@@ -522,7 +538,7 @@
                 <small id="mode-note" style="color: #ffd700; display: block; margin-top: 10px;"></small>
             </div>
 
-            <div class="status-card" style="margin-top: 20px; text-align: center;">
+            <div class="status-card" id="lcd-card" style="margin-top: 20px; text-align: center;">
                 <h3>LCD</h3>
                 <!-- A copy of the knob's screen (every page, the eye too), fetched every 2 s while this tab shows -->
                 <canvas id="lcd-view" width="240" height="240"
