@@ -2,6 +2,7 @@
 // preview in tools/photo_eye.py: keep the two in step.
 
 #include "photo_eye.h"
+#include "lcd_view.h"
 #include <esp_heap_caps.h>
 #include <math.h>
 
@@ -149,6 +150,7 @@ void photo_eye_draw(lgfx::LGFX_Device *tft, const PhotoEye *e, int gx, int gy, f
       line_buf[x] = p;
     }
     tft->writePixels((lgfx::rgb565_t *)line_buf, OUT);
+    lcd_view_eye_row(y, line_buf);  // Web LCD view (copies only while capturing)
   }
   tft->endWrite();
 }

@@ -522,6 +522,14 @@
                 <small id="mode-note" style="color: #ffd700; display: block; margin-top: 10px;"></small>
             </div>
 
+            <div class="status-card" style="margin-top: 20px; text-align: center;">
+                <h3>LCD</h3>
+                <!-- A copy of the knob's screen (every page, the eye too), fetched every 2 s while this tab shows -->
+                <canvas id="lcd-view" width="240" height="240"
+                        style="width: 240px; max-width: 100%; border-radius: 50%; background: #000; border: 2px solid rgba(255, 215, 0, 0.4);"></canvas>
+                <small id="lcd-note" style="color: #606060; display: block; margin-top: 8px;">Updates every 2 seconds</small>
+            </div>
+
             <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid rgba(255, 215, 0, 0.2);">
                 <a href="https://github.com/sergeant82d/Wifi_Fan_Knob" target="_blank" style="color: #ffd700; text-decoration: none; font-size: 0.9rem;">
                     🔗 GitHub Repository
@@ -928,6 +936,7 @@
 
             document.getElementById(tabName).classList.add('active');
             event.target.classList.add('active');
+            if (tabName === 'home') loadLcd();  // Don't wait up to 2 s for the LCD view
         }
 
         // Slider follows the device's target until the user moves it. While dragging, the speed is
@@ -1289,6 +1298,43 @@
         }
         document.addEventListener('DOMContentLoaded', loadStatus);
         setInterval(loadStatus, 2000);  // Knob changes show within ~2 s
+
+        // LCD view (Home tab): /api/lcd is the knob's screen as raw 240x240 RGB565 (little-endian).
+        // Fetched only while the Home tab shows and the page is visible; the board captures only
+        // while asked. 503 = no copy yet (the first request starts capturing): retry soon.
+        let lcdBusy = false;
+        async function loadLcd() {
+            if (lcdBusy || document.hidden || !document.getElementById('home').classList.contains('active')) return;
+            lcdBusy = true;
+            try {
+                const r = await fetch('/api/lcd', { cache: 'no-store' });
+                if (r.status === 503) {
+                    setTimeout(loadLcd, 1200);
+                } else if (r.ok) {
+                    const px = new Uint16Array(await r.arrayBuffer());
+                    if (px.length === 240 * 240) {
+                        const ctx = document.getElementById('lcd-view').getContext('2d');
+                        const img = ctx.createImageData(240, 240);
+                        for (let i = 0, j = 0; i < px.length; i++, j += 4) {
+                            const v = px[i];
+                            img.data[j] = ((v >> 8) & 0xF8) | (v >> 13);             // R: 5 bits -> 8
+                            img.data[j + 1] = ((v >> 3) & 0xFC) | ((v >> 9) & 0x03); // G: 6 bits -> 8
+                            img.data[j + 2] = ((v << 3) & 0xF8) | ((v >> 2) & 0x07); // B: 5 bits -> 8
+                            img.data[j + 3] = 255;
+                        }
+                        ctx.putImageData(img, 0, 0);
+                        document.getElementById('lcd-note').textContent =
+                            'Updates every 2 seconds (last ' + new Date().toLocaleTimeString() + ')';
+                    }
+                }
+            } catch (e) {
+                // Offline: the status line already says so
+            }
+            lcdBusy = false;
+        }
+        setInterval(loadLcd, 2000);
+        document.addEventListener('DOMContentLoaded', loadLcd);
+        document.addEventListener('visibilitychange', loadLcd);
 
         // Fan profiles (Config tab)
         let fanProfiles = null;

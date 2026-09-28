@@ -10,6 +10,7 @@
 // Photo eyes (artist pictures, photo_eye.cpp) share the motion, blinks and sleep here.
 
 #include "dragon_eye.h"
+#include "lcd_view.h"
 #include "eye_styles.h"
 #include <Arduino.h>
 #include <esp_heap_caps.h>
@@ -248,6 +249,10 @@ static void sleep_phase_set(SleepPhase p, uint32_t ms) {
   phase_ms = ms;
 }
 
+void eye_redraw() {
+  drawn_shut = false;
+}
+
 void eye_set_sleeping(bool on) {
   sleeping = on;
   drawn_shut = false;  // The screen was LVGL's (or awake eye) until now
@@ -382,6 +387,7 @@ static void draw_eye(uint32_t iScale, int scleraX, int scleraY, uint32_t uT, uin
       line_buf[x] = p;
     }
     tft->writePixels((lgfx::rgb565_t *)line_buf, OUT);
+    lcd_view_eye_row(y, line_buf);  // Web LCD view (copies only while capturing)
   }
   tft->endWrite();
 }

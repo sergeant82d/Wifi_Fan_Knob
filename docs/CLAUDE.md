@@ -65,6 +65,7 @@ cd Wifi_Fan_Knob
 | `include/ui.h` / `src/ui.cpp` | ✅ Working | LVGL tileview pages (Main / Settings), segments, knob menu |
 | `include/dragon_eye.h` / `src/dragon_eye.cpp` | ✅ Working | Animated eye (standby + screensaver), native 240x240 |
 | `include/eye_styles.h` / `src/eye_styles.cpp` | ✅ Working | The eye styles: 10 Uncanny Eyes (`include/eyes/*Eye.h` = Adafruit tables) + photo eyes |
+| `include/lcd_view.h` / `src/lcd_view.cpp` | ✅ Working | Web LCD view: copies of the screen for `GET /api/lcd` (LVGL snapshot; eye rows copied as drawn) |
 | `include/photo_eye.h` / `src/photo_eye.cpp` | ✅ Working | Photo eye renderer (artist open/shut pictures: moving iris, reactive slit pupil, lids); data `include/eyes/*Photo.h` from `tools/photo_eye.py` |
 
 ### Documentation (`docs/`)
@@ -310,6 +311,16 @@ See `platformio.ini`. Libraries:
   Hotspot: join code first, tap the code for the page link (**hotspot view untested**). Off
   Main, the knob now steps one page per click the way it turns (`ui_step_page()`).
   `docs/DISPLAY_GUIDE.md` section 4.
+- Web LCD view (verified 2026-09-28 by the user on PC and phone, handoff item 2): Home tab "LCD" card, a round 240 px canvas refreshed every 2 s while the Home tab
+  shows. `GET /api/lcd` (no login) = raw 240x240 RGB565 little-endian (115,200 B, header
+  `X-Frame`); 503 = no copy yet or the last one still sending (page retries in 1.2 s). The
+  screen can't be read back (no MISO), so `lcd_view.cpp` copies frames on the way to it:
+  `lv_snapshot_take_to_buf(lv_scr_act())` in `loop()` for LVGL screens (`LV_USE_SNAPSHOT`),
+  and the eye renderers copy each row (`lcd_view_eye_row()`) during one frame a second;
+  `eye_redraw()` makes a shut sleeping eye draw once for it. Captures run only for 5 s after
+  a request, at most 1/s. Two 115 KB PSRAM buffers; publish skips while a frame is sending.
+  Checked: Main, screensaver eye (open and mid-blink), shut standby eye; standby eye stays
+  14 fps while captured. Not on the capture: LVGL's top layer (nothing uses it now).
 - Display modes as radio buttons (2026-09-26): one `mode_request` (`power_request_mode()`,
   `PowerMode` in `power.h`) replaces the separate standby/screensaver requests; knob, touch,
   web (`POST /api/mode` active|screensaver|standby) and HA all go through it, so exactly one

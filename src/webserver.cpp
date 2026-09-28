@@ -5,6 +5,7 @@
 #include "power.h"
 #include "mqtt.h"
 #include "eye_styles.h"
+#include "lcd_view.h"
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
 #include <WiFi.h>
@@ -286,6 +287,28 @@ void init_webserver() {
     String body;
     serializeJson(doc, body);
     request->send(200, "application/json", body);
+  });
+
+  // LCD view for the Home tab: the latest copy of the screen, raw 240x240 RGB565 little-endian.
+  // Asking also keeps the board capturing for a few seconds (lcd_view.h). 503 = no copy yet,
+  // or the last one is still being sent: try again shortly.
+  server->on(AsyncURIMatcher::exact("/api/lcd"), HTTP_GET, [](AsyncWebServerRequest *request) {
+    uint32_t seq;
+    const uint8_t *frame = lcd_view_lock(&seq);
+    if (!frame) {
+      request->send(503, "text/plain", "No LCD frame yet");
+      return;
+    }
+    AsyncWebServerResponse *response = request->beginResponse("application/octet-stream", LCD_VIEW_BYTES,
+      [frame](uint8_t *buf, size_t maxLen, size_t index) -> size_t {
+        size_t n = min(maxLen, LCD_VIEW_BYTES - index);
+        memcpy(buf, frame + index, n);
+        return n;
+      });
+    response->addHeader("Cache-Control", "no-store");
+    response->addHeader("X-Frame", String(seq));
+    request->onDisconnect([]() { lcd_view_unlock(); });  // Sent or aborted: the frame is free again
+    request->send(response);
   });
 
   // Set target RPM from the Home tab (same target the knob adjusts)

@@ -120,6 +120,7 @@ class LGFX : public lgfx::LGFX_Device {
 LGFX gfx;
 
 #include "dragon_eye.h"  // Standby/screensaver eye, draws straight to gfx
+#include "lcd_view.h"    // Web LCD view: copies of the screen
 #include "eye_styles.h"
 #include <driver/pulse_cnt.h>
 
@@ -642,6 +643,7 @@ void setup() {
   Serial.println("Initializing display...");
   gfx.init();
   eye_begin(&gfx);
+  if (!lcd_view_init()) Serial.println("[LCD VIEW] No PSRAM for the web LCD view");
   gfx.setColorDepth(16);
   gfx.fillScreen(TFT_BLACK);
   gfx.setTextColor(TFT_WHITE);
@@ -904,7 +906,13 @@ void loop() {
     bool draw = !power_is_standby() || eye_stirred() || millis() - last_eye_frame >= 1000 / STANDBY_EYE_FPS;
     if (draw) {
       last_eye_frame = millis();
+      bool capture = lcd_view_capture_due();  // Web LCD view: copy this frame as it's drawn
+      if (capture) {
+        eye_redraw();  // A shut eye isn't redrawn; draw it once for the copy
+        lcd_view_eye_begin();
+      }
       eye_frame();
+      if (capture) lcd_view_eye_end();
     } else {
       delay(5);  // Keep polling touch, knob and button between frames
     }
@@ -947,6 +955,7 @@ void loop() {
     // LVGL tick
     lv_tick_inc(5);
     lv_task_handler();
+    if (lcd_view_capture_due()) lcd_view_capture_lvgl();  // Web LCD view
 
     delay(5);
   }
