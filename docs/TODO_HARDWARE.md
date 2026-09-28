@@ -4,7 +4,7 @@
 
 - [ ] Power - replace multi-output regulator with Five (5) Volt SMPS (on-hand bench supplies)
 
-- [ ] BME688 Air Quality sensor - https://www.adafruit.com/product/5046 - $20 + S&H
+- [ ] SGP41 & SHT41 Air Quality and Temp/Humidity sensors - https://www.adafruit.com/product/6455 / https://www.adafruit.com/product/5776 - $26 + S&H
 
 - [ ] 
 
