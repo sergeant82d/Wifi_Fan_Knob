@@ -81,6 +81,7 @@ cd Wifi_Fan_Knob
 | `Status_Reports/STATUS_REPORT_03.md` | End-of-day report, 2026-09-24 (second hardware session) |
 | `Status_Reports/STATUS_REPORT_04.md` | End-of-day report, 2026-09-25 (third hardware session: fan control, profiles, Auto Configure, LCD theme) |
 | `Status_Reports/STATUS_REPORT_05.md` | End-of-day report, 2026-09-26 (web page and LCD to-do items, display modes, standby prompt, photo eyes Dragon 2-10) |
+| `Status_Reports/STATUS_REPORT_06.md` | End-of-day report, 2026-09-28 (handoff items: USB serial fix, QR code page, web LCD view, Notes box) |
 | `MQTT_SCHEMA.md` | Original HA discovery design (superseded; see MQTT below) |
 | `SPIFFS_CONFIG_SCHEMA.md` | JSON config structure |
 | `images/` | Pictures used by the docs: board photo, display layout diagram, arc-button design reference |
@@ -331,6 +332,21 @@ See `platformio.ini`. Libraries:
   the file (`{"text":""}` if none); `POST /api/notes` (login) is a plain form post, field
   `text` (the library parses long form bodies itself, no body handler), `NOTES_MAX` 4000
   UTF-8 bytes; the reply is `{"saved","by"}`. `saved` is blank until NTP has synced.
+- Photo eyes, Dragon 2-11 (verified on the board 2026-09-27 by the user: Dragons 3-10 all
+  fine; Dragon 11 added from `23-4.png` / `24-4.png`, "works great"; `docs/PHOTO_EYES.md`):
+  the artist's open/shut pairs (`assets/eye_art/`) animated by `photo_eye.cpp`: iris moves
+  over the socket, slit pupil reacts "to light" (wide when shut, narrows on peeks, snaps narrow
+  on stir/screensaver start, drifts and flinches awake), cornea highlights fixed, lids
+  blink/sleep through the shut picture; same motion/blink/sleep/stir/glance as the Uncanny
+  styles (`dragon_eye.cpp` dispatches on `EyeStyle::photo`). Data from `tools/photo_eye.py`
+  (Pillow + numpy) and a hand-measured `eye.json` per eye; ~200-240 KB flash each plus a 77 KB
+  PSRAM iris table built by `photo_eye_prepare()` when one is selected. Firmware 85.5 % of the
+  app slot with Dragon 11 (room for about 4 more; removing a style's block in `eye_styles.cpp`
+  frees its flash). `/api/config` lists 19 styles (~1.9 KB of its 3 KB JSON document).
+  Not recorded: fps per photo eye (`[EYE] n fps`).
+- NTP (verified 2026-09-28: the LCD clock and the Notes "last saved" time show the correct
+  local time): background SNTP started when WiFi STA connects, re-syncs every 60 min, local
+  time per configured zone (`configTzTime`; plain `configTime` would reset TZ to UTC).
 - Display modes as radio buttons (2026-09-26): one `mode_request` (`power_request_mode()`,
   `PowerMode` in `power.h`) replaces the separate standby/screensaver requests; knob, touch,
   web (`POST /api/mode` active|screensaver|standby) and HA all go through it, so exactly one
@@ -437,25 +453,7 @@ See `platformio.ini`. Libraries:
   and the even-spread preset rule (it gave 500/500/800/1000 before).
 
 ### 🔧 Implemented, not yet verified
-- Photo eyes, Dragon 2-11 (2026-09-26; **verified on the board 2026-09-27**: user, Dragons 3-10
-  all fine; Dragon 11 added 2026-09-27 from `23-4.png` / `24-4.png`, confirmed "works great";
-  firmware then 5.6 MB =
-  85.5 % of the app slot, room for about 4 more; `docs/PHOTO_EYES.md`): the artist's open/shut pairs
-  (`assets/eye_art/`) animated by `photo_eye.cpp`: iris moves over the socket, slit pupil
-  reacts "to light" (wide when shut, narrows on peeks, snaps narrow on stir/screensaver start,
-  drifts and flinches awake), cornea highlights fixed, lids blink/sleep through the shut
-  picture; same motion/blink/sleep/stir/glance as the Uncanny styles (`dragon_eye.cpp`
-  dispatches on `EyeStyle::photo`). Data from `tools/photo_eye.py` (Pillow + numpy) and a
-  hand-measured `eye.json` per eye; ~200-240 KB flash each (~2 MB for nine) plus a 77 KB
-  PSRAM iris table built by `photo_eye_prepare()` when one is selected. Checked only on the
-  PC: files compile with g++ against stub headers, and the renderer's host output matches the
-  converter's preview (Dragon 2 pixel-identical after the flash-saving rework). First written in
-  a cloud session without PlatformIO; since built and run on the board (above).
-  To check: build size (estimate ~5.5 MB of the 6.25 MB slot; room for ~3 more eyes, and
-  removing a style's block in `eye_styles.cpp` frees its flash), fps per eye (`[EYE] n fps`),
-  looks. `/api/config` now lists 19 styles (~1.9 KB of its 3 KB JSON document).
-- NTP: background SNTP started when WiFi STA connects, re-syncs every 60 min, local time
-  per configured zone (`configTzTime`; plain `configTime` would reset TZ to UTC).
+- (none)
 
 ### ⬜ Not started
 - (Done) Noctua industrial 3000 RPM fan: first Auto Configure failed ("no RPM at full speed") on
@@ -698,6 +696,9 @@ Not issues now; kept so they can be looked at again later (user, 2026-09-27).
    especially past ~90 %.** Ways to make room: remove unused eye styles in
    `src/eye_styles.cpp` (photo or Uncanny), or a custom partition table with a bigger app
    slot (flashed over USB; moves SPIFFS, so config and fan profiles are reset).
+3. **MQTT status dot on the LCD** (from `HANDOFF_FROM_ETH_Touch_PWM.md`; parked by the user
+   2026-09-28). ETH_Touch_PWM shows one in its LCD title bar. Here the Settings page already
+   shows MQTT as text, and the round Main screen has little room.
 
 ---
 

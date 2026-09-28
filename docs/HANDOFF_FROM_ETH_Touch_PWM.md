@@ -3,8 +3,8 @@
 **Progress (2026-09-28):** 1 done (`c12d170`; uses `setTxTimeoutMs(1)`, 0 hangs core 3.0.4),
 3 done (`2420c49`; the page is left of Settings, the user's choice), 2 done (`610fad2`, phone
 layout in the next commit; the eye is captured too), 4 done (Notes box, form post instead
-of a body handler). Items 1-4 finished; 5 only if the user asks. Themes and
-the History tab were dropped by the user (2026-09-28). Details of each in
+of a body handler). Items 1-4 finished. Themes and the History tab were
+dropped by the user (2026-09-28); the MQTT dot moved to `docs/CLAUDE.md`, "Possible future mods". Details of each in
 `docs/CLAUDE.md` (Verified list).
 
 Written 2026-09-28 by the Claude session working on the sister project ETH_Touch_PWM
@@ -105,11 +105,6 @@ Source in ETH_Touch_PWM:
 Here: SPIFFS `/notes.json` (separate from `/config.json`, so settings changes never touch it),
 `require_login()` on the POST, and an ESPAsyncWebServer body handler (the body can arrive in
 chunks). The page's CSS uses fixed colours, not ETH's CSS variables: adapt the styles.
-
-## Later, or only if the user wants them
-
-5. **MQTT status dot.** ETH added one to its LCD title bar. The Settings page here already
-   shows MQTT as text and the round Main screen has little room; skip unless asked.
 
 ## Doesn't apply here
 
