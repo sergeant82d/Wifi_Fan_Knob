@@ -216,6 +216,48 @@
             background: rgba(255, 100, 100, 0.5);
         }
 
+        /* NOTES (Home tab) */
+        #notes {
+            width: 100%;
+            min-height: 170px;
+            max-height: 420px;
+            resize: vertical;
+            padding: 12px 15px;
+            border: 2px solid rgba(255, 215, 0, 0.2);
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.05);
+            color: #e0e0e0;
+            font: inherit;
+            line-height: 1.45;
+        }
+
+        #notes:focus {
+            outline: none;
+            border-color: #ffd700;
+        }
+
+        .emoji-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-bottom: 8px;
+        }
+
+        .emoji-bar button {
+            min-width: 0;
+            padding: 3px 7px;
+            font-size: 1.05rem;
+            line-height: 1.2;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 215, 0, 0.2);
+            border-radius: 4px;
+        }
+
+        .emoji-bar button:hover {
+            border-color: #ffd700;
+            background: rgba(255, 215, 0, 0.1);
+        }
+
         /* STATUS CARDS */
         .status-card {
             background: rgba(255, 255, 255, 0.05);
@@ -544,6 +586,20 @@
                 <canvas id="lcd-view" width="240" height="240"
                         style="width: 240px; max-width: 100%; border-radius: 50%; background: #000; border: 2px solid rgba(255, 215, 0, 0.4);"></canvas>
                 <small id="lcd-note" style="color: #606060; display: block; margin-top: 8px;">Updates every 2 seconds</small>
+            </div>
+
+            <div class="status-card" id="notes-card" style="margin-top: 20px;">
+                <h3>Notes</h3>
+                <div class="emoji-bar" id="emoji-bar"></div>
+                <textarea id="notes" rows="8" spellcheck="true" placeholder="Notes for this fan: filter changes, what was set and why..."></textarea>
+                <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 10px;">
+                    <button type="button" class="btn-primary" onclick="saveNotes()">Save notes</button>
+                    <small id="notes-meta" style="color: #a0a0a0;"></small>
+                </div>
+                <small style="color: #606060; display: block; margin-top: 8px;">
+                    Plain text; emojis work (Windows: Win + . opens the emoji picker). Kept on the board,
+                    shared by every browser. Saving needs the login.
+                </small>
             </div>
 
             <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid rgba(255, 215, 0, 0.2);">
@@ -1351,6 +1407,73 @@
         setInterval(loadLcd, 2000);
         document.addEventListener('DOMContentLoaded', loadLcd);
         document.addEventListener('visibilitychange', loadLcd);
+
+        // Notes (Home tab): kept on the board (/api/notes), up to 4000 UTF-8 bytes
+        const NOTES_MAX = 4000;
+        const NOTE_EMOJIS = ['\u2705', '\u26A0\uFE0F', '\u274C', '\u2757', '\uD83D\uDD27', '\uD83C\uDF21\uFE0F',
+            '\uD83D\uDCA8', '\uD83D\uDD0C', '\uD83D\uDCC5', '\uD83D\uDCDD', '\uD83D\uDCA1', '\uD83D\uDC4D'];
+        let notesSaved = '', notesLastSaved = '';
+        const noteBytes = (t) => new TextEncoder().encode(t).length;
+
+        function notesMeta() {
+            const t = document.getElementById('notes').value, n = noteBytes(t);
+            const meta = document.getElementById('notes-meta');
+            meta.textContent = n + ' / ' + NOTES_MAX + ' bytes' + (t !== notesSaved ? ' \u00b7 unsaved changes' : '') +
+                (notesLastSaved ? ' \u00b7 ' + notesLastSaved : '');
+            meta.style.color = n > NOTES_MAX ? '#ff6464' : '#a0a0a0';
+        }
+
+        function lastSavedText(r) {
+            return r.saved ? 'last saved ' + r.saved + (r.by ? ' by ' + r.by : '') : (r.by ? 'last saved by ' + r.by : '');
+        }
+
+        async function loadNotes() {
+            try {
+                const r = await (await fetch('/api/notes', { cache: 'no-store' })).json();
+                const box = document.getElementById('notes');
+                notesSaved = r.text || '';
+                if (box.value === '' || box.value === notesSaved) box.value = notesSaved;  // Keep unsaved typing
+                notesLastSaved = lastSavedText(r);
+                notesMeta();
+            } catch (e) {}
+        }
+
+        async function saveNotes() {
+            const text = document.getElementById('notes').value;
+            if (noteBytes(text) > NOTES_MAX) {
+                alert('Too long: ' + noteBytes(text) + ' of ' + NOTES_MAX + ' bytes.');
+                return;
+            }
+            try {
+                const r = JSON.parse(await postForm('/api/notes', { text }));
+                notesSaved = text;
+                notesLastSaved = lastSavedText(r) || 'saved';
+                notesMeta();
+            } catch (e) {
+                alert('Notes not saved: ' + e.message);
+            }
+        }
+
+        function insertAtCursor(el, text) {
+            const a = el.selectionStart ?? el.value.length, b = el.selectionEnd ?? el.value.length;
+            el.value = el.value.slice(0, a) + text + el.value.slice(b);
+            el.selectionStart = el.selectionEnd = a + text.length;
+            el.focus();
+            notesMeta();
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const bar = document.getElementById('emoji-bar');
+            bar.innerHTML = NOTE_EMOJIS.map((e) => '<button type="button" title="Insert ' + e + '">' + e + '</button>').join('');
+            bar.querySelectorAll('button').forEach((b) => b.onclick = () => insertAtCursor(document.getElementById('notes'), b.textContent));
+            document.getElementById('notes').oninput = notesMeta;
+            loadNotes();
+        });
+
+        // Leaving the page with unsaved notes: the browser asks first
+        window.addEventListener('beforeunload', (e) => {
+            if (document.getElementById('notes').value !== notesSaved) { e.preventDefault(); e.returnValue = ''; }
+        });
 
         // Fan profiles (Config tab)
         let fanProfiles = null;

@@ -8,6 +8,7 @@
 #include "lcd_view.h"
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
+#include <SPIFFS.h>
 #include <WiFi.h>
 #include <Update.h>
 #include <esp_ota_ops.h>
@@ -23,6 +24,10 @@ extern const uint8_t index_html_end[] asm("_binary_web_index_html_end");
 // Error from the current/last OTA upload ("" = OK), and its HTTP status
 static String ota_error;
 static int ota_error_code = 500;
+
+// Notes on the Home tab (/api/notes)
+static const char *NOTES_PATH = "/notes.json";
+static const size_t NOTES_MAX = 4000;  // UTF-8 bytes
 
 // Web login (HTTP Basic, config.webserver). Every endpoint that changes something
 // requires it; read-only GETs stay open. No login set = changes refused until one is set.
@@ -309,6 +314,48 @@ void init_webserver() {
     response->addHeader("X-Frame", String(seq));
     request->onDisconnect([]() { lcd_view_unlock(); });  // Sent or aborted: the frame is free again
     request->send(response);
+  });
+
+  // Notes (Home tab): free text shared by every browser, in /notes.json = {"text","saved","by"}.
+  // Separate from /config.json, so settings changes never touch it. UTF-8 (emojis are fine),
+  // up to NOTES_MAX bytes. The POST is a normal form post, field "text".
+  server->on(AsyncURIMatcher::exact("/api/notes"), HTTP_GET, [](AsyncWebServerRequest *request) {
+    if (SPIFFS.exists(NOTES_PATH)) request->send(SPIFFS, NOTES_PATH, "application/json");
+    else request->send(200, "application/json", "{\"text\":\"\"}");
+  });
+
+  server->on(AsyncURIMatcher::exact("/api/notes"), HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (!require_login(request)) return;
+    if (!request->hasParam("text", true)) {
+      request->send(400, "text/plain", "No notes sent");
+      return;
+    }
+    const String &text = request->getParam("text", true)->value();
+    if (text.length() > NOTES_MAX) {
+      request->send(400, "text/plain", "Notes are too long (" + String(NOTES_MAX) + " bytes max)");
+      return;
+    }
+    char saved[20] = "";  // Blank until the clock has synced
+    time_t now = time(nullptr);
+    if (now > 24 * 3600) {
+      struct tm t;
+      localtime_r(&now, &t);
+      strftime(saved, sizeof(saved), "%Y-%m-%d %H:%M", &t);
+    }
+    DynamicJsonDocument doc(text.length() + 256);
+    doc["text"] = text;
+    doc["saved"] = saved;
+    doc["by"] = config.webserver.username;
+    File f = SPIFFS.open(NOTES_PATH, "w");
+    if (!f || serializeJson(doc, f) == 0) {
+      request->send(500, "text/plain", "Could not save the notes");
+      return;
+    }
+    f.close();
+    doc.remove("text");  // Reply: when and by whom
+    String body;
+    serializeJson(doc, body);
+    request->send(200, "application/json", body);
   });
 
   // Set target RPM from the Home tab (same target the knob adjusts)

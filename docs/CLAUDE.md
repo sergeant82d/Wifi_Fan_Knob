@@ -7,7 +7,7 @@
 **Repo root**: `D:\GitHub\VSCodeProjects\Wifi_Bench_Fan\Wifi_Fan_Knob`  
 **PlatformIO project**: the repo root (`platformio.ini` is at the top level)  
 **Status**: Hardware bring-up in progress — display, WiFi AP, SPIFFS and webserver verified on the board  
-**Last updated**: 2026-09-28 (handoff items 1-3: serial fix, QR code page, web LCD view)
+**Last updated**: 2026-09-28 (handoff items 1-4: serial fix, QR code page, web LCD view, notes)
 
 
 1. Don’t assume. Don’t hide confusion. Surface tradeoffs.
@@ -39,9 +39,10 @@ cd Wifi_Fan_Knob
   projects share one core folder, so the first build after switching projects re-downloads
   the core (~3 min).
 - Build: PlatformIO **Build**. Flash: **Upload** only — the web UI (`web/index.html`) is
-  compiled into the firmware via `board_build.embed_txtfiles`. SPIFFS holds `/config.json`
-  and `/fans.json` (fan profiles). Do not run `uploadfs`: it rewrites the whole SPIFFS
-  partition, wiping both (config defaults are recreated on next boot; profiles are lost).
+  compiled into the firmware via `board_build.embed_txtfiles`. SPIFFS holds `/config.json`,
+  `/fans.json` (fan profiles) and `/notes.json` (Home tab notes). Do not run `uploadfs`: it
+  rewrites the whole SPIFFS partition, wiping them (config defaults are recreated on next
+  boot; profiles and notes are lost).
 - CLI builds: use `~/.platformio/penv/Scripts/pio.exe`. An older PlatformIO in
   `C:\Python312\Scripts` (6.1.19) fails with `SCons.Tool.FortranCommon` errors.
 
@@ -323,6 +324,13 @@ See `platformio.ini`. Libraries:
   14 fps while captured. Not on the capture: LVGL's top layer (nothing uses it now).
   On phones (max-width 768 px) the LCD card is first on the Home tab (`#home` becomes a flex
   column, `#lcd-card { order: -1 }`); desktop order unchanged. Verified by the user.
+- Notes box (verified 2026-09-28 by the user, handoff item 4): Home tab "Notes" card under
+  the LCD card: textarea, 12 emoji buttons (insert at cursor), byte counter, "last saved
+  <time> by <user>", `beforeunload` warning while unsaved. `/notes.json` =
+  `{"text","saved","by"}`, separate from `config.json`. `GET /api/notes` (no login) serves
+  the file (`{"text":""}` if none); `POST /api/notes` (login) is a plain form post, field
+  `text` (the library parses long form bodies itself, no body handler), `NOTES_MAX` 4000
+  UTF-8 bytes; the reply is `{"saved","by"}`. `saved` is blank until NTP has synced.
 - Display modes as radio buttons (2026-09-26): one `mode_request` (`power_request_mode()`,
   `PowerMode` in `power.h`) replaces the separate standby/screensaver requests; knob, touch,
   web (`POST /api/mode` active|screensaver|standby) and HA all go through it, so exactly one
