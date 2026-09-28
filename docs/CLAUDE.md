@@ -33,7 +33,11 @@ cd Wifi_Fan_Knob
   16 MB QIO flash, OPI PSRAM (`qio_opi`), `default_16MB.csv` partitions (2 OTA slots).
 - Serial is native USB (COM port VID 303A:1001); needs `-DARDUINO_USB_CDC_ON_BOOT=1`,
   otherwise `Serial` goes to unconnected UART0 and only IDF logs reach USB.
-- Platform is pioarduino `espressif32` 51.x → Arduino core 3.0.4 / ESP-IDF 5.1.
+- Platform is pioarduino 51.03.04 → Arduino core 3.0.4 / ESP-IDF 5.1, pinned by URL in
+  `platformio.ini` (2026-09-28). Plain `espressif32` means "whichever pioarduino release was
+  installed last on this PC"; ETH_Touch_PWM's 55.03.311 (core 3.3.11) had replaced it. Both
+  projects share one core folder, so the first build after switching projects re-downloads
+  the core (~3 min).
 - Build: PlatformIO **Build**. Flash: **Upload** only — the web UI (`web/index.html`) is
   compiled into the firmware via `board_build.embed_txtfiles`. SPIFFS holds `/config.json`
   and `/fans.json` (fan profiles). Do not run `uploadfs`: it rewrites the whole SPIFFS
@@ -435,6 +439,12 @@ See `platformio.ini`. Libraries:
   Configure unless the user asks for it.
 
 ### Known quirks
+- **USB serial stall (fixed 2026-09-28, verified)**: with COM13 held open but not read (closed
+  serial monitor, UPS software), each print retried up to ~2 s and froze `loop()`.
+  `Serial.setTxTimeoutMs(1)` after `Serial.begin()` drops output instead. **Not 0 on core
+  3.0.4**: `HWCDC::write()` counts retries down from the timeout, 0 wraps to ~4 billion, and
+  the first full buffer (MQTT discovery burst at boot) hung the board, off the network too.
+  Opening the port from a script resets the board unless DTR and RTS are set False first.
 - **Forgotten web login**: every change needs it, so recovery is over USB — erase the SPIFFS
   partition (config lives only there; defaults are recreated on next boot):
   `~/.platformio/penv/Scripts/python.exe ~/.platformio/packages/tool-esptoolpy/esptool.py --chip esp32s3 --port COM13 erase_region 0xC90000 0x360000`

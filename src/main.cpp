@@ -617,6 +617,11 @@ void setup() {
   init_power_latch();
 
   Serial.begin(115200);
+  // Native USB: when a PC holds the port open without reading it (closed serial monitor, UPS
+  // software), each print would retry for up to ~2 s and stall loop(). Drop output instead.
+  // 1, not 0: core 3.0.4's HWCDC::write() decrements a retry counter starting at the timeout,
+  // so 0 wraps to ~4 billion and the first full buffer hangs every print (seen 2026-09-28).
+  Serial.setTxTimeoutMs(1);
   delay(1000);
   Serial.println("\n\n=== PWM Fan Controller Startup ===\n");
   Serial.printf("Flash: %u MB, PSRAM: %u bytes\n", ESP.getFlashChipSize() / (1024 * 1024), ESP.getPsramSize());
