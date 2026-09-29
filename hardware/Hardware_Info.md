@@ -6,3 +6,6 @@
 
 - APDS9999 Presence sensor
     - https://www.adafruit.com/product/6461
+
+- AMG8833 IR Thermal Camera Sensor
+    - https://www.adafruit.com/product/3538
