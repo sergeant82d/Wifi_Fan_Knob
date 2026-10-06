@@ -669,6 +669,13 @@ STANDBY (1)
   - Step 1, binary: VOC Index above an on-threshold -> fan High; below a lower off-threshold ->
     off (e.g. on > 150, off < 120); plus a minimum run time (e.g. 2 min after clearing) so it
     doesn't flap. Ignore the index until the SGP41 has settled.
+  - **Restarts and room moves (decided 2026-10-06, option A):** the Gas Index Algorithm's
+    learned state is in RAM only, so every restart (power cycle, reset, firmware flash) starts
+    it learning from scratch; after a room move it re-learns by itself (learning window ~12 h),
+    and a restart is the quick "recalibrate". So Auto mode ignores the VOC Index for about the
+    first hour after a restart (exact time to set from real readings). Not done: saving the
+    learned state (Sensirion's get/set states) so restarts keep it; that would need a
+    "Recalibrate" button for room moves. Revisit only if restarts upset Auto mode in practice.
   - Step 2, later: fan speed scaled from the VOC Index (Low..Max), smoothed.
   - Placement matters: in the fan's airflow the readings depend on the fan running; near the
     work it reads the air the user breathes.
