@@ -105,7 +105,7 @@ typedef struct {
     uint8_t speed;                  // 1-10 (Flash, Breathe, Rainbow)
   } leds;
 
-  // Peripheral power switch (GPIO 4 transistor: fan, lights, sensors, EMC2101)
+  // Peripheral power switch (GPIO 4 transistor: the 12 V rail, i.e. the fan)
   struct {
     bool activeHigh;                // true = pin HIGH turns power on (default)
   } power;

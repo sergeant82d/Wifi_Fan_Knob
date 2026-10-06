@@ -14,6 +14,7 @@
 #include "power.h"
 #include "mqtt.h"
 #include "leds.h"
+#include "air.h"
 
 // ============================================================================
 // PIN DEFINITIONS (Elecrow 1.28" Rotary Display)
@@ -49,8 +50,9 @@
 #define KEEP_ALIVE_PIN 2
 #define POWER_LIGHT_PIN 40
 
-// Peripheral power switch: transistor cutting external power (fan, lights, sensors,
-// EMC2101). Undriven until config loads; hardware pull must hold it OFF.
+// Peripheral power switch: transistor cutting the 12 V rail (the fan). The EMC2101 and the
+// sensors are on the always-on 3.3 V (user 2026-10-06). Undriven until config loads; hardware
+// pull must hold it OFF.
 #define PERIPH_POWER_PIN 4
 
 // Test I/O (available for future use)
@@ -448,10 +450,26 @@ static void set_peripheral_power(bool on) {
   Serial.printf("[POWER] Peripherals %s (GPIO %d %s)\n", on ? "ON" : "OFF", PERIPH_POWER_PIN, level ? "HIGH" : "LOW");
 }
 
-// Power up external devices, let them settle, then probe the EMC2101 (on the switched rail)
+// List every device answering on the main I2C bus (serial log). Expected: 0x44 SHT41,
+// 0x4C EMC2101, 0x52 APDS-9999, 0x59 SGP41.
+static void i2c_scan() {
+  Serial.print("[I2C] Found:");
+  int found = 0;
+  for (uint8_t addr = 0x08; addr < 0x78; addr++) {
+    Wire.beginTransmission(addr);
+    if (Wire.endTransmission() == 0) {
+      Serial.printf(" 0x%02X", addr);
+      found++;
+    }
+  }
+  Serial.println(found ? "" : " nothing");
+}
+
+// Power up the 12 V rail, let it settle, then list the I2C bus and set up the EMC2101
 static void power_up_peripherals() {
   set_peripheral_power(true);
   delay(50);
+  i2c_scan();
   if (!fan_init()) {
     Serial.println("WARNING: Fan controller not responding");
   }
@@ -743,6 +761,7 @@ void loop() {
   // Handle encoder rotation
   fan_update();
   leds_update();
+  air_update();
   int32_t delta = encoder_read_detents();
   poll_button();
   if (delta != 0) note_activity();

@@ -7,6 +7,7 @@
 #include "eye_styles.h"
 #include "lcd_view.h"
 #include "leds.h"
+#include "air.h"
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
 #include <SPIFFS.h>
@@ -281,6 +282,15 @@ void init_webserver() {
     doc["periph_power"] = power_peripherals_on();
     doc["saver_paused"] = power_saver_paused();
     doc["mqtt_connected"] = mqtt_connected();
+    AirReadings air = air_get();  // SHT41 + SGP41; values only when valid
+    JsonObject a = doc.createNestedObject("air");
+    a["state"] = air.state;
+    if (air.temp_ok) {
+      a["temp_c"] = serialized(String(air.temp_c, 1));  // One decimal (a float prints as 26.60000038)
+      a["humidity"] = serialized(String(air.humidity, 1));
+    }
+    if (air.voc > 0) a["voc"] = air.voc;
+    if (air.nox > 0) a["nox"] = air.nox;
     doc["fw_version"] = config.firmwareVersion;
     char build_id[9];  // First 8 hex chars of firmware ELF SHA-256: unique per build
     esp_app_get_elf_sha256(build_id, sizeof(build_id));

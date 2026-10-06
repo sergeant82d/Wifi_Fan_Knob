@@ -3,6 +3,7 @@
 #include "fan_control.h"
 #include "power.h"
 #include "leds.h"
+#include "air.h"
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
@@ -158,6 +159,42 @@ static void publish_discovery() {
     doc["icon"] = "mdi:speedometer";
     publish_config("number", "led_speed", doc);
   }
+  {
+    StaticJsonDocument<768> doc;
+    doc["name"] = "Temperature";
+    doc["state_topic"] = topic("temperature");
+    doc["unit_of_measurement"] = "\u00b0C";  // HA converts to the user's units
+    doc["device_class"] = "temperature";
+    doc["state_class"] = "measurement";
+    doc["suggested_display_precision"] = 1;
+    publish_config("sensor", "temperature", doc);
+  }
+  {
+    StaticJsonDocument<768> doc;
+    doc["name"] = "Humidity";
+    doc["state_topic"] = topic("humidity");
+    doc["unit_of_measurement"] = "%";
+    doc["device_class"] = "humidity";
+    doc["state_class"] = "measurement";
+    doc["suggested_display_precision"] = 1;
+    publish_config("sensor", "humidity", doc);
+  }
+  {
+    StaticJsonDocument<768> doc;
+    doc["name"] = "VOC Index";
+    doc["state_topic"] = topic("voc");
+    doc["state_class"] = "measurement";
+    doc["icon"] = "mdi:air-filter";
+    publish_config("sensor", "voc", doc);
+  }
+  {
+    StaticJsonDocument<768> doc;
+    doc["name"] = "NOx Index";
+    doc["state_topic"] = topic("nox");
+    doc["state_class"] = "measurement";
+    doc["icon"] = "mdi:molecule";
+    publish_config("sensor", "nox", doc);
+  }
   // Screensaver was briefly a binary_sensor: an empty retained config removes that entity
   client.publish((String("homeassistant/binary_sensor/") + dev_id + "/screensaver/config").c_str(), "", true);
   Serial.println("[MQTT] Home Assistant discovery published");
@@ -226,6 +263,18 @@ static void publish_state(bool force) {
   if (force || config.leds.speed != last_led_speed) {
     client.publish(topic("led_speed").c_str(), String(config.leds.speed).c_str(), true);
     last_led_speed = config.leds.speed;
+  }
+  // Air: every 10 s, only valid values (none while the SGP41 warms up)
+  static unsigned long last_air = 0;
+  if (force || millis() - last_air >= 10000) {
+    last_air = millis();
+    AirReadings air = air_get();
+    if (air.temp_ok) {
+      client.publish(topic("temperature").c_str(), String(air.temp_c, 1).c_str(), true);
+      client.publish(topic("humidity").c_str(), String(air.humidity, 1).c_str(), true);
+    }
+    if (air.voc > 0) client.publish(topic("voc").c_str(), String(air.voc).c_str(), true);
+    if (air.nox > 0) client.publish(topic("nox").c_str(), String(air.nox).c_str(), true);
   }
   if (force || millis() - last_diag > 60000) {
     client.publish(topic("rssi").c_str(), String(WiFi.RSSI()).c_str(), true);

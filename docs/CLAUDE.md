@@ -7,7 +7,7 @@
 **Repo root**: `D:\GitHub\VSCodeProjects\Wifi_Bench_Fan\Wifi_Fan_Knob`  
 **PlatformIO project**: the repo root (`platformio.ini` is at the top level)  
 **Status**: Hardware bring-up in progress — display, WiFi AP, SPIFFS and webserver verified on the board  
-**Last updated**: 2026-10-06 (RGB LEDs; TACH pull-up replaced, 140 mm fan dead)
+**Last updated**: 2026-10-06 (RGB LEDs; air sensors SHT41 + SGP41; TACH pull-up replaced, 140 mm fan dead)
 
 
 1. Don’t assume. Don’t hide confusion. Surface tradeoffs.
@@ -67,6 +67,7 @@ cd Wifi_Fan_Knob
 | `include/dragon_eye.h` / `src/dragon_eye.cpp` | ✅ Working | Animated eye (standby + screensaver), native 240x240 |
 | `include/eye_styles.h` / `src/eye_styles.cpp` | ✅ Working | The eye styles: 10 Uncanny Eyes (`include/eyes/*Eye.h` = Adafruit tables) + photo eyes |
 | `include/lcd_view.h` / `src/lcd_view.cpp` | ✅ Working | Web LCD view: copies of the screen for `GET /api/lcd` (LVGL snapshot; eye rows copied as drawn) |
+| `include/air.h` / `src/air.cpp` | ✅ Working | SHT41 + SGP41 read once a second from `loop()` (raw commands, no driver library); VOC/NOx Index via Sensirion's Gas Index Algorithm |
 | `include/leds.h` / `src/leds.cpp` | ✅ Working | RGB LEDs (5x WS2812, GPIO 48): Solid / Flash / Breathe / Rainbow, brightness capped at 100 of 255 |
 | `include/photo_eye.h` / `src/photo_eye.cpp` | ✅ Working | Photo eye renderer (artist open/shut pictures: moving iris, reactive slit pupil, lids); data `include/eyes/*Photo.h` from `tools/photo_eye.py` |
 
@@ -126,10 +127,10 @@ https://github.com/Elecrow-RD/CrowPanel-1.28inch-HMI-ESP32-Rotary-Display-240-24
 | Display Backlight | 46 | HIGH = on; PWM-capable |
 | **Display rail** | **1** | Must be HIGH or the display is dark |
 | **"KEEP_ALIVE"** | **2** | Role unknown — see note below |
-| **Peripheral power switch** | **4** | Transistor for external devices; level in config |
+| **Peripheral power switch** | **4** | Transistor switching the 12 V rail (fan) only; level in config |
 | Touch SDA / SCL | 6 / 7 | |
 | Touch INT / RST | 5 / 13 | |
-| Main I2C SDA / SCL | 38 / 39 | EMC2101 (0x4C) + optional OLED |
+| Main I2C SDA / SCL | 38 / 39 | SHT41 (0x44), EMC2101 (0x4C), APDS-9999 (0x52), SGP41 (0x59); all on always-on 3.3 V. Boot/wake log lists them (`[I2C] Found:`) |
 | EMC2101 TACH (on the Adafruit 4808 board) | — | **Needs a 10 kΩ pull-up to 3.3 V** (added by user 2026-09-25; found open and discoloured on the TACH end 2026-10-06 and replaced: symptom was 0 RPM measured at every speed; tach line then tested open to GND, 3.3 V and 5 V; the board's own TACH pull-up is off unless its solder jumper is bridged). Without it the tach floats and counts PWM noise |
 | Encoder A / B / SW | 45 / 42 / 41 | A/B decoded by PCNT hardware (no interrupts); SW polled, active-low |
 | Power Light | 40 | Elecrow drives it LOW |
@@ -346,6 +347,19 @@ See `platformio.ini`. Libraries:
   values in `GET /api/config` `leds` (the card fills on page load, so an HA change shows after
   a reload). HA: light "LEDs" (JSON schema, `brightness_scale` 100, rgb, effect list) on
   `<base>/leds` + `/leds/set`, number "LED Speed" on `<base>/led_speed`. MQTT buffer 1536.
+- Air sensors (verified 2026-10-06 on the board: readings at boot, through standby and after
+  wake, confirmed by the user; HA entities and eye smoothness not yet confirmed): Adafruit
+  SHT41 (0x44) + SGP41 (0x59) on the main bus, always-on 3.3 V. `air.cpp` reads them from
+  `loop()` once a second as a non-blocking sequence: SHT41 0xFD, wait 10 ms, read; SGP41
+  0x2619 with the SHT41's RH/T as compensation (0x2612 conditioning with defaults for the
+  first 10 s after boot), wait 55 ms, read; Sensirion CRC-8 checked. Not a separate task: Wire's
+  lock covers one call, not a request plus its reads, so two tasks could mix replies; and
+  Sensirion's driver libraries delay() inside calls. Only `sensirion/Sensirion Gas Index
+  Algorithm` is used (VOC Index: ~100 = the room's normal, learned over hours, 0 for the first
+  ~45 s; NOx Index: 1 = normal). `GET /api/status` `air` = state ("ok", "warming up", "no
+  sensor") + temp_c, humidity, voc, nox when valid. Web: Home tab "Air" card (°F and °C). HA:
+  sensors Temperature (°C, HA converts), Humidity, VOC Index, NOx Index, every 10 s, valid
+  values only. First readings: 26.5 °C, 42 %RH, NOx 1.
 - Photo eyes, Dragon 2-11 (verified on the board 2026-09-27 by the user: Dragons 3-10 all
   fine; Dragon 11 added from `23-4.png` / `24-4.png`, "works great"; `docs/PHOTO_EYES.md`):
   the artist's open/shut pairs (`assets/eye_art/`) animated by `photo_eye.cpp`: iris moves
@@ -382,13 +396,14 @@ See `platformio.ini`. Libraries:
   EMC2101's power but not the fan's 12 V, the PWM line floats high and a 4-wire fan runs at
   100 %: switch the fan's 12 V too (or keep the EMC2101 powered).
 - `include/ui.h` standby LVGL screen (grey clock) still exists but is no longer shown.
-- Peripheral power switch (verified): GPIO 4 drives a transistor that powers everything except
-  MCU/LCD (fan, lights, sensors, EMC2101). ON while awake, OFF in standby; Fan Off only sets
+- Peripheral power switch (verified): GPIO 4 drives a transistor that switches **only the 12 V
+  rail** (the fan). The EMC2101 and the air sensors are on the MCU's always-on 3.3 V (user
+  2026-10-06; earlier notes here said they were switched). ON while awake, OFF in standby; Fan Off only sets
   target/PWM 0. ON level configurable (`config.power.activeHigh`, Config tab, default HIGH;
   applied on save). Pin undriven until config loads at boot, so hardware needs a pull holding
-  the switch OFF (pull-down if active-HIGH, pull-up if active-LOW). EMC2101 is on the switched
-  rail: probed 50 ms after power-on at boot and on every wake; marked absent in standby.
-  I2C caution: an unpowered EMC2101 must not back-power from or drag down SDA/SCL.
+  the switch OFF (pull-down if active-HIGH, pull-up if active-LOW). The EMC2101 is probed
+  50 ms after the rail comes on, at boot and on every wake, and marked absent in standby (the
+  firmware's choice; it stays powered).
 - MQTT / Home Assistant (verified with HA + Mosquitto add-on at 192.168.10.85, login required):
   `mqtt.cpp` runs PubSubClient in its own task (core 0) so blocking connects never stall loop();
   retries every 15 s; reconnects after Config save. Topics `<topicPrefix>/<chipId>/...`
@@ -638,7 +653,7 @@ STANDBY (1)
 4. Field testing, including the industrial fans once they have power.
 
 ### Later (user notes)
-- **Air quality sensors + Auto mode (upcoming hardware)**: **SGP41** (VOC + NOx) with an **SHT41**
+- **Air quality sensors + Auto mode** (sensors fitted and read 2026-10-06, see Verified; Auto mode not started): **SGP41** (VOC + NOx) with an **SHT41**
   (temperature + humidity) on the main I2C bus (user 2026-09-27; replaces the BME688 plan of
   2026-09-26). Addresses 0x59 (SGP41) and 0x44 (SHT41): no clash with EMC2101 0x4C or APDS9999
   0x52. Libraries: Sensirion I2C SGP41 + Sensirion Gas Index Algorithm (open source) + an SHT4x

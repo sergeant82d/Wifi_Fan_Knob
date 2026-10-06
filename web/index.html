@@ -537,6 +537,30 @@
             </div>
 
             <div class="status-card">
+                <h3>Air</h3>
+                <div class="status-item">
+                    <span class="status-label">Temperature:</span>
+                    <span class="status-value" id="air-temp">--</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Humidity:</span>
+                    <span class="status-value" id="air-humidity">--</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">VOC Index:</span>
+                    <span class="status-value" id="air-voc">--</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">NOx Index:</span>
+                    <span class="status-value" id="air-nox">--</span>
+                </div>
+                <small id="air-note" style="color: #606060; display: block; margin-top: 10px;">
+                    VOC: 100 = this room's normal air, higher = more fumes. NOx: 1 = normal.
+                    The VOC Index learns the room over the first hours.
+                </small>
+            </div>
+
+            <div class="status-card">
                 <h3>Quick Start Presets</h3>
                 <div class="presets-grid">
                     <button class="preset-btn" id="preset-btn-low">Low</button>
@@ -937,8 +961,8 @@
                 <div class="status-card">
                     <h3>Peripheral Power Switch</h3>
                     <p style="color: #a0a0a0; margin-bottom: 15px; font-size: 0.9rem;">
-                        GPIO 4 transistor that powers the fan, lights, sensors and fan controller.
-                        On while awake, off in standby.
+                        GPIO 4 transistor that switches the 12 V rail (the fan). The fan controller
+                        and sensors stay powered. On while awake, off in standby.
                     </p>
                     <div class="form-group">
                         <label for="power-level">Switch turns power ON when GPIO 4 is</label>
@@ -1411,6 +1435,13 @@
                 set('periph-power', s.periph_power ? 'On' : 'Off');
                 showMode(s.power_mode, s.saver_paused);
                 set('mqtt-status', s.mqtt_connected ? 'Yes' : 'No');
+                const air = s.air || {};
+                const wait = air.state === 'ok' ? '--' : air.state;  // "warming up" or "no sensor"
+                set('air-temp', air.temp_c === undefined ? wait
+                    : (air.temp_c * 9 / 5 + 32).toFixed(1) + ' \u00b0F (' + air.temp_c.toFixed(1) + ' \u00b0C)');
+                set('air-humidity', air.humidity === undefined ? wait : air.humidity.toFixed(1) + ' %');
+                set('air-voc', air.voc === undefined ? wait : air.voc);
+                set('air-nox', air.nox === undefined ? wait : air.nox);
                 set('speed-range', s.min_rpm + '-' + s.max_rpm);
                 const slider = document.getElementById('speed-slider');
                 slider.min = s.min_rpm;
