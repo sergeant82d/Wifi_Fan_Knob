@@ -1,5 +1,12 @@
 # A running list of things to attend to during active sessions.
 
+## 20261003
+
+- [ ] Need to add some control over the built-in/hardwired RGB LEDs. Take cues from the WLED GitHub project, but I only need a few options. Something like:
+	- All LEDs flashing, and I can change the color. Could also use as a warning/caution to user.
+	- Rainbow changing colors moving around the knob in a circle.
+	- ?? Any suggestions??
+
 ## 20260927
 
 - [x] Update to STATUS_REPORT_05 - Waiting on you: (done 2026-09-27, 199b230)
