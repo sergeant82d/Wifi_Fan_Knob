@@ -13,6 +13,7 @@
 #include "fan_profiles.h"
 #include "power.h"
 #include "mqtt.h"
+#include "leds.h"
 
 // ============================================================================
 // PIN DEFINITIONS (Elecrow 1.28" Rotary Display)
@@ -35,10 +36,6 @@
 // Main I2C (OLED & EMC2101)
 #define I2C_SDA_PIN 38
 #define I2C_SCL_PIN 39
-
-// RGB LED (WS2812)
-#define LED_PIN 48
-#define LED_NUM 5
 
 // Rotary Encoder
 #define ENCODER_A_PIN 45
@@ -633,6 +630,7 @@ void setup() {
   pinMode(ENCODER_SW_PIN, INPUT_PULLUP);
   pinMode(POWER_LIGHT_PIN, OUTPUT);
   digitalWrite(POWER_LIGHT_PIN, HIGH);
+  leds_begin();  // RGB LEDs off until loop() draws the saved effect
   // PWM backlight, full until config loads
   if (!ledcAttach(SCREEN_BACKLIGHT_PIN, 5000, 8)) {
     Serial.println("WARNING: Backlight PWM attach failed");
@@ -744,6 +742,7 @@ void loop() {
 
   // Handle encoder rotation
   fan_update();
+  leds_update();
   int32_t delta = encoder_read_detents();
   poll_button();
   if (delta != 0) note_activity();

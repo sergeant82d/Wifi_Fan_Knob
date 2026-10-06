@@ -2,6 +2,7 @@
 #include "config.h"
 #include "fan_control.h"
 #include "power.h"
+#include "leds.h"
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
@@ -128,6 +129,35 @@ static void publish_discovery() {
     doc["icon"] = "mdi:eye";
     publish_config("switch", "screensaver", doc);
   }
+  {
+    // RGB LEDs as a light (JSON schema): on/off, colour, brightness (HA's 100 % = the
+    // firmware cap), effects. Off is the light's off state, not an effect.
+    StaticJsonDocument<1024> doc;
+    doc["name"] = "LEDs";
+    doc["schema"] = "json";
+    doc["command_topic"] = topic("leds/set");
+    doc["state_topic"] = topic("leds");
+    doc["brightness"] = true;
+    doc["brightness_scale"] = LED_BRIGHTNESS_MAX;
+    doc.createNestedArray("supported_color_modes").add("rgb");
+    doc["effect"] = true;
+    JsonArray effects = doc.createNestedArray("effect_list");
+    for (const char *name : LED_EFFECT_NAMES) effects.add(name);
+    doc["icon"] = "mdi:led-strip-variant";
+    publish_config("light", "leds", doc);
+  }
+  {
+    StaticJsonDocument<768> doc;
+    doc["name"] = "LED Speed";
+    doc["command_topic"] = topic("led_speed/set");
+    doc["state_topic"] = topic("led_speed");
+    doc["min"] = 1;
+    doc["max"] = LED_SPEED_MAX;
+    doc["step"] = 1;
+    doc["mode"] = "slider";
+    doc["icon"] = "mdi:speedometer";
+    publish_config("number", "led_speed", doc);
+  }
   // Screensaver was briefly a binary_sensor: an empty retained config removes that entity
   client.publish((String("homeassistant/binary_sensor/") + dev_id + "/screensaver/config").c_str(), "", true);
   Serial.println("[MQTT] Home Assistant discovery published");
@@ -175,6 +205,28 @@ static void publish_state(bool force) {
     client.publish(topic("brightness").c_str(), String(brightness).c_str(), true);
     last_brightness = brightness;
   }
+  // LEDs: the light's JSON state, sent when anything in it changes (web, HA)
+  static String last_leds;
+  StaticJsonDocument<256> led;
+  led["state"] = config.leds.on ? "ON" : "OFF";
+  led["brightness"] = config.leds.brightness;
+  led["color_mode"] = "rgb";
+  JsonObject color = led.createNestedObject("color");
+  color["r"] = (config.leds.color >> 16) & 0xFF;
+  color["g"] = (config.leds.color >> 8) & 0xFF;
+  color["b"] = config.leds.color & 0xFF;
+  led["effect"] = LED_EFFECT_NAMES[config.leds.effect];
+  String leds;
+  serializeJson(led, leds);
+  if (force || leds != last_leds) {
+    client.publish(topic("leds").c_str(), leds.c_str(), true);
+    last_leds = leds;
+  }
+  static int last_led_speed = -1;
+  if (force || config.leds.speed != last_led_speed) {
+    client.publish(topic("led_speed").c_str(), String(config.leds.speed).c_str(), true);
+    last_led_speed = config.leds.speed;
+  }
   if (force || millis() - last_diag > 60000) {
     client.publish(topic("rssi").c_str(), String(WiFi.RSSI()).c_str(), true);
     client.publish(topic("uptime").c_str(), String(millis() / 1000).c_str(), true);
@@ -209,6 +261,29 @@ static void on_message(char *t, byte *payload, unsigned int len) {
       applyDisplaySettings();
       saveConfig();
     }
+  } else if (tp == topic("leds/set")) {
+    // JSON with any of state, brightness, color {r,g,b}, effect; missing = unchanged
+    StaticJsonDocument<256> in;
+    if (deserializeJson(in, msg)) return;
+    auto l = config.leds;
+    if (in.containsKey("state")) l.on = in["state"] == "ON";
+    if (in.containsKey("brightness")) l.brightness = constrain(in["brightness"].as<int>(), 1, LED_BRIGHTNESS_MAX);
+    if (in.containsKey("color")) {
+      l.color = ((uint32_t)(in["color"]["r"] | 0) << 16) | ((uint32_t)(in["color"]["g"] | 0) << 8) |
+                (uint32_t)(in["color"]["b"] | 0);
+    }
+    if (in.containsKey("effect")) {
+      int e = led_effect_from_name(in["effect"] | "");
+      if (e >= 0) l.effect = e;
+    }
+    config.leds = l;
+    saveConfig();
+  } else if (tp == topic("led_speed/set")) {
+    long s = lroundf(msg.toFloat());
+    if (s >= 1 && s <= LED_SPEED_MAX) {
+      config.leds.speed = s;
+      saveConfig();
+    }
   }
 }
 
@@ -232,6 +307,8 @@ static void try_connect() {
   client.subscribe(topic("standby/set").c_str());
   client.subscribe(topic("brightness/set").c_str());
   client.subscribe(topic("screensaver/set").c_str());
+  client.subscribe(topic("leds/set").c_str());
+  client.subscribe(topic("led_speed/set").c_str());
   publish_state(true);
 }
 
@@ -269,7 +346,7 @@ static void mqtt_task(void *) {
 void mqtt_init() {
   dev_id = String(config.mqtt.topicPrefix) + "_" + config.chipId;
   base = String(config.mqtt.topicPrefix) + "/" + config.chipId;
-  client.setBufferSize(1024);  // Discovery payloads exceed the 256-byte default
+  client.setBufferSize(1536);  // Discovery payloads exceed the 256-byte default (the LED light's is the largest)
   client.setSocketTimeout(5);
   client.setCallback(on_message);
   xTaskCreatePinnedToCore(mqtt_task, "mqtt", 6144, nullptr, 1, nullptr, 0);

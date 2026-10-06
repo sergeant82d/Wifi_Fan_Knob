@@ -6,6 +6,7 @@
 #include "mqtt.h"
 #include "eye_styles.h"
 #include "lcd_view.h"
+#include "leds.h"
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
 #include <SPIFFS.h>
@@ -439,6 +440,51 @@ void init_webserver() {
       return;
     }
     request->send(200, "text/plain", "Brightness saved");
+  });
+
+  // RGB LEDs (Home tab "LEDs" card): any of on=0|1, effect=<name>, color=#RRGGBB,
+  // brightness=1-LED_BRIGHTNESS_MAX, speed=1-10. All checked before any is applied; saved.
+  server->on(AsyncURIMatcher::exact("/api/leds"), HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (!require_login(request)) return;
+    auto l = config.leds;
+    long v;
+    if (request->hasParam("on", true)) l.on = form_value(request, "on") == "1";
+    if (request->hasParam("effect", true)) {
+      int e = led_effect_from_name(form_value(request, "effect").c_str());
+      if (e < 0) {
+        request->send(400, "text/plain", "Unknown LED effect");
+        return;
+      }
+      l.effect = e;
+    }
+    if (request->hasParam("color", true)) {
+      String c = form_value(request, "color");
+      if (c.length() != 7 || c[0] != '#' || strspn(c.c_str() + 1, "0123456789abcdefABCDEF") != 6) {
+        request->send(400, "text/plain", "Colour must be #RRGGBB");
+        return;
+      }
+      l.color = strtoul(c.c_str() + 1, nullptr, 16);
+    }
+    if (request->hasParam("brightness", true)) {
+      if (!form_int(request, "brightness", 1, LED_BRIGHTNESS_MAX, v)) {
+        request->send(400, "text/plain", "LED brightness must be 1-" + String(LED_BRIGHTNESS_MAX));
+        return;
+      }
+      l.brightness = v;
+    }
+    if (request->hasParam("speed", true)) {
+      if (!form_int(request, "speed", 1, LED_SPEED_MAX, v)) {
+        request->send(400, "text/plain", "LED speed must be 1-" + String(LED_SPEED_MAX));
+        return;
+      }
+      l.speed = v;
+    }
+    config.leds = l;
+    if (!saveConfig()) {
+      request->send(500, "text/plain", "Failed to write config to SPIFFS");
+      return;
+    }
+    request->send(200, "text/plain", "LEDs saved");
   });
 
   // Display mode, like radio buttons: active, screensaver or standby (exactly one is on)

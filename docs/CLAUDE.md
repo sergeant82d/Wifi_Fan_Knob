@@ -7,7 +7,7 @@
 **Repo root**: `D:\GitHub\VSCodeProjects\Wifi_Bench_Fan\Wifi_Fan_Knob`  
 **PlatformIO project**: the repo root (`platformio.ini` is at the top level)  
 **Status**: Hardware bring-up in progress — display, WiFi AP, SPIFFS and webserver verified on the board  
-**Last updated**: 2026-09-28 (handoff items 1-4: serial fix, QR code page, web LCD view, notes)
+**Last updated**: 2026-10-06 (RGB LEDs; TACH pull-up replaced, 140 mm fan dead)
 
 
 1. Don’t assume. Don’t hide confusion. Surface tradeoffs.
@@ -67,6 +67,7 @@ cd Wifi_Fan_Knob
 | `include/dragon_eye.h` / `src/dragon_eye.cpp` | ✅ Working | Animated eye (standby + screensaver), native 240x240 |
 | `include/eye_styles.h` / `src/eye_styles.cpp` | ✅ Working | The eye styles: 10 Uncanny Eyes (`include/eyes/*Eye.h` = Adafruit tables) + photo eyes |
 | `include/lcd_view.h` / `src/lcd_view.cpp` | ✅ Working | Web LCD view: copies of the screen for `GET /api/lcd` (LVGL snapshot; eye rows copied as drawn) |
+| `include/leds.h` / `src/leds.cpp` | ✅ Working | RGB LEDs (5x WS2812, GPIO 48): Solid / Flash / Breathe / Rainbow, brightness capped at 100 of 255 |
 | `include/photo_eye.h` / `src/photo_eye.cpp` | ✅ Working | Photo eye renderer (artist open/shut pictures: moving iris, reactive slit pupil, lids); data `include/eyes/*Photo.h` from `tools/photo_eye.py` |
 
 ### Documentation (`docs/`)
@@ -129,10 +130,10 @@ https://github.com/Elecrow-RD/CrowPanel-1.28inch-HMI-ESP32-Rotary-Display-240-24
 | Touch SDA / SCL | 6 / 7 | |
 | Touch INT / RST | 5 / 13 | |
 | Main I2C SDA / SCL | 38 / 39 | EMC2101 (0x4C) + optional OLED |
-| EMC2101 TACH (on the Adafruit 4808 board) | — | **Needs a 10 kΩ pull-up to 3.3 V** (added by user 2026-09-25; the board's own TACH pull-up is off unless its solder jumper is bridged). Without it the tach floats and counts PWM noise |
+| EMC2101 TACH (on the Adafruit 4808 board) | — | **Needs a 10 kΩ pull-up to 3.3 V** (added by user 2026-09-25; found open and discoloured on the TACH end 2026-10-06 and replaced: symptom was 0 RPM measured at every speed; tach line then tested open to GND, 3.3 V and 5 V; the board's own TACH pull-up is off unless its solder jumper is bridged). Without it the tach floats and counts PWM noise |
 | Encoder A / B / SW | 45 / 42 / 41 | A/B decoded by PCNT hardware (no interrupts); SW polled, active-low |
 | Power Light | 40 | Elecrow drives it LOW |
-| RGB LED Data | 48 | |
+| RGB LED Data | 48 | 5x WS2812, GRB (Elecrow example); `leds.cpp` |
 
 **GPIO 1 & 2.** Earlier design notes called GPIO 2 a soft power latch (P-MOSFET) for the
 whole board. Elecrow's example sets GPIO 1 and 2 HIGH with the comment "These two rails must
@@ -332,6 +333,19 @@ See `platformio.ini`. Libraries:
   the file (`{"text":""}` if none); `POST /api/notes` (login) is a plain form post, field
   `text` (the library parses long form bodies itself, no body handler), `NOTES_MAX` 4000
   UTF-8 bytes; the reply is `{"saved","by"}`. `saved` is blank until NTP has synced.
+- RGB LEDs (verified 2026-10-06 by the user: every effect, colour, brightness, speed,
+  standby, Home Assistant; TODO 2026-10-03): 5x WS2812 on GPIO 48 behind the knob, Adafruit
+  NeoPixel library, drawn by `leds_update()` in `loop()` (max 50/s, sent only on change).
+  Effects Solid, Flash (2 s period at speed 1, 0.2 s at 10), Breathe (8 s .. 0.8 s, squared
+  fade), Rainbow (hues spread over the 5 LEDs, a turn in 10 s .. 1 s). Off is the "on" flag, so
+  the effect is kept. Off in standby. **Brightness cap `LED_BRIGHTNESS_MAX` = 100 of 255 (user
+  2026-10-06)**: applied when drawing, also the top of the web slider and HA's 100 %.
+  `config.leds` = on, effect, color (0xRRGGBB), brightness 1-100, speed 1-10; defaults off,
+  gold 0xFFD700, 50, 5. Web: Home tab "LEDs" card (under Display Mode), `POST /api/leds`
+  (login; any of on, effect, color #RRGGBB, brightness, speed; all checked before applying),
+  values in `GET /api/config` `leds` (the card fills on page load, so an HA change shows after
+  a reload). HA: light "LEDs" (JSON schema, `brightness_scale` 100, rgb, effect list) on
+  `<base>/leds` + `/leds/set`, number "LED Speed" on `<base>/led_speed`. MQTT buffer 1536.
 - Photo eyes, Dragon 2-11 (verified on the board 2026-09-27 by the user: Dragons 3-10 all
   fine; Dragon 11 added from `23-4.png` / `24-4.png`, "works great"; `docs/PHOTO_EYES.md`):
   the artist's open/shut pairs (`assets/eye_art/`) animated by `photo_eye.cpp`: iris moves
@@ -460,6 +474,10 @@ See `platformio.ini`. Libraries:
   the bench supply; user rewired its power 2026-09-27. Profiles on the board now: "Noctua 140mm -
   1" (the industrial fan: top 2981 RPM, slowest 361, max 2900; active) and "Noctua 120mm - 1"
   (the NF-P12: top 1626, slowest 149).
+  **2026-10-06: the 140 mm industrial fan died** (12 V at its connector, no spin at any setting;
+  same day the TACH pull-up was found open). Don't reconnect it to the board. The NF-P12 is
+  fitted and its profile active; it measured ~1415 RPM at the 1600 setting (1603 on 09-25)
+  with 12.43 V at the fan at full speed, so the user will re-run Auto Configure.
 - Manual calibration mode (knob steps one Fan Setting, press to accept): superseded by Auto
   Configure unless the user asks for it.
 

@@ -1,6 +1,7 @@
 #include "config.h"
 #include "eye_styles.h"
 #include <SPIFFS.h>
+#include "leds.h"
 #include <ArduinoJson.h>
 
 // ============================================================================
@@ -177,6 +178,14 @@ bool loadConfig() {
   config.system.standbyTimeout = doc["system"]["standbyTimeout"] | 0;
   config.system.autoUpdate = doc["system"]["autoUpdate"] | false;
 
+  // RGB LEDs (clamped: an edited file can't exceed the brightness cap)
+  config.leds.on = doc["leds"]["on"] | false;
+  config.leds.effect = doc["leds"]["effect"] | (int)LED_SOLID;
+  if (config.leds.effect >= LED_EFFECT_COUNT) config.leds.effect = LED_SOLID;
+  config.leds.color = doc["leds"]["color"] | 0xFFD700;
+  config.leds.brightness = constrain(doc["leds"]["brightness"] | 50, 1, LED_BRIGHTNESS_MAX);
+  config.leds.speed = constrain(doc["leds"]["speed"] | 5, 1, LED_SPEED_MAX);
+
   // Peripheral power switch
   config.power.activeHigh = doc["power"]["activeHigh"] | true;
 
@@ -263,6 +272,13 @@ bool saveConfig() {
   doc["system"]["deepSleepEnabled"] = config.system.deepSleepEnabled;
   doc["system"]["standbyTimeout"] = config.system.standbyTimeout;
   doc["system"]["autoUpdate"] = config.system.autoUpdate;
+
+  // RGB LEDs
+  doc["leds"]["on"] = config.leds.on;
+  doc["leds"]["effect"] = config.leds.effect;
+  doc["leds"]["color"] = config.leds.color;
+  doc["leds"]["brightness"] = config.leds.brightness;
+  doc["leds"]["speed"] = config.leds.speed;
 
   // Peripheral power switch
   doc["power"]["activeHigh"] = config.power.activeHigh;
@@ -368,6 +384,13 @@ void setDefaultConfig() {
   config.system.deepSleepEnabled = true;
   config.system.standbyTimeout = 0;
   config.system.autoUpdate = false;
+
+  // RGB LEDs: off; gold (the page's colour) when first turned on
+  config.leds.on = false;
+  config.leds.effect = LED_SOLID;
+  config.leds.color = 0xFFD700;
+  config.leds.brightness = 50;
+  config.leds.speed = 5;
 
   // Advanced
   config.advanced.debugMode = false;
@@ -476,6 +499,17 @@ String getConfigAsJson() {
   doc["fan"]["maxRpm"] = config.fan.maxRpm;
 
   doc["power"]["activeHigh"] = config.power.activeHigh;
+
+  doc["leds"]["on"] = config.leds.on;
+  doc["leds"]["effect"] = LED_EFFECT_NAMES[config.leds.effect];
+  char color[8];
+  snprintf(color, sizeof(color), "#%06lX", (unsigned long)config.leds.color);
+  doc["leds"]["color"] = color;
+  doc["leds"]["brightness"] = config.leds.brightness;
+  doc["leds"]["speed"] = config.leds.speed;
+  doc["leds"]["brightnessMax"] = LED_BRIGHTNESS_MAX;
+  JsonArray effects = doc["leds"].createNestedArray("effects");
+  for (const char *name : LED_EFFECT_NAMES) effects.add(name);
 
   String jsonString;
   serializeJson(doc, jsonString);

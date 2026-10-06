@@ -580,6 +580,44 @@
                 <small id="mode-note" style="color: #ffd700; display: block; margin-top: 10px;"></small>
             </div>
 
+            <div class="status-card" id="leds-card" style="margin-top: 20px;">
+                <h3>LEDs</h3>
+                <p style="color: #a0a0a0; margin-bottom: 12px; font-size: 0.9rem;">
+                    The five lights on the knob. Off in standby. Also in Home Assistant as "LEDs".
+                </p>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <button type="button" class="btn-secondary" id="led-Off" onclick="setLedEffect('Off')">Off</button>
+                    <button type="button" class="btn-secondary" id="led-Solid" onclick="setLedEffect('Solid')">Solid</button>
+                    <button type="button" class="btn-secondary" id="led-Flash" onclick="setLedEffect('Flash')">Flash</button>
+                    <button type="button" class="btn-secondary" id="led-Breathe" onclick="setLedEffect('Breathe')">Breathe</button>
+                    <button type="button" class="btn-secondary" id="led-Rainbow" onclick="setLedEffect('Rainbow')">Rainbow</button>
+                </div>
+                <div style="display: flex; align-items: center; gap: 12px; margin-top: 16px;">
+                    <label for="led-color" style="color: #a0a0a0; min-width: 80px;">Colour</label>
+                    <input type="color" id="led-color" value="#ffd700" onchange="saveLeds({ color: this.value })"
+                           style="width: 60px; height: 36px; border: 2px solid rgba(255, 215, 0, 0.2); border-radius: 6px; background: none; cursor: pointer;">
+                    <small style="color: #606060;">Not used by Rainbow</small>
+                </div>
+                <div class="speed-input-group" style="margin-top: 12px;">
+                    <label for="led-brightness" style="color: #a0a0a0; min-width: 80px;">Brightness</label>
+                    <input type="range" id="led-brightness" min="1" max="100" value="50"
+                           oninput="document.getElementById('led-brightness-label').textContent = this.value"
+                           onchange="saveLeds({ brightness: this.value })">
+                    <span class="speed-value"><span id="led-brightness-label">50</span></span>
+                </div>
+                <div class="speed-input-group" style="margin-top: 12px;">
+                    <label for="led-speed" style="color: #a0a0a0; min-width: 80px;">Speed</label>
+                    <input type="range" id="led-speed" min="1" max="10" value="5"
+                           oninput="document.getElementById('led-speed-label').textContent = this.value"
+                           onchange="saveLeds({ speed: this.value })">
+                    <span class="speed-value"><span id="led-speed-label">5</span></span>
+                </div>
+                <small style="color: #606060; display: block; margin-top: 10px;">
+                    Brightness 100 is the firmware limit (100 of the LEDs' 255). Speed is for Flash, Breathe and Rainbow.
+                    Changes apply and save at once; they need the login.
+                </small>
+            </div>
+
             <div class="status-card" id="lcd-card" style="margin-top: 20px; text-align: center;">
                 <h3>LCD</h3>
                 <!-- A copy of the knob's screen (every page, the eye too), fetched every 2 s while this tab shows -->
@@ -1081,6 +1119,40 @@
                 : '';
         }
 
+        // LEDs card (Home tab): Off is the "on" switch; the effect is kept for next time
+        let ledState = null;
+        function showLeds(l) {
+            ledState = l;
+            const sel = l.on ? l.effect : 'Off';
+            ['Off', 'Solid', 'Flash', 'Breathe', 'Rainbow'].forEach(e => {
+                document.getElementById('led-' + e).className = e === sel ? 'btn-primary' : 'btn-secondary';
+            });
+            document.getElementById('led-color').value = l.color.toLowerCase();
+            document.getElementById('led-brightness').max = l.brightnessMax;
+            document.getElementById('led-brightness').value = l.brightness;
+            document.getElementById('led-brightness-label').textContent = l.brightness;
+            document.getElementById('led-speed').value = l.speed;
+            document.getElementById('led-speed-label').textContent = l.speed;
+        }
+
+        async function saveLeds(fields) {
+            try {
+                await postForm('/api/leds', fields);
+                if ('on' in fields) ledState.on = fields.on === 1;
+                if ('effect' in fields) ledState.effect = fields.effect;
+                if ('color' in fields) ledState.color = fields.color;
+                if ('brightness' in fields) ledState.brightness = Number(fields.brightness);
+                if ('speed' in fields) ledState.speed = Number(fields.speed);
+            } catch (e) {
+                alert('LEDs not changed: ' + e.message);
+            }
+            if (ledState) showLeds(ledState);  // On failure, back to what the board has
+        }
+
+        function setLedEffect(effect) {
+            saveLeds(effect === 'Off' ? { on: 0 } : { on: 1, effect });
+        }
+
         // Immediate stop: target 0, no confirmation
         async function fanOff() {
             try {
@@ -1297,6 +1369,7 @@
                 });
                 eyeSelect.value = c.display.eyeStyle;
                 document.getElementById('power-level').value = c.power.activeHigh ? 'high' : 'low';
+                showLeds(c.leds);
                 updateBrightnessLabel(c.display.brightness);
                 const w = c.network.wifi;
                 document.getElementById('hostname').value = w.hostname;

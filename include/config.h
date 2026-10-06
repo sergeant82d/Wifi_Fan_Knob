@@ -96,6 +96,15 @@ typedef struct {
     bool autoUpdate;                // Auto check for OTA updates
   } system;
 
+  // RGB LEDs (leds.h): web Home tab and Home Assistant
+  struct {
+    bool on;                        // false = off (the effect is kept for the next "on")
+    uint8_t effect;                 // LedEffect: Solid, Flash, Breathe, Rainbow
+    uint32_t color;                 // 0xRRGGBB (not used by Rainbow)
+    uint8_t brightness;             // 1-LED_BRIGHTNESS_MAX (100), of 255
+    uint8_t speed;                  // 1-10 (Flash, Breathe, Rainbow)
+  } leds;
+
   // Peripheral power switch (GPIO 4 transistor: fan, lights, sensors, EMC2101)
   struct {
     bool activeHigh;                // true = pin HIGH turns power on (default)
