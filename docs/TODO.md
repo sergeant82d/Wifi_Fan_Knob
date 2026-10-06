@@ -2,10 +2,13 @@
 
 ## 20261003
 
-- [ ] Need to add some control over the built-in/hardwired RGB LEDs. Take cues from the WLED GitHub project, but I only need a few options. Something like:
+- [x] Need to add some control over the built-in/hardwired RGB LEDs. Take cues from the WLED GitHub project, but I only need a few options. Something like:
 	- All LEDs flashing, and I can change the color. Could also use as a warning/caution to user.
 	- Rainbow changing colors moving around the knob in a circle.
 	- ?? Any suggestions??
+	  Answer: done 2026-10-06, 584d624. Off, Solid, Flash, Breathe and Rainbow, with colour, brightness
+	  (capped at 100 of 255) and speed, on the web Home tab and in Home Assistant; off in standby.
+	  Later ideas: colour from fan speed, colour from air quality (SGP41), a warning flash.
 
 ## 20260927
 
