@@ -348,7 +348,7 @@ See `platformio.ini`. Libraries:
   a reload). HA: light "LEDs" (JSON schema, `brightness_scale` 100, rgb, effect list) on
   `<base>/leds` + `/leds/set`, number "LED Speed" on `<base>/led_speed`. MQTT buffer 1536.
 - Air sensors (verified 2026-10-06 on the board: readings at boot, through standby and after
-  wake, confirmed by the user; HA entities and eye smoothness not yet confirmed): Adafruit
+  wake; HA entities, temperature accuracy and eye smoothness confirmed by the user): Adafruit
   SHT41 (0x44) + SGP41 (0x59) on the main bus, always-on 3.3 V. `air.cpp` reads them from
   `loop()` once a second as a non-blocking sequence: SHT41 0xFD, wait 10 ms, read; SGP41
   0x2619 with the SHT41's RH/T as compensation (0x2612 conditioning with defaults for the
