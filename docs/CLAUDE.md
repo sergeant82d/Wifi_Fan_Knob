@@ -698,7 +698,13 @@ STANDBY (1)
     work it reads the air the user breathes.
   - With the Auto segment the RPM arc can reach lower again (towards a 270 deg sweep): the IP
     box moved to Settings (TODO.md item, do it together with the Auto button).
-- **Presence sensor (APDS-9999 fitted 2026-10-06; its proximity doesn't reach a seated user even at full power, see Verified; next candidate the AMG8833 thermal camera)**: APDS9999 (proximity, lux,
+- **Presence: AMG8833 thermal camera ordered (user decision 2026-10-06).** Chosen over ST's
+  STHS34PF80 (single IR pixel with on-chip presence flags: less code, but it can't tell a hot
+  iron or hot-air gun from a person, and the iron can't be kept out of its view). The AMG8833's
+  8x8 picture lets the firmware ignore a small very hot spot and look for a person-sized warm
+  area. I2C 0x69 (Adafruit default; 0x68 alt), no clash. Before the wake rule: test away /
+  sitting / leaning in / iron hot with nobody there / a long still sit.
+- **Presence sensor (APDS-9999 fitted 2026-10-06; its proximity doesn't reach a seated user even at full power, see Verified)**: APDS9999 (proximity, lux,
   colour), I2C 0x52. Its interrupt pin is optional (polling a few times a second is enough), so
   no GPIO needs reserving now. **User's rule: presence for longer than X seconds wakes the
   screen (leaves the screensaver/standby as a wake) AND starts the SGP41 settle time**, so the
