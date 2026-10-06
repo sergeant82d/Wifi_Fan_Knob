@@ -670,6 +670,13 @@ STANDBY (1)
 4. Field testing, including the industrial fans once they have power.
 
 ### Later (user notes)
+- **Web page: left-side tabs (user 2026-10-06), at the next web page change.** Use the layout
+  of ETH_Touch_PWM (`D:\GitHub\VSCodeProjects\ETH_Touch_PWM\web\index.html`: `.sidebar` of
+  240 px with `<nav class="tabs">`; on phones it becomes a top strip) instead of the top tab
+  bar. Layout only: the Themes picker was dropped (2026-09-28). ETH's CSS uses colour
+  variables, this page fixed colours, so adapt rather than copy. Home tab order as of
+  2026-10-06: RPM, presets, manual speed, FAN OFF, Display Mode, Air, Presence & Light, LCD
+  (+ brightness), LEDs, System Status, Notes; on phones the LCD card first.
 - **Air quality sensors + Auto mode** (sensors fitted and read 2026-10-06, see Verified; Auto mode not started): **SGP41** (VOC + NOx) with an **SHT41**
   (temperature + humidity) on the main I2C bus (user 2026-09-27; replaces the BME688 plan of
   2026-09-26). Addresses 0x59 (SGP41) and 0x44 (SHT41): no clash with EMC2101 0x4C or APDS9999

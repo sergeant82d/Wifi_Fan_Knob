@@ -503,6 +503,26 @@
                 <div class="rpm-label">Measured: <span id="rpm-measured">--</span> RPM</div>
             </div>
 
+            <div class="status-card">
+                <h3>Quick Start Presets</h3>
+                <div class="presets-grid">
+                    <button class="preset-btn" id="preset-btn-low">Low</button>
+                    <button class="preset-btn" id="preset-btn-medium">Med</button>
+                    <button class="preset-btn" id="preset-btn-high">High</button>
+                    <button class="preset-btn" id="preset-btn-max">Max</button>
+                </div>
+            </div>
+
+            <div class="speed-control">
+                <h3>Manual Speed Control</h3>
+                <div class="speed-input-group">
+                    <input type="range" id="speed-slider" min="0" max="2500" value="1500"
+                           oninput="updateSpeed(this.value)" onchange="sendSlider(true)">
+                    <span class="speed-value" id="speed-display">1500</span>
+                </div>
+                <small style="color: #606060; display: block; margin-top: 10px;">The fan follows the slider as you move it (<span id="speed-range">0-2500</span> RPM)</small>
+            </div>
+
             <button class="btn-danger" onclick="fanOff()"
                     style="width: 100%; padding: 18px; margin-bottom: 20px; font-size: 1.4rem; font-weight: 700; background: #d32f2f; color: #fff;">
                 <!-- Inline SVG: the Unicode power symbol has no glyph on Android -->
@@ -512,28 +532,18 @@
                 </svg>FAN OFF
             </button>
 
-            <div class="status-card">
-                <h3>System Status</h3>
-                <div class="status-item">
-                    <span class="status-label">Fan Status:</span>
-                    <span class="status-value" id="fan-status">Running</span>
+            <div class="status-card" style="margin-top: 20px;">
+                <h3>Display Mode</h3>
+                <p style="color: #a0a0a0; margin-bottom: 12px; font-size: 0.9rem;">
+                    One at a time, like radio buttons. Screensaver: the eye, fan keeps running.
+                    Standby: fan off, external power off.
+                </p>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <button type="button" class="btn-secondary" id="mode-active" onclick="setMode('active')">Active</button>
+                    <button type="button" class="btn-secondary" id="mode-screensaver" onclick="setMode('screensaver')">Screensaver</button>
+                    <button type="button" class="btn-secondary" id="mode-standby" onclick="setMode('standby')">Standby</button>
                 </div>
-                <div class="status-item">
-                    <span class="status-label">Power Mode:</span>
-                    <span class="status-value" id="power-mode">Active</span>
-                </div>
-                <div class="status-item">
-                    <span class="status-label">Peripheral Power:</span>
-                    <span class="status-value" id="periph-power">--</span>
-                </div>
-                <div class="status-item">
-                    <span class="status-label">WiFi Signal:</span>
-                    <span class="status-value" id="wifi-signal">-55 dBm</span>
-                </div>
-                <div class="status-item">
-                    <span class="status-label">MQTT Connected:</span>
-                    <span class="status-value" id="mqtt-status">Yes</span>
-                </div>
+                <small id="mode-note" style="color: #ffd700; display: block; margin-top: 10px;"></small>
             </div>
 
             <div class="status-card">
@@ -575,48 +585,21 @@
                 </small>
             </div>
 
-            <div class="status-card">
-                <h3>Quick Start Presets</h3>
-                <div class="presets-grid">
-                    <button class="preset-btn" id="preset-btn-low">Low</button>
-                    <button class="preset-btn" id="preset-btn-medium">Med</button>
-                    <button class="preset-btn" id="preset-btn-high">High</button>
-                    <button class="preset-btn" id="preset-btn-max">Max</button>
-                </div>
-            </div>
-
-            <div class="speed-control">
-                <h3>Manual Speed Control</h3>
-                <div class="speed-input-group">
-                    <input type="range" id="speed-slider" min="0" max="2500" value="1500"
-                           oninput="updateSpeed(this.value)" onchange="sendSlider(true)">
-                    <span class="speed-value" id="speed-display">1500</span>
-                </div>
-                <small style="color: #606060; display: block; margin-top: 10px;">The fan follows the slider as you move it (<span id="speed-range">0-2500</span> RPM)</small>
-            </div>
-
-            <div class="speed-control">
-                <h3>LCD Brightness</h3>
-                <div class="speed-input-group">
-                    <input type="range" id="brightness" min="10" max="100" value="80"
+            <div class="status-card" id="lcd-card" style="margin-top: 20px; text-align: center;">
+                <h3>LCD</h3>
+                <!-- A copy of the knob's screen (every page, the eye too), fetched every 2 s while this tab shows -->
+                <canvas id="lcd-view" width="240" height="240"
+                        style="width: 240px; max-width: 100%; border-radius: 50%; background: #000; border: 2px solid rgba(255, 215, 0, 0.4);"></canvas>
+                <small id="lcd-note" style="color: #606060; display: block; margin-top: 8px;">Updates every 2 seconds</small>
+                <div style="text-align: left; margin-top: 16px;">
+                    <h3 style="font-size: 1rem;">Brightness</h3>
+                    <div class="speed-input-group">
+                        <input type="range" id="brightness" min="10" max="100" value="80"
                            oninput="updateBrightnessLabel(this.value)" onchange="saveBrightness(this.value)">
-                    <span class="speed-value"><span id="brightness-label">80</span>%</span>
+                        <span class="speed-value"><span id="brightness-label">80</span>%</span>
+                    </div>
+                    <small style="color: #606060; display: block; margin-top: 10px;">Saved when you let go of the slider</small>
                 </div>
-                <small style="color: #606060; display: block; margin-top: 10px;">Saved when you let go of the slider</small>
-            </div>
-
-            <div class="status-card" style="margin-top: 20px;">
-                <h3>Display Mode</h3>
-                <p style="color: #a0a0a0; margin-bottom: 12px; font-size: 0.9rem;">
-                    One at a time, like radio buttons. Screensaver: the eye, fan keeps running.
-                    Standby: fan off, external power off.
-                </p>
-                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                    <button type="button" class="btn-secondary" id="mode-active" onclick="setMode('active')">Active</button>
-                    <button type="button" class="btn-secondary" id="mode-screensaver" onclick="setMode('screensaver')">Screensaver</button>
-                    <button type="button" class="btn-secondary" id="mode-standby" onclick="setMode('standby')">Standby</button>
-                </div>
-                <small id="mode-note" style="color: #ffd700; display: block; margin-top: 10px;"></small>
             </div>
 
             <div class="status-card" id="leds-card" style="margin-top: 20px;">
@@ -657,12 +640,28 @@
                 </small>
             </div>
 
-            <div class="status-card" id="lcd-card" style="margin-top: 20px; text-align: center;">
-                <h3>LCD</h3>
-                <!-- A copy of the knob's screen (every page, the eye too), fetched every 2 s while this tab shows -->
-                <canvas id="lcd-view" width="240" height="240"
-                        style="width: 240px; max-width: 100%; border-radius: 50%; background: #000; border: 2px solid rgba(255, 215, 0, 0.4);"></canvas>
-                <small id="lcd-note" style="color: #606060; display: block; margin-top: 8px;">Updates every 2 seconds</small>
+            <div class="status-card">
+                <h3>System Status</h3>
+                <div class="status-item">
+                    <span class="status-label">Fan Status:</span>
+                    <span class="status-value" id="fan-status">Running</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Power Mode:</span>
+                    <span class="status-value" id="power-mode">Active</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Peripheral Power:</span>
+                    <span class="status-value" id="periph-power">--</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">WiFi Signal:</span>
+                    <span class="status-value" id="wifi-signal">-55 dBm</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">MQTT Connected:</span>
+                    <span class="status-value" id="mqtt-status">Yes</span>
+                </div>
             </div>
 
             <div class="status-card" id="notes-card" style="margin-top: 20px;">
