@@ -370,6 +370,13 @@ See `platformio.ini`. Libraries:
   bench 2-7, sitting 1-9, leaning in 6-11, standing 1-8, hand at ~20 cm peaks 13-16. So at
   working distance it can't see a person (it's a phone-style near sensor). The lux reading
   dropped with the user's shadow (36 -> 16 lx leaning in), but that depends on the lamps.
+  **Full power** (25 mA, 255 pulses; user seated 80-110 cm away): empty bench ~100 (75-120),
+  sitting the same, leaning in ~135 (115-155). Still no seated detection; leaning in is too
+  near the noise. **Conclusion (2026-10-06): the APDS-9999 can't do presence at this bench;
+  use it for light level (auto LCD brightness) and maybe a close hand wave. For presence:
+  the AMG8833 thermal camera (on the user's hardware list) or an mmWave radar.**
+  The chip is always powered and keeps its registers over a board restart, so
+  `presence_begin()` writes the datasheet reset values (PS_VCSEL 0x36, 8 pulses) every boot.
 - Photo eyes, Dragon 2-11 (verified on the board 2026-09-27 by the user: Dragons 3-10 all
   fine; Dragon 11 added from `23-4.png` / `24-4.png`, "works great"; `docs/PHOTO_EYES.md`):
   the artist's open/shut pairs (`assets/eye_art/`) animated by `photo_eye.cpp`: iris moves
@@ -691,7 +698,7 @@ STANDBY (1)
     work it reads the air the user breathes.
   - With the Auto segment the RPM arc can reach lower again (towards a 270 deg sweep): the IP
     box moved to Settings (TODO.md item, do it together with the Auto button).
-- **Presence sensor (APDS-9999 fitted 2026-10-06; its proximity doesn't reach a seated user, see Verified)**: APDS9999 (proximity, lux,
+- **Presence sensor (APDS-9999 fitted 2026-10-06; its proximity doesn't reach a seated user even at full power, see Verified; next candidate the AMG8833 thermal camera)**: APDS9999 (proximity, lux,
   colour), I2C 0x52. Its interrupt pin is optional (polling a few times a second is enough), so
   no GPIO needs reserving now. **User's rule: presence for longer than X seconds wakes the
   screen (leaves the screensaver/standby as a wake) AND starts the SGP41 settle time**, so the

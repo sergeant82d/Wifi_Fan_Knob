@@ -15,8 +15,12 @@ static portMUX_TYPE readings_mux = portMUX_INITIALIZER_UNLOCKED;
 static PresenceReadings readings = {false, 0, 0};
 
 void presence_begin() {
+  // The chip is always powered, so it keeps settings across board restarts: set the proximity
+  // LED to the datasheet's reset values (PS_VCSEL 0x36: 60 kHz, current bits 110; 8 pulses).
+  // Full power (25 mA, 255 pulses) was tested 2026-10-06 and still couldn't see a seated user.
   found = apds.begin(0x52, &Wire) && apds.setProxResolution(APDS9999_PROX_RES_11BIT) &&
-          apds.enableProximitySensor(true) && apds.enableLightSensor(true);
+          apds.setLEDFrequency(APDS9999_LED_FREQ_60KHZ) && apds.setLEDCurrent((apds9999_led_current_t)0x06) &&
+          apds.setLEDPulses(8) && apds.enableProximitySensor(true) && apds.enableLightSensor(true);
   Serial.println(found ? "[PRESENCE] APDS-9999 ready" : "[PRESENCE] APDS-9999 not found");
 }
 
