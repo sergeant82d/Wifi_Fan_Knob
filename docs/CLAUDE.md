@@ -68,6 +68,7 @@ cd Wifi_Fan_Knob
 | `include/eye_styles.h` / `src/eye_styles.cpp` | ✅ Working | The eye styles: 10 Uncanny Eyes (`include/eyes/*Eye.h` = Adafruit tables) + photo eyes |
 | `include/lcd_view.h` / `src/lcd_view.cpp` | ✅ Working | Web LCD view: copies of the screen for `GET /api/lcd` (LVGL snapshot; eye rows copied as drawn) |
 | `include/air.h` / `src/air.cpp` | ✅ Working | SHT41 + SGP41 read once a second from `loop()` (raw commands, no driver library); VOC/NOx Index via Sensirion's Gas Index Algorithm |
+| `include/presence.h` / `src/presence.cpp` | ✅ Working | APDS-9999 proximity + light (lux) read from `loop()` (Adafruit APDS9999 library) |
 | `include/leds.h` / `src/leds.cpp` | ✅ Working | RGB LEDs (5x WS2812, GPIO 48): Solid / Flash / Breathe / Rainbow, brightness capped at 100 of 255 |
 | `include/photo_eye.h` / `src/photo_eye.cpp` | ✅ Working | Photo eye renderer (artist open/shut pictures: moving iris, reactive slit pupil, lids); data `include/eyes/*Photo.h` from `tools/photo_eye.py` |
 
@@ -360,6 +361,15 @@ See `platformio.ini`. Libraries:
   sensor") + temp_c, humidity, voc, nox when valid. Web: Home tab "Air" card (°F and °C). HA:
   sensors Temperature (°C, HA converts), Humidity, VOC Index, NOx Index, every 10 s, valid
   values only. First readings: 26.5 °C, 42 %RH, NOx 1.
+- APDS-9999 readings (verified 2026-10-06 on the board; step 1 of the presence plan):
+  Adafruit APDS9999 library (no delays inside; the chip measures by itself, `loop()` reads
+  the result registers): proximity 11-bit (0-2047, higher = closer) every 200 ms, lux from
+  the green channel every 1 s. `GET /api/status` `presence` = ok, prox, lux. Web: Home tab
+  "Presence & Light" card. HA: sensors Proximity and Illuminance, every 10 s.
+  **Bench test, default LED settings, sensor tilted ~30 deg back, facing the user:** empty
+  bench 2-7, sitting 1-9, leaning in 6-11, standing 1-8, hand at ~20 cm peaks 13-16. So at
+  working distance it can't see a person (it's a phone-style near sensor). The lux reading
+  dropped with the user's shadow (36 -> 16 lx leaning in), but that depends on the lamps.
 - Photo eyes, Dragon 2-11 (verified on the board 2026-09-27 by the user: Dragons 3-10 all
   fine; Dragon 11 added from `23-4.png` / `24-4.png`, "works great"; `docs/PHOTO_EYES.md`):
   the artist's open/shut pairs (`assets/eye_art/`) animated by `photo_eye.cpp`: iris moves
@@ -681,7 +691,7 @@ STANDBY (1)
     work it reads the air the user breathes.
   - With the Auto segment the RPM arc can reach lower again (towards a 270 deg sweep): the IP
     box moved to Settings (TODO.md item, do it together with the Auto button).
-- **Presence sensor (possible future hardware, user 2026-09-27)**: APDS9999 (proximity, lux,
+- **Presence sensor (APDS-9999 fitted 2026-10-06; its proximity doesn't reach a seated user, see Verified)**: APDS9999 (proximity, lux,
   colour), I2C 0x52. Its interrupt pin is optional (polling a few times a second is enough), so
   no GPIO needs reserving now. **User's rule: presence for longer than X seconds wakes the
   screen (leaves the screensaver/standby as a wake) AND starts the SGP41 settle time**, so the

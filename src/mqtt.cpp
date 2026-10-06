@@ -4,6 +4,7 @@
 #include "power.h"
 #include "leds.h"
 #include "air.h"
+#include "presence.h"
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
@@ -195,6 +196,23 @@ static void publish_discovery() {
     doc["icon"] = "mdi:molecule";
     publish_config("sensor", "nox", doc);
   }
+  {
+    StaticJsonDocument<768> doc;
+    doc["name"] = "Proximity";
+    doc["state_topic"] = topic("proximity");
+    doc["state_class"] = "measurement";
+    doc["icon"] = "mdi:signal-distance-variant";
+    publish_config("sensor", "proximity", doc);
+  }
+  {
+    StaticJsonDocument<768> doc;
+    doc["name"] = "Illuminance";
+    doc["state_topic"] = topic("illuminance");
+    doc["unit_of_measurement"] = "lx";
+    doc["device_class"] = "illuminance";
+    doc["state_class"] = "measurement";
+    publish_config("sensor", "illuminance", doc);
+  }
   // Screensaver was briefly a binary_sensor: an empty retained config removes that entity
   client.publish((String("homeassistant/binary_sensor/") + dev_id + "/screensaver/config").c_str(), "", true);
   Serial.println("[MQTT] Home Assistant discovery published");
@@ -275,6 +293,11 @@ static void publish_state(bool force) {
     }
     if (air.voc > 0) client.publish(topic("voc").c_str(), String(air.voc).c_str(), true);
     if (air.nox > 0) client.publish(topic("nox").c_str(), String(air.nox).c_str(), true);
+    PresenceReadings pr = presence_get();
+    if (pr.ok) {
+      client.publish(topic("proximity").c_str(), String(pr.prox).c_str(), true);
+      client.publish(topic("illuminance").c_str(), String(pr.lux, 1).c_str(), true);
+    }
   }
   if (force || millis() - last_diag > 60000) {
     client.publish(topic("rssi").c_str(), String(WiFi.RSSI()).c_str(), true);

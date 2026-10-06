@@ -8,6 +8,7 @@
 #include "lcd_view.h"
 #include "leds.h"
 #include "air.h"
+#include "presence.h"
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
 #include <SPIFFS.h>
@@ -291,6 +292,13 @@ void init_webserver() {
     }
     if (air.voc > 0) a["voc"] = air.voc;
     if (air.nox > 0) a["nox"] = air.nox;
+    PresenceReadings pr = presence_get();  // APDS-9999; values only when it answers
+    JsonObject p = doc.createNestedObject("presence");
+    p["ok"] = pr.ok;
+    if (pr.ok) {
+      p["prox"] = pr.prox;
+      p["lux"] = serialized(String(pr.lux, 1));
+    }
     doc["fw_version"] = config.firmwareVersion;
     char build_id[9];  // First 8 hex chars of firmware ELF SHA-256: unique per build
     esp_app_get_elf_sha256(build_id, sizeof(build_id));

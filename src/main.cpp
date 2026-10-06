@@ -15,6 +15,7 @@
 #include "mqtt.h"
 #include "leds.h"
 #include "air.h"
+#include "presence.h"
 
 // ============================================================================
 // PIN DEFINITIONS (Elecrow 1.28" Rotary Display)
@@ -690,6 +691,7 @@ void setup() {
   // I2C (EMC2101 is probed after peripheral power comes on, below)
   Serial.println("Initializing I2C...");
   Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
+  presence_begin();  // APDS-9999 is on always-on 3.3 V
 
   // Encoder Input
   Serial.println("Initializing encoder...");
@@ -762,6 +764,7 @@ void loop() {
   fan_update();
   leds_update();
   air_update();
+  presence_update();
   int32_t delta = encoder_read_detents();
   poll_button();
   if (delta != 0) note_activity();

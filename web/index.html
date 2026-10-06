@@ -561,6 +561,21 @@
             </div>
 
             <div class="status-card">
+                <h3>Presence &amp; Light</h3>
+                <div class="status-item">
+                    <span class="status-label">Proximity:</span>
+                    <span class="status-value" id="presence-prox">--</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Light:</span>
+                    <span class="status-value" id="presence-lux">--</span>
+                </div>
+                <small style="color: #606060; display: block; margin-top: 10px;">
+                    Proximity 0-2047: higher = something closer in front of the sensor.
+                </small>
+            </div>
+
+            <div class="status-card">
                 <h3>Quick Start Presets</h3>
                 <div class="presets-grid">
                     <button class="preset-btn" id="preset-btn-low">Low</button>
@@ -1442,6 +1457,9 @@
                 set('air-humidity', air.humidity === undefined ? wait : air.humidity.toFixed(1) + ' %');
                 set('air-voc', air.voc === undefined ? wait : air.voc);
                 set('air-nox', air.nox === undefined ? wait : air.nox);
+                const pr = s.presence || {};
+                set('presence-prox', pr.ok ? pr.prox : 'no sensor');
+                set('presence-lux', pr.ok ? pr.lux.toFixed(1) + ' lx' : 'no sensor');
                 set('speed-range', s.min_rpm + '-' + s.max_rpm);
                 const slider = document.getElementById('speed-slider');
                 slider.min = s.min_rpm;
