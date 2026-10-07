@@ -6,10 +6,18 @@ How this list works (the all-projects format, agreed 2026-10-07; from ETH_Touch_
   the notes are turned into items below and this section is emptied.
 - **Open**: oldest first. **Done**: newest first, with date and commit. Done items older than
   about two weeks move to `docs/TODO_DONE.md`.
-- Tags: `[Board]` needs the board on the bench, `[LCD]` round screen, `[Web]` web page,
-  `[HA]` Home Assistant / MQTT, `[Net]` WiFi / network, `[Sensor]` air, light and presence
-  sensors, `[Eye]` screensaver / standby eye, `[Docs]`, `[Decide]` needs a decision,
-  `[Question]` needs an answer.
+- Tags (alphabetical; the same set in every project, copy one into an item):
+  - `[Board]` needs a board on the bench
+  - `[Decide]` needs a decision
+  - `[Docs]` documentation
+  - `[Eye]` screensaver / standby eye
+  - `[HA]` Home Assistant / MQTT
+  - `[LCD]` round screen
+  - `[Net]` WiFi / network
+  - `[Question]` needs an answer
+  - `[SD]` SD card (ETH_Touch_PWM)
+  - `[Sensor]` air, light and presence sensors
+  - `[Web]` web page
 
 ## Your notes
 
