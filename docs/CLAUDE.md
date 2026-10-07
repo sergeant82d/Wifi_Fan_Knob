@@ -697,7 +697,9 @@ STANDBY (1)
 - **Web page: left-side tabs (user 2026-10-06), at the next web page change.** Use the layout
   of ETH_Touch_PWM (`D:\GitHub\VSCodeProjects\ETH_Touch_PWM\web\index.html`: `.sidebar` of
   240 px with `<nav class="tabs">`; on phones it becomes a top strip) instead of the top tab
-  bar. Layout only: the Themes picker was dropped (2026-09-28). ETH's CSS uses colour
+  bar, with the standard tab names (Dashboard, Fan Control, Home Assistant, Network, System;
+  user 2026-10-07; standard in `D:\GitHub\WEB_STYLE.md`). Layout only: no theme picker
+  (dropped 2026-09-28; confirmed 2026-10-07, Navy & gold only; **may be revisited**). ETH's CSS uses colour
   variables, this page fixed colours, so adapt rather than copy. Home tab order as of
   2026-10-06: RPM, presets, manual speed, FAN OFF, Display Mode, Air, Presence & Light, LCD
   (+ brightness), LEDs, System Status, Notes; on phones the LCD card first.
