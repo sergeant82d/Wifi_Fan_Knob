@@ -43,11 +43,15 @@ How this list works (the all-projects format, agreed 2026-10-07; from ETH_Touch_
       the "presence for X seconds wakes the screen" rule
 - [ ] `[Board]` GPIO 4 pull-down resistor: waits on the FPC breakout for GPIO 4 access
       (status report 05)
-- [ ] `[LCD]` Swiping between LCD pages is barely usable and very unfriendly: relook at the swipe
-      functions (user, 2026-10-07; after the docs split)
 
 ## Done
 
+- [x] `[LCD]` Swiping between LCD pages is barely usable and very unfriendly: relook at the swipe
+      functions (user, 2026-10-07; after the docs split). Measured first: during a swipe LVGL's
+      clock ran at 20-80 % of real time and each redraw took 110-240 ms. Fixed: LVGL reads the
+      real clock; the RPM arc can't be dragged (swipes from the edge change page; segment taps
+      reach the screen edge); two 40-line draw buffers sent by DMA. User: "That did it"
+      (2026-10-07, this commit). Not done, by choice: a faster slide animation (later, if wanted)
 - [x] `[Docs]` Split the big `docs/CLAUDE.md` into a short root `CLAUDE.md` and
       `docs/PROJECT_HISTORY.md`, like the other projects: the guide renamed (history kept),
       with a current-status section; the root file rewritten short (2026-10-07, this commit)

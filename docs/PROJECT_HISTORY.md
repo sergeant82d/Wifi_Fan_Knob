@@ -421,6 +421,16 @@ See `platformio.ini`. Libraries:
   becomes a top strip; on the Dashboard the LCD card's two parts (`#lcd-viewer`,
   `#lcd-brightness`) become separate cards (`display: contents`): picture first, Brightness
   between Presence & Light and LEDs (user). Colours: the standard variables, Navy & gold only.
+- LCD swiping (verified 2026-10-07 by the user: "That did it"). Measured with a temporary log:
+  still, ~185 `loop()` passes/s and `lv_task_handler()` 1-2 ms; while swiping, 34-160 passes/s,
+  LVGL's clock at 20-80 % of real time (it got `lv_tick_inc(5)` per pass) and single redraws of
+  105-240 ms. Fixes: (1) `LV_TICK_CUSTOM` with `millis()` in `lv_conf.h` (no `lv_tick_inc`);
+  (2) the RPM arc is display only (not clickable, drag handle hidden), so swipes that start on
+  the ring change page; segment taps count out to the screen edge (`SEG_TOUCH_R_OUT` 120);
+  (3) two 40-line draw buffers (`DRAW_LINES`, internal DMA RAM, ~19 KB each; fallback: one
+  10-line buffer) and `pushImageDMA` in `display_flush()` with the write left open, so LVGL
+  draws the next part while the last one is sent. After (3) idle redraws stay 1-2 ms. Not
+  done: a faster slide animation (only if wanted).
 - Restart (verified 2026-10-07 by the user: LCD, web, HA): `power_request_restart(from)`
   (`power.h`, `main.cpp`) restarts ~0.5 s later from `loop()`; nothing saved or lost, the fan
   starts stopped. LCD: System page (left-most, `create_system_page()`: firmware version,

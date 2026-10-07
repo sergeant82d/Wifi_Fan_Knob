@@ -150,7 +150,13 @@ static const int SEG_SPAN = 48;     // Per segment incl. gap
 static const int SEG_GAP = 4;
 static const int SEG_R_OUT = 94;    // Outer edge of the band
 static const int SEG_R_IN = 60;     // Inner edge of the band
+static const int SEG_TOUCH_R_OUT = 120;  // Taps count out to here (the screen edge)
 ```
+
+**Touch areas:** a tap counts for a segment from 6 px inside its inner edge out to
+`SEG_TOUCH_R_OUT`, the screen's edge, so the ring around the segments (where the RPM arc is
+drawn; the arc can't be dragged) belongs to the segment next to it. Taps in the bottom gap
+(clock, dots) belong to no segment.
 
 **Angles** are in degrees, measured **clockwise from 3 o'clock**: 0° is 3 o'clock, 90° is
 6 o'clock, 180° is 9 o'clock and 270° is 12 o'clock. The right-hand side of the picture
@@ -206,10 +212,11 @@ In `create_main_page()`:
 | Ring thickness | `lv_obj_set_style_arc_width(rpm_arc, 12, ...)`. There are two lines: track and fill |
 | Track colour (unfilled part) | `THEME_TRACK` on the `LV_PART_MAIN` line |
 | Fill colour | `THEME_GOLD` on the `LV_PART_INDICATOR` line |
-| Drag knob colour | `THEME_TEXT` on the `LV_PART_KNOB` line |
 | Overall size | `lv_obj_set_size(rpm_arc, 228, 228)`. If you make it smaller, reduce `SEG_R_OUT` to match |
 
-The arc can be dragged to set the speed. It snaps to the RPM step size set in the config.
+The arc only shows the speed: it can't be dragged (since 2026-10-07, so a swipe that starts
+on the ring changes page). Set the speed with the knob, the segments or the web page.
+Its drag handle is hidden (`LV_OPA_TRANSP` on the `LV_PART_KNOB` line).
 
 ### Target RPM, actual RPM and clock
 

@@ -128,17 +128,21 @@ LGFX gfx;
 // LVGL BUFFER & DISPLAY CALLBACK
 // ============================================================================
 
+// Two DRAW_LINES-line buffers in internal DMA-capable RAM: LVGL draws into one while the other
+// goes to the panel by DMA (2026-10-07; was one 10-line buffer sent with writePixels, which
+// made a page swipe redraw take 110-240 ms). Falls back to the old single buffer.
+static const uint32_t DRAW_LINES = 40;
 static lv_disp_draw_buf_t draw_buf;
-static lv_color_t buf[screenWidth * 10];
+static lv_color_t fallback_buf[screenWidth * 10];
 
 void display_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p) {
   uint32_t w = (area->x2 - area->x1 + 1);
   uint32_t h = (area->y2 - area->y1 + 1);
 
-  gfx.startWrite();
-  gfx.setAddrWindow(area->x1, area->y1, w, h);
-  gfx.writePixels((lgfx::rgb565_t *)&color_p->full, w * h);
-  gfx.endWrite();
+  // The write stays open between flushes, so this DMA transfer can run while LVGL draws the
+  // next part into the other buffer; LovyanGFX waits for it before the next transfer.
+  if (gfx.getStartCount() == 0) gfx.startWrite();
+  gfx.pushImageDMA(area->x1, area->y1, w, h, (lgfx::rgb565_t *)&color_p->full);
 
   lv_disp_flush_ready(disp);
 }
@@ -750,7 +754,16 @@ void setup() {
   gfx.println("Booting...");
 
   lv_init();
-  lv_disp_draw_buf_init(&draw_buf, buf, NULL, screenWidth * 10);
+  lv_color_t *buf1 = (lv_color_t *)heap_caps_malloc(screenWidth * DRAW_LINES * sizeof(lv_color_t), MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
+  lv_color_t *buf2 = (lv_color_t *)heap_caps_malloc(screenWidth * DRAW_LINES * sizeof(lv_color_t), MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
+  if (buf1 && buf2) {
+    lv_disp_draw_buf_init(&draw_buf, buf1, buf2, screenWidth * DRAW_LINES);
+  } else {
+    Serial.println("[DISPLAY] No RAM for the DMA draw buffers; using one 10-line buffer");
+    free(buf1);
+    free(buf2);
+    lv_disp_draw_buf_init(&draw_buf, fallback_buf, NULL, screenWidth * 10);
+  }
 
   static lv_disp_drv_t disp_drv;
   lv_disp_drv_init(&disp_drv);
@@ -1057,9 +1070,7 @@ void loop() {
       eye_fps_start = millis();
     }
   } else {
-    // LVGL tick
-    lv_tick_inc(5);
-    lv_task_handler();
+    lv_task_handler();  // LVGL keeps time from millis() (LV_TICK_CUSTOM in lv_conf.h)
     if (lcd_view_capture_due()) lcd_view_capture_lvgl();  // Web LCD view
 
     delay(5);

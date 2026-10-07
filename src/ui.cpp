@@ -190,13 +190,6 @@ static void update_clock() {
 // PUBLIC
 // ============================================================================
 
-// Arc dragged by touch: snap to the RPM step; loop() redraws from the new target
-static void arc_changed_cb(lv_event_t *) {
-  int32_t step = config.fan.rpmStep > 0 ? config.fan.rpmStep : 1;
-  int32_t rpm = ((lv_arc_get_value(rpm_arc) + step / 2) / step) * step;
-  fan_set_target(rpm);
-}
-
 void ui_init() {
   main_screen = lv_scr_act();
   lv_obj_set_style_bg_color(main_screen, lv_color_hex(THEME_BG_TOP), 0);
@@ -235,6 +228,8 @@ static const int SEG_SPAN = 48;     // Per segment incl. gap: 5 x 48 = 240°, op
 static const int SEG_GAP = 4;
 static const int SEG_R_OUT = 94;    // Inside the RPM ring (inner edge ~102) and its knob
 static const int SEG_R_IN = 60;
+static const int SEG_TOUCH_R_OUT = 120;  // Taps count out to the screen edge, over the RPM ring
+                                         // (display only since 2026-10-07; user, same day)
 static const char *const seg_text[SEG_COUNT] = {LV_SYMBOL_POWER "\nOff", "Low", "Med", "High", "Max"};
 static lv_obj_t *segs[SEG_COUNT];
 static lv_obj_t *seg_labels[SEG_COUNT];
@@ -261,14 +256,14 @@ static void seg_highlight() {
   }
 }
 
-// Segment under the current touch point, or -1 (6 px slack at the band edges)
+// Segment under the current touch point, or -1: from 6 px inside the band out to the screen edge
 static int seg_at() {
   lv_point_t p;
   lv_indev_get_point(lv_indev_get_act(), &p);
   int dx = p.x - lv_disp_get_hor_res(nullptr) / 2;
   int dy = p.y - lv_disp_get_ver_res(nullptr) / 2;
   float r = sqrtf(dx * dx + dy * dy);
-  if (r < SEG_R_IN - 6 || r > SEG_R_OUT + 6) return -1;
+  if (r < SEG_R_IN - 6 || r > SEG_TOUCH_R_OUT) return -1;
   int a = ((int)lroundf(atan2f(dy, dx) * RAD_TO_DEG) + 360) % 360;
   int rel = (a - SEG_START + 360) % 360;
   return rel < SEG_COUNT * SEG_SPAN ? rel / SEG_SPAN : -1;
@@ -345,9 +340,8 @@ static void show_popup(const char *text, lv_color_t bg) {
   lv_timer_resume(popup_timer);
 }
 
-// Two taps within 400 ms (millis: lv_tick only approximates real time here).
-// Swipes and arc drags don't count: LVGL sends no CLICKED after a scroll, and
-// the arc handles its own touches.
+// Two taps within 400 ms (millis).
+// Swipes don't count: LVGL sends no CLICKED after a scroll.
 static void main_tap_cb(lv_event_t *) {
   static unsigned long last_tap = 0;
   int seg = seg_at();
@@ -375,8 +369,8 @@ static void create_main_page(lv_obj_t *scr) {
   lv_obj_add_event_cb(scr, main_tap_cb, LV_EVENT_CLICKED, nullptr);
 
   // RPM arc: ends level with the bottom edges of the outer segments (Off, Max), leaving
-  // the gap at the bottom clear of the status box. Drag along the ring to set speed
-  // (arc only hit-tests on the ring, so swipes in the middle still change pages).
+  // the gap at the bottom clear of the status box. Display only (user, 2026-10-07): it can't
+  // be dragged, so a swipe that starts on the ring changes page instead of the speed.
   rpm_arc = lv_arc_create(scr);
   lv_obj_set_size(rpm_arc, 228, 228);
   lv_obj_center(rpm_arc);
@@ -384,19 +378,12 @@ static void create_main_page(lv_obj_t *scr) {
   lv_arc_set_bg_angles(rpm_arc, 0, SEG_COUNT * SEG_SPAN - SEG_GAP);        // 236° sweep
   lv_arc_set_range(rpm_arc, config.fan.minRpm, config.fan.maxRpm);
   lv_arc_set_value(rpm_arc, config.fan.minRpm);
-  // Ring-only touch: ADV_HITTEST makes LVGL use the arc's ring hit test (off by default,
-  // in which case the whole 228 px square grabs every swipe). Ext area widens the ring,
-  // but only down to the segments' outer edge: 114 - 12 - 8 = 94 = SEG_R_OUT. Wider, and
-  // taps on a segment's outer part set the arc (a stepped speed) instead of the preset.
-  lv_obj_add_flag(rpm_arc, LV_OBJ_FLAG_ADV_HITTEST);
-  lv_obj_set_ext_click_area(rpm_arc, 114 - 12 - SEG_R_OUT);
+  lv_obj_clear_flag(rpm_arc, LV_OBJ_FLAG_CLICKABLE);  // Touches pass through to the page
   lv_obj_set_style_arc_width(rpm_arc, 12, LV_PART_MAIN);
   lv_obj_set_style_arc_width(rpm_arc, 12, LV_PART_INDICATOR);
   lv_obj_set_style_arc_color(rpm_arc, lv_color_hex(THEME_TRACK), LV_PART_MAIN);
   lv_obj_set_style_arc_color(rpm_arc, lv_color_hex(THEME_GOLD), LV_PART_INDICATOR);
-  lv_obj_set_style_bg_color(rpm_arc, lv_color_hex(THEME_TEXT), LV_PART_KNOB);
-  lv_obj_set_style_pad_all(rpm_arc, 2, LV_PART_KNOB);
-  lv_obj_add_event_cb(rpm_arc, arc_changed_cb, LV_EVENT_VALUE_CHANGED, nullptr);
+  lv_obj_set_style_bg_opa(rpm_arc, LV_OPA_TRANSP, LV_PART_KNOB);  // No drag handle: nothing to drag
 
   // Clock in the arc's bottom gap, above the page dots
   clock_label = lv_label_create(scr);
