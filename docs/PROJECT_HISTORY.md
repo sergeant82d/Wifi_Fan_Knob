@@ -91,6 +91,7 @@ cd Wifi_Fan_Knob
 | `Status_Reports/STATUS_REPORT_05.md` | End-of-day report, 2026-09-26 (web page and LCD to-do items, display modes, standby prompt, photo eyes Dragon 2-10) |
 | `Status_Reports/STATUS_REPORT_06.md` | End-of-day report, 2026-09-28 (handoff items: USB serial fix, QR code page, web LCD view, Notes box) |
 | `Status_Reports/STATUS_REPORT_07.md` | End-of-day report, 2026-10-06 (RGB LEDs, SHT41 + SGP41 + APDS-9999, dead 140 mm fan and TACH pull-up, Home tab reorder) |
+| `Status_Reports/STATUS_REPORT_08.md` | End-of-day report, 2026-10-07 (Auto brightness, all-projects standards, left-sidebar web page, Restart, docs split, smooth LCD swiping) |
 | `MQTT_SCHEMA.md` | Original HA discovery design (superseded; see MQTT below) |
 | `SPIFFS_CONFIG_SCHEMA.md` | JSON config structure |
 | `images/` | Pictures used by the docs: board photo, display layout diagram, arc-button design reference |
