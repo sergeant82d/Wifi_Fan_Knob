@@ -1,1116 +1,842 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WiFi Fan Knob - Control Panel</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            color: #e0e0e0;
-            min-height: 100vh;
-            padding: 20px;
-        }
-
-        .container {
-            max-width: 900px;
-            margin: 0 auto;
-        }
-
-        header {
-            text-align: center;
-            margin-bottom: 30px;
-            padding-bottom: 20px;
-            border-bottom: 2px solid rgba(255, 215, 0, 0.3);
-        }
-
-        h1 {
-            font-size: 2.5rem;
-            color: #ffd700;
-            margin-bottom: 10px;
-            font-weight: 700;
-            letter-spacing: 1px;
-        }
-
-        .status-line {
-            font-size: 0.9rem;
-            color: #a0a0a0;
-        }
-
-        .tabs {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 30px;
-            flex-wrap: wrap;
-            border-bottom: 2px solid rgba(255, 215, 0, 0.2);
-        }
-
-        .tab-btn {
-            padding: 12px 24px;
-            border: none;
-            background: transparent;
-            color: #a0a0a0;
-            cursor: pointer;
-            font-size: 1rem;
-            font-weight: 600;
-            transition: all 0.3s ease;
-            position: relative;
-            border-bottom: 3px solid transparent;
-        }
-
-        .tab-btn:hover {
-            color: #ffd700;
-        }
-
-        .tab-btn.active {
-            color: #ffd700;
-            border-bottom-color: #ffd700;
-        }
-
-        .tab-content {
-            display: none;
-            animation: fadeIn 0.3s ease;
-        }
-
-        .tab-content.active {
-            display: block;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-
-        /* FORM STYLES */
-        .form-grid {
-            display: grid;
-            gap: 20px;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-        }
-
-        .form-group {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        label {
-            font-weight: 600;
-            color: #ffd700;
-            font-size: 0.95rem;
-        }
-
-        input[type="text"],
-        input[type="password"],
-        input[type="number"],
-        input[type="email"],
-        select {
-            padding: 12px 15px;
-            border: 2px solid rgba(255, 215, 0, 0.2);
-            border-radius: 6px;
-            background: rgba(255, 255, 255, 0.05);
-            color: #e0e0e0;
-            font-size: 1rem;
-            transition: all 0.3s ease;
-        }
-
-        input[type="text"]:focus,
-        input[type="password"]:focus,
-        input[type="number"]:focus,
-        input[type="email"]:focus,
-        select:focus {
-            outline: none;
-            border-color: #ffd700;
-            background: rgba(255, 215, 0, 0.1);
-        }
-
-        input[type="range"] {
-            width: 100%;
-            height: 6px;
-            border-radius: 3px;
-            background: rgba(255, 215, 0, 0.2);
-            outline: none;
-            -webkit-appearance: none;
-        }
-
-        input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 18px;
-            height: 18px;
-            border-radius: 50%;
-            background: #ffd700;
-            cursor: pointer;
-            box-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
-        }
-
-        input[type="range"]::-moz-range-thumb {
-            width: 18px;
-            height: 18px;
-            border-radius: 50%;
-            background: #ffd700;
-            cursor: pointer;
-            border: none;
-            box-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
-        }
-
-        input[type="checkbox"] {
-            width: 20px;
-            height: 20px;
-            cursor: pointer;
-            accent-color: #ffd700;
-        }
-
-        .checkbox-group {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        button {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 6px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            min-width: 120px;
-        }
-
-        .btn-primary {
-            background: #ffd700;
-            color: #1a1a2e;
-        }
-
-        .btn-primary:hover {
-            background: #ffed4e;
-            box-shadow: 0 4px 12px rgba(255, 215, 0, 0.3);
-            transform: translateY(-2px);
-        }
-
-        .btn-secondary {
-            background: rgba(255, 215, 0, 0.1);
-            color: #ffd700;
-            border: 2px solid #ffd700;
-        }
-
-        .btn-secondary:hover {
-            background: rgba(255, 215, 0, 0.2);
-        }
-
-        .btn-danger {
-            background: rgba(255, 100, 100, 0.3);
-            color: #ff6464;
-            border: 2px solid #ff6464;
-        }
-
-        .btn-danger:hover {
-            background: rgba(255, 100, 100, 0.5);
-        }
-
-        /* NOTES (Home tab) */
-        #notes {
-            width: 100%;
-            min-height: 170px;
-            max-height: 420px;
-            resize: vertical;
-            padding: 12px 15px;
-            border: 2px solid rgba(255, 215, 0, 0.2);
-            border-radius: 6px;
-            background: rgba(255, 255, 255, 0.05);
-            color: #e0e0e0;
-            font: inherit;
-            line-height: 1.45;
-        }
-
-        #notes:focus {
-            outline: none;
-            border-color: #ffd700;
-        }
-
-        .emoji-bar {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 4px;
-            margin-bottom: 8px;
-        }
-
-        .emoji-bar button {
-            min-width: 0;
-            padding: 3px 7px;
-            font-size: 1.05rem;
-            line-height: 1.2;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 215, 0, 0.2);
-            border-radius: 4px;
-        }
-
-        .emoji-bar button:hover {
-            border-color: #ffd700;
-            background: rgba(255, 215, 0, 0.1);
-        }
-
-        /* STATUS CARDS */
-        .status-card {
-            background: rgba(255, 255, 255, 0.05);
-            border: 2px solid rgba(255, 215, 0, 0.2);
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-
-        .status-card h3 {
-            color: #ffd700;
-            margin-bottom: 12px;
-            font-size: 1.1rem;
-        }
-
-        .status-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px solid rgba(255, 215, 0, 0.1);
-        }
-
-        .status-item:last-child {
-            border-bottom: none;
-        }
-
-        .status-label {
-            color: #a0a0a0;
-        }
-
-        .status-value {
-            color: #ffd700;
-            font-weight: 600;
-        }
-
-        /* HOME TAB SPECIFIC */
-        .rpm-display {
-            background: rgba(255, 215, 0, 0.1);
-            border: 3px solid #ffd700;
-            border-radius: 12px;
-            padding: 30px;
-            text-align: center;
-            margin-bottom: 20px;
-        }
-
-        .rpm-number {
-            font-size: 3.5rem;
-            color: #ffd700;
-            font-weight: 700;
-            line-height: 1;
-        }
-
-        .rpm-label {
-            color: #a0a0a0;
-            font-size: 1rem;
-            margin-top: 8px;
-        }
-
-        .presets-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-
-        /* Same colours as the Display Mode buttons; the preset at the current target is solid gold */
-        .preset-btn {
-            padding: 15px 10px;
-            background: rgba(255, 215, 0, 0.1);
-            border: 2px solid #ffd700;
-            border-radius: 6px;
-            color: #ffd700;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .preset-btn:hover {
-            background: rgba(255, 215, 0, 0.2);
-        }
-
-        .preset-btn.selected {
-            background: #ffd700;
-            color: #1a1a2e;
-        }
-
-        .speed-control {
-            background: rgba(255, 255, 255, 0.05);
-            border: 2px solid rgba(255, 215, 0, 0.2);
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-
-        .speed-control h3 {
-            color: #ffd700;
-            margin-bottom: 15px;
-        }
-
-        .speed-input-group {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-        }
-
-        .speed-input-group input[type="range"] {
-            flex: 1;
-        }
-
-        .speed-value {
-            color: #ffd700;
-            font-weight: 700;
-            min-width: 60px;
-            text-align: right;
-        }
-
-        /* OTA TAB */
-        .file-upload {
-            border: 2px dashed rgba(255, 215, 0, 0.3);
-            border-radius: 8px;
-            padding: 40px 20px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            background: rgba(255, 255, 255, 0.02);
-        }
-
-        .file-upload:hover {
-            border-color: #ffd700;
-            background: rgba(255, 215, 0, 0.05);
-        }
-
-        .file-upload input[type="file"] {
-            display: none;
-        }
-
-        .upload-text {
-            color: #a0a0a0;
-            margin-bottom: 10px;
-        }
-
-        .upload-hint {
-            color: #606060;
-            font-size: 0.85rem;
-        }
-
-        /* MESSAGES */
-        .alert {
-            padding: 15px 20px;
-            border-radius: 6px;
-            margin-bottom: 20px;
-            border-left: 4px solid;
-        }
-
-        .alert-success {
-            background: rgba(76, 175, 80, 0.1);
-            border-left-color: #4caf50;
-            color: #4caf50;
-        }
-
-        .alert-error {
-            background: rgba(244, 67, 54, 0.1);
-            border-left-color: #f44336;
-            color: #f44336;
-        }
-
-        .alert-info {
-            background: rgba(33, 150, 243, 0.1);
-            border-left-color: #2196f3;
-            color: #2196f3;
-        }
-
-        /* RESPONSIVE */
-        @media (max-width: 768px) {
-            h1 {
-                font-size: 1.8rem;
-            }
-
-            .tabs {
-                gap: 5px;
-            }
-
-            .tab-btn {
-                padding: 10px 16px;
-                font-size: 0.9rem;
-            }
-
-            .form-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .rpm-number {
-                font-size: 2.5rem;
-            }
-
-            /* Home tab on phones: the LCD card first. A flex column can reorder; its margins
-               don't overlap like block margins, so the cards' top margins go (each card's
-               bottom margin still gives the 20 px gap). */
-            #home.active {
-                display: flex;
-                flex-direction: column;
-            }
-
-            #lcd-card {
-                order: -1;
-            }
-
-            #home > .status-card {
-                margin-top: 0 !important;
-            }
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WiFi Fan Knob</title>
+<!--
+  WiFi Fan Knob web page, compiled into the firmware (platformio.ini embed_txtfiles); data from
+  /api/* (src/webserver.cpp). Layout, colours and components follow the all-projects standard
+  D:\GitHub\WEB_STYLE.md (left sidebar; reference page ETH_Touch_PWM). Colours are variables,
+  Navy & gold only: no theme picker here (user 2026-10-07; may be revisited).
+-->
+<style>
+/* Navy & gold (WEB_STYLE.md preset "navy-gold"); the only theme on this page */
+:root {
+  --bg: #1a1a2e; --bg2: #16213e; --panel: #222339; --border: #3a3b5c;
+  --text: #e0e0e0; --muted: #a0a0a0;
+  --accent: #ffd700; --on-accent: #1a1a2e;
+  --ok: #4caf50; --warn: #ff9800; --error: #f44336;
+}
+/* Derived from the theme colours; no need to change */
+:root {
+  --accent-soft: color-mix(in srgb, var(--accent) 14%, transparent);
+  --accent-line: color-mix(in srgb, var(--accent) 35%, transparent);
+  --radius: 6px;
+  --sidebar: 240px;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
+body { font-family: var(--font); color: var(--text); background: linear-gradient(135deg, var(--bg), var(--bg2)) fixed; min-height: 100vh; }
+a { color: var(--accent); }
+.app { display: flex; min-height: 100vh; }
+
+/* --- Sidebar --- */
+.sidebar { width: var(--sidebar); flex: none; background: color-mix(in srgb, var(--panel) 85%, transparent);
+  border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 20px 0; position: sticky; top: 0; height: 100vh; }
+.brand { padding: 0 20px 22px; }
+.brand-name { font-size: 1.15rem; font-weight: 700; color: var(--accent); }
+.brand-sub { font-size: .75rem; color: var(--muted); margin-top: 3px; font-family: var(--mono); word-break: break-all; }
+.brand-ip { font-size: .85rem; color: var(--text); margin-top: 4px; font-family: var(--mono); }
+.tabs { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.tab { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 20px; background: none; border: none;
+  border-left: 3px solid transparent; color: var(--muted); font: inherit; font-size: .95rem; cursor: pointer; text-align: left; }
+.tab svg { width: 20px; height: 20px; flex: none; }
+.tab:hover { color: var(--text); background: var(--accent-soft); }
+.tab.active { color: var(--accent); border-left-color: var(--accent); background: var(--accent-soft); }
+.lights { padding: 16px 20px 0; border-top: 1px solid var(--border); display: grid; gap: 8px; font-size: .8rem; color: var(--muted); }
+.light { display: flex; align-items: center; gap: 8px; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); flex: none; }
+.dot.ok { background: var(--ok); box-shadow: 0 0 6px var(--ok); }
+.dot.bad { background: var(--error); box-shadow: 0 0 6px var(--error); }
+.dot.warn { background: var(--warn); }
+.who { font-size: .85rem; color: var(--muted); }
+.who b { color: var(--text); font-weight: 600; }
+
+/* --- Content --- */
+.main { flex: 1; min-width: 0; padding: 24px 32px 40px; }
+.main > * { max-width: 900px; }
+.topbar { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 24px;
+  padding-bottom: 14px; border-bottom: 1px solid var(--accent-line); flex-wrap: wrap; }
+.page-title { font-size: 1.5rem; font-weight: 700; }
+.top-right { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.clock { font-family: var(--mono); font-size: 1.1rem; color: var(--accent); }
+.page { display: none; }
+.page.active { display: block; }
+.panel { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; margin-bottom: 16px; }
+.panel h2 { font-size: 1rem; margin-bottom: 14px; color: var(--text); }
+.panel h3 { font-size: .9rem; margin-bottom: 10px; color: var(--text); }
+.hint { font-size: .8rem; color: var(--muted); margin-top: 6px; line-height: 1.4; }
+.status-item { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: .9rem; }
+.status-item:last-child { border-bottom: none; }
+.status-label { color: var(--muted); }
+.status-value { color: var(--text); font-family: var(--mono); text-align: right; word-break: break-all; }
+
+/* --- Forms --- */
+.form { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label, .field .label { font-size: .85rem; color: var(--muted); }
+.field small { font-size: .8rem; color: var(--muted); line-height: 1.4; }
+input[type=text], input[type=password], input[type=number], select, textarea {
+  width: 100%; padding: 9px 11px; border-radius: var(--radius); border: 1px solid var(--border);
+  background: var(--bg); color: var(--text); font: inherit; }
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+input:user-invalid { border-color: var(--error); }
+input[type=checkbox], input[type=range] { accent-color: var(--accent); }
+input[type=checkbox] { width: 18px; height: 18px; cursor: pointer; }
+input[type=range] { width: 100%; }
+input[type=color] { width: 60px; height: 36px; border: 1px solid var(--border); border-radius: var(--radius); background: none; cursor: pointer; }
+.checkbox-group { display: flex; align-items: center; gap: 10px; }
+.checkbox-group label { color: var(--text); font-size: .95rem; }
+.actions { display: flex; align-items: center; gap: 14px; margin-top: 16px; flex-wrap: wrap; }
+.btn { padding: 10px 20px; border-radius: var(--radius); border: 1px solid var(--accent); background: var(--accent);
+  color: var(--on-accent); font: inherit; font-weight: 600; cursor: pointer; }
+.btn:hover { filter: brightness(1.1); }
+.btn.ghost { background: transparent; color: var(--accent); }
+.btn.danger { background: var(--error); border-color: var(--error); color: #fff; }
+.btn.ghost.danger { background: transparent; color: var(--error); border-color: var(--error); }
+.btn:disabled { opacity: .5; cursor: default; }
+form > .btn { margin: 0 0 16px; }
+
+/* --- Dashboard --- */
+.rpm-display { background: var(--accent-soft); border: 2px solid var(--accent); border-radius: var(--radius); padding: 24px;
+  text-align: center; margin-bottom: 16px; }
+.rpm-number { font-size: 3.5rem; color: var(--accent); font-weight: 700; line-height: 1; font-family: var(--mono); }
+.rpm-label { color: var(--muted); margin-top: 8px; }
+.presets-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; }
+/* Like the Display Mode buttons: the preset at the current target is filled */
+.preset-btn { padding: 14px 10px; background: transparent; border: 1px solid var(--accent); border-radius: var(--radius);
+  color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; }
+.preset-btn:hover { background: var(--accent-soft); }
+.preset-btn.selected { background: var(--accent); color: var(--on-accent); }
+.speed-input-group { display: flex; gap: 12px; align-items: center; }
+.speed-input-group input[type=range] { flex: 1; min-width: 0; }
+.speed-value { color: var(--accent); font-weight: 700; font-family: var(--mono); min-width: 3.5em; text-align: right; }
+.fan-off { width: 100%; padding: 16px; margin-bottom: 16px; font-size: 1.3rem; font-weight: 700; }
+#notes { min-height: 170px; max-height: 420px; resize: vertical; line-height: 1.45; }
+.emoji-bar { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+.emoji-bar button { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 3px 7px;
+  font-size: 1.05rem; line-height: 1.2; cursor: pointer; }
+.emoji-bar button:hover { border-color: var(--accent); background: var(--accent-soft); }
+#wifi-networks .preset-btn { text-align: left; }
+#lcd-brightness { margin-top: 16px; }
+
+/* --- System: firmware upload --- */
+.file-upload { border: 2px dashed var(--border); border-radius: var(--radius); padding: 28px 16px; text-align: center;
+  cursor: pointer; color: var(--muted); font-size: .9rem; }
+.file-upload:hover { border-color: var(--accent); color: var(--text); background: var(--accent-soft); }
+.file-upload input[type=file] { display: none; }
+.upload-hint { font-size: .8rem; margin-top: 6px; }
+
+/* --- Login dialog --- */
+dialog { margin: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel); color: var(--text);
+  padding: 22px; width: min(360px, 92vw); }
+dialog::backdrop { background: rgba(0, 0, 0, .55); }
+dialog h2 { font-size: 1.1rem; margin-bottom: 14px; }
+dialog .field { margin-bottom: 12px; }
+
+/* --- Phones: sidebar becomes a top strip --- */
+@media (max-width: 760px) {
+  .app { flex-direction: column; }
+  .sidebar { width: 100%; height: auto; position: static; padding: 12px 0 0; border-right: none; border-bottom: 1px solid var(--border); }
+  .brand { padding: 0 16px 10px; }
+  .tabs { flex-direction: row; overflow-x: auto; }
+  .tab { width: auto; flex: none; padding: 10px 14px; border-left: none; border-bottom: 3px solid transparent; }
+  .tab.active { border-bottom-color: var(--accent); }
+  .lights { display: flex; flex-wrap: wrap; gap: 14px; padding: 10px 16px; }
+  .main { padding: 16px; }
+  .rpm-number { font-size: 2.5rem; }
+  /* The LCD picture first on the Dashboard (user, 2026-09-28) ... */
+  #page-dashboard.active { display: flex; flex-direction: column; }
+  /* ... but only the picture: the LCD card's two parts become cards of their own (display: contents),
+     the picture first, Brightness / Auto where the card was, between Presence & Light and LEDs (user, 2026-10-07) */
+  #lcd-card { display: contents; }
+  #lcd-card > .lcd-part { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 18px; margin: 0 0 16px; }
+  #lcd-viewer { order: -1; }
+  #lcd-brightness h3 { font-size: 1rem; margin-bottom: 14px; }
+  #page-dashboard > *, #lcd-card > * { min-width: 0; }
+}
+</style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>⚡ WiFi Fan Knob</h1>
-            <div class="status-line">Control Panel • IP: <span id="device-ip">192.168.1.100</span> • Status: <span id="device-status">Online</span></div>
-            <div id="login-bar" style="margin-top: 10px; font-size: 0.9rem;">
-                <span id="login-state" style="color: #a0a0a0;">Checking login...</span>
-                <button id="logout-btn" class="btn-secondary" onclick="logOut()" style="display: none; padding: 4px 12px; margin-left: 8px;">Log out</button>
-                <form id="login-form" onsubmit="logIn(event)" style="display: none; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 8px;">
-                    <input type="text" id="login-user" placeholder="Username" autocomplete="username" required style="width: auto;">
-                    <input type="password" id="login-pass" placeholder="Password" autocomplete="current-password" required style="width: auto;">
-                    <button type="submit" class="btn-secondary">Log in</button>
-                </form>
-            </div>
-        </header>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-name">WiFi Fan Knob</div>
+      <div class="brand-ip" id="device-ip">--</div>
+      <div class="brand-sub" id="device-status">--</div>
+    </div>
+    <nav class="tabs">
+      <button class="tab" data-page="dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+        Dashboard</button>
+      <button class="tab" data-page="fans">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="2"/><path d="M12 10c0-4 1-7 4-7 2 0 3 2 2 4s-4 3-6 3zM14 12c4 0 7 1 7 4 0 2-2 3-4 2s-3-4-3-6zM12 14c0 4-1 7-4 7-2 0-3-2-2-4s4-3 6-3zM10 12c-4 0-7-1-7-4 0-2 2-3 4-2s3 4 3 6z"/></svg>
+        Fan Control</button>
+      <button class="tab" data-page="ha">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg>
+        Home Assistant</button>
+      <button class="tab" data-page="network">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="6"/><rect x="2" y="16" width="6" height="6"/><rect x="16" y="16" width="6" height="6"/><path d="M12 8v4M5 16v-4h14v4"/></svg>
+        Network</button>
+      <button class="tab" data-page="system">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 01-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 010-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 014 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 010 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>
+        System</button>
+    </nav>
+    <div class="lights">
+      <div class="light"><span class="dot" id="dot-wifi"></span><span id="light-wifi">WiFi</span></div>
+      <div class="light"><span class="dot" id="dot-mqtt"></span>MQTT</div>
+      <div class="light"><span class="dot" id="dot-fan"></span>Fan controller</div>
+    </div>
+  </aside>
 
-        <div class="tabs">
-            <button class="tab-btn active" onclick="switchTab('home')">Home</button>
-            <button class="tab-btn" onclick="switchTab('wifi')">WiFi</button>
-            <button class="tab-btn" onclick="switchTab('fan')">Fan Settings</button>
-            <button class="tab-btn" onclick="switchTab('config')">Config</button>
-            <button class="tab-btn" onclick="switchTab('ota')">OTA Update</button>
+  <main class="main">
+    <header class="topbar">
+      <h1 class="page-title" id="page-title">Dashboard</h1>
+      <div class="top-right">
+        <span class="clock" id="clock">--:--</span>
+        <span class="who" id="who">Not logged in</span>
+        <button class="btn ghost" id="btn-login" onclick="loginButton()">Log in</button>
+      </div>
+    </header>
+
+    <section class="page" id="page-dashboard">
+        <div class="rpm-display">
+            <div class="rpm-number" id="rpm-current">--</div>
+            <div class="rpm-label">Target RPM</div>
+            <div class="rpm-label">Measured: <span id="rpm-measured">--</span> RPM</div>
         </div>
 
-        <!-- HOME TAB -->
-        <div id="home" class="tab-content active">
-            <div class="rpm-display">
-                <div class="rpm-number" id="rpm-current">--</div>
-                <div class="rpm-label">Target RPM</div>
-                <div class="rpm-label">Measured: <span id="rpm-measured">--</span> RPM</div>
+        <div class="panel">
+            <h2>Quick Start Presets</h2>
+            <div class="presets-grid">
+                <button class="preset-btn" id="preset-btn-low">Low</button>
+                <button class="preset-btn" id="preset-btn-medium">Med</button>
+                <button class="preset-btn" id="preset-btn-high">High</button>
+                <button class="preset-btn" id="preset-btn-max">Max</button>
             </div>
+        </div>
 
-            <div class="status-card">
-                <h3>Quick Start Presets</h3>
-                <div class="presets-grid">
-                    <button class="preset-btn" id="preset-btn-low">Low</button>
-                    <button class="preset-btn" id="preset-btn-medium">Med</button>
-                    <button class="preset-btn" id="preset-btn-high">High</button>
-                    <button class="preset-btn" id="preset-btn-max">Max</button>
-                </div>
+        <div class="panel">
+            <h2>Manual Speed Control</h2>
+            <div class="speed-input-group">
+                <input type="range" id="speed-slider" min="0" max="2500" value="1500"
+                       oninput="updateSpeed(this.value)" onchange="sendSlider(true)">
+                <span class="speed-value" id="speed-display">1500</span>
             </div>
+            <small style="color: var(--muted); display: block; margin-top: 10px;">The fan follows the slider as you move it (<span id="speed-range">0-2500</span> RPM)</small>
+        </div>
 
-            <div class="speed-control">
-                <h3>Manual Speed Control</h3>
+        <button class="btn danger fan-off" onclick="fanOff()">
+            <!-- Inline SVG: the Unicode power symbol has no glyph on Android -->
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                 stroke-linecap="round" style="vertical-align: -5px; margin-right: 8px;" aria-hidden="true">
+                <path d="M12 3v9"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/>
+            </svg>FAN OFF
+        </button>
+
+        <div class="panel">
+            <h2>Display Mode</h2>
+            <p style="color: var(--muted); margin-bottom: 12px; font-size: 0.9rem;">
+                One at a time, like radio buttons. Screensaver: the eye, fan keeps running.
+                Standby: fan off, external power off.
+            </p>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <button type="button" class="btn ghost" id="mode-active" onclick="setMode('active')">Active</button>
+                <button type="button" class="btn ghost" id="mode-screensaver" onclick="setMode('screensaver')">Screensaver</button>
+                <button type="button" class="btn ghost" id="mode-standby" onclick="setMode('standby')">Standby</button>
+            </div>
+            <small id="mode-note" style="color: var(--accent); display: block; margin-top: 10px;"></small>
+        </div>
+
+        <div class="panel">
+            <h2>Air</h2>
+            <div class="status-item">
+                <span class="status-label">Temperature:</span>
+                <span class="status-value" id="air-temp">--</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Humidity:</span>
+                <span class="status-value" id="air-humidity">--</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">VOC Index:</span>
+                <span class="status-value" id="air-voc">--</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">NOx Index:</span>
+                <span class="status-value" id="air-nox">--</span>
+            </div>
+            <small id="air-note" style="color: var(--muted); display: block; margin-top: 10px;">
+                VOC: 100 = this room's normal air, higher = more fumes. NOx: 1 = normal.
+                The VOC Index learns the room over the first hours.
+            </small>
+        </div>
+
+        <div class="panel">
+            <h2>Presence &amp; Light</h2>
+            <div class="status-item">
+                <span class="status-label">Proximity:</span>
+                <span class="status-value" id="presence-prox">--</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Light:</span>
+                <span class="status-value" id="presence-lux">--</span>
+            </div>
+            <small style="color: var(--muted); display: block; margin-top: 10px;">
+                Proximity 0-2047: higher = something closer in front of the sensor.
+            </small>
+        </div>
+
+        <div class="panel" id="lcd-card">
+            <div class="lcd-part" id="lcd-viewer" style="text-align: center;">
+            <h2>LCD</h2>
+            <!-- A copy of the knob's screen (every page, the eye too), fetched every 2 s while this tab shows -->
+            <canvas id="lcd-view" width="240" height="240"
+                    style="width: 240px; max-width: 100%; border-radius: 50%; background: #000; border: 2px solid var(--accent-line);"></canvas>
+            <small id="lcd-note" style="color: var(--muted); display: block; margin-top: 8px;">Updates every 2 seconds</small>
+            </div>
+            <div class="lcd-part" id="lcd-brightness">
+                <h3>Brightness</h3>
                 <div class="speed-input-group">
-                    <input type="range" id="speed-slider" min="0" max="2500" value="1500"
-                           oninput="updateSpeed(this.value)" onchange="sendSlider(true)">
-                    <span class="speed-value" id="speed-display">1500</span>
+                    <input type="range" id="brightness" min="10" max="100" value="80"
+                       oninput="brightnessDragging = true; updateBrightnessLabel(this.value)"
+                       onchange="brightnessDragging = false; saveBrightness(this.value)">
+                    <span class="speed-value"><span id="brightness-label">80</span>%</span>
                 </div>
-                <small style="color: #606060; display: block; margin-top: 10px;">The fan follows the slider as you move it (<span id="speed-range">0-2500</span> RPM)</small>
-            </div>
-
-            <button class="btn-danger" onclick="fanOff()"
-                    style="width: 100%; padding: 18px; margin-bottom: 20px; font-size: 1.4rem; font-weight: 700; background: #d32f2f; color: #fff;">
-                <!-- Inline SVG: the Unicode power symbol has no glyph on Android -->
-                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-                     stroke-linecap="round" style="vertical-align: -5px; margin-right: 8px;" aria-hidden="true">
-                    <path d="M12 3v9"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/>
-                </svg>FAN OFF
-            </button>
-
-            <div class="status-card" style="margin-top: 20px;">
-                <h3>Display Mode</h3>
-                <p style="color: #a0a0a0; margin-bottom: 12px; font-size: 0.9rem;">
-                    One at a time, like radio buttons. Screensaver: the eye, fan keeps running.
-                    Standby: fan off, external power off.
-                </p>
-                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                    <button type="button" class="btn-secondary" id="mode-active" onclick="setMode('active')">Active</button>
-                    <button type="button" class="btn-secondary" id="mode-screensaver" onclick="setMode('screensaver')">Screensaver</button>
-                    <button type="button" class="btn-secondary" id="mode-standby" onclick="setMode('standby')">Standby</button>
+                <small style="color: var(--muted); display: block; margin-top: 10px;">Saved when you let go of the slider. Moving it turns Auto off.</small>
+                <div class="checkbox-group" style="margin-top: 14px;">
+                    <input type="checkbox" id="auto-brightness" onchange="saveAutoBrightness({ auto: this.checked ? 1 : 0 })">
+                    <label for="auto-brightness">Auto: follow the room light (light sensor)</label>
                 </div>
-                <small id="mode-note" style="color: #ffd700; display: block; margin-top: 10px;"></small>
-            </div>
-
-            <div class="status-card">
-                <h3>Air</h3>
-                <div class="status-item">
-                    <span class="status-label">Temperature:</span>
-                    <span class="status-value" id="air-temp">--</span>
+                <div class="speed-input-group" style="margin-top: 10px;">
+                    <label for="auto-min" style="color: var(--muted); min-width: 80px;">Dark</label>
+                    <input type="range" id="auto-min" min="10" max="100" value="20"
+                           oninput="document.getElementById('auto-min-label').textContent = this.value"
+                           onchange="saveAutoBrightness({ min: this.value })">
+                    <span class="speed-value"><span id="auto-min-label">20</span>%</span>
                 </div>
-                <div class="status-item">
-                    <span class="status-label">Humidity:</span>
-                    <span class="status-value" id="air-humidity">--</span>
+                <div class="speed-input-group" style="margin-top: 10px;">
+                    <label for="auto-max" style="color: var(--muted); min-width: 80px;">Bright</label>
+                    <input type="range" id="auto-max" min="10" max="100" value="100"
+                           oninput="document.getElementById('auto-max-label').textContent = this.value"
+                           onchange="saveAutoBrightness({ max: this.value })">
+                    <span class="speed-value"><span id="auto-max-label">100</span>%</span>
                 </div>
-                <div class="status-item">
-                    <span class="status-label">VOC Index:</span>
-                    <span class="status-value" id="air-voc">--</span>
-                </div>
-                <div class="status-item">
-                    <span class="status-label">NOx Index:</span>
-                    <span class="status-value" id="air-nox">--</span>
-                </div>
-                <small id="air-note" style="color: #606060; display: block; margin-top: 10px;">
-                    VOC: 100 = this room's normal air, higher = more fumes. NOx: 1 = normal.
-                    The VOC Index learns the room over the first hours.
+                <small id="auto-note" style="color: var(--muted); display: block; margin-top: 10px;">
+                    Auto sets the screen between the Dark level (about 5 lx and darker) and the Bright level
+                    (about 500 lx and brighter), fading so a passing shadow doesn't flicker it. The LED ring
+                    follows too (LED brightness 10 to 90).
                 </small>
-            </div>
-
-            <div class="status-card">
-                <h3>Presence &amp; Light</h3>
-                <div class="status-item">
-                    <span class="status-label">Proximity:</span>
-                    <span class="status-value" id="presence-prox">--</span>
-                </div>
-                <div class="status-item">
-                    <span class="status-label">Light:</span>
-                    <span class="status-value" id="presence-lux">--</span>
-                </div>
-                <small style="color: #606060; display: block; margin-top: 10px;">
-                    Proximity 0-2047: higher = something closer in front of the sensor.
-                </small>
-            </div>
-
-            <div class="status-card" id="lcd-card" style="margin-top: 20px; text-align: center;">
-                <h3>LCD</h3>
-                <!-- A copy of the knob's screen (every page, the eye too), fetched every 2 s while this tab shows -->
-                <canvas id="lcd-view" width="240" height="240"
-                        style="width: 240px; max-width: 100%; border-radius: 50%; background: #000; border: 2px solid rgba(255, 215, 0, 0.4);"></canvas>
-                <small id="lcd-note" style="color: #606060; display: block; margin-top: 8px;">Updates every 2 seconds</small>
-                <div style="text-align: left; margin-top: 16px;">
-                    <h3 style="font-size: 1rem;">Brightness</h3>
-                    <div class="speed-input-group">
-                        <input type="range" id="brightness" min="10" max="100" value="80"
-                           oninput="brightnessDragging = true; updateBrightnessLabel(this.value)"
-                           onchange="brightnessDragging = false; saveBrightness(this.value)">
-                        <span class="speed-value"><span id="brightness-label">80</span>%</span>
-                    </div>
-                    <small style="color: #606060; display: block; margin-top: 10px;">Saved when you let go of the slider. Moving it turns Auto off.</small>
-                    <div class="checkbox-group" style="margin-top: 14px;">
-                        <input type="checkbox" id="auto-brightness" onchange="saveAutoBrightness({ auto: this.checked ? 1 : 0 })">
-                        <label for="auto-brightness">Auto: follow the room light (light sensor)</label>
-                    </div>
-                    <div class="speed-input-group" style="margin-top: 10px;">
-                        <label for="auto-min" style="color: #a0a0a0; min-width: 80px;">Dark</label>
-                        <input type="range" id="auto-min" min="10" max="100" value="20"
-                               oninput="document.getElementById('auto-min-label').textContent = this.value"
-                               onchange="saveAutoBrightness({ min: this.value })">
-                        <span class="speed-value"><span id="auto-min-label">20</span>%</span>
-                    </div>
-                    <div class="speed-input-group" style="margin-top: 10px;">
-                        <label for="auto-max" style="color: #a0a0a0; min-width: 80px;">Bright</label>
-                        <input type="range" id="auto-max" min="10" max="100" value="100"
-                               oninput="document.getElementById('auto-max-label').textContent = this.value"
-                               onchange="saveAutoBrightness({ max: this.value })">
-                        <span class="speed-value"><span id="auto-max-label">100</span>%</span>
-                    </div>
-                    <small id="auto-note" style="color: #606060; display: block; margin-top: 10px;">
-                        Auto sets the screen between the Dark level (about 5 lx and darker) and the Bright level
-                        (about 500 lx and brighter), fading so a passing shadow doesn't flicker it. The LED ring
-                        follows too (LED brightness 10 to 90).
-                    </small>
-                </div>
-            </div>
-
-            <div class="status-card" id="leds-card" style="margin-top: 20px;">
-                <h3>LEDs</h3>
-                <p style="color: #a0a0a0; margin-bottom: 12px; font-size: 0.9rem;">
-                    The five lights on the knob. They stay on in standby. Also in Home Assistant as "LEDs".
-                </p>
-                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                    <button type="button" class="btn-secondary" id="led-Off" onclick="setLedEffect('Off')">Off</button>
-                    <button type="button" class="btn-secondary" id="led-Solid" onclick="setLedEffect('Solid')">Solid</button>
-                    <button type="button" class="btn-secondary" id="led-Flash" onclick="setLedEffect('Flash')">Flash</button>
-                    <button type="button" class="btn-secondary" id="led-Breathe" onclick="setLedEffect('Breathe')">Breathe</button>
-                    <button type="button" class="btn-secondary" id="led-Rainbow" onclick="setLedEffect('Rainbow')">Rainbow</button>
-                </div>
-                <div style="display: flex; align-items: center; gap: 12px; margin-top: 16px;">
-                    <label for="led-color" style="color: #a0a0a0; min-width: 80px;">Colour</label>
-                    <input type="color" id="led-color" value="#ffd700" onchange="saveLeds({ color: this.value })"
-                           style="width: 60px; height: 36px; border: 2px solid rgba(255, 215, 0, 0.2); border-radius: 6px; background: none; cursor: pointer;">
-                    <small style="color: #606060;">Not used by Rainbow</small>
-                </div>
-                <div class="speed-input-group" style="margin-top: 12px;">
-                    <label for="led-brightness" style="color: #a0a0a0; min-width: 80px;">Brightness</label>
-                    <input type="range" id="led-brightness" min="1" max="100" value="50"
-                           oninput="document.getElementById('led-brightness-label').textContent = this.value"
-                           onchange="saveLeds({ brightness: this.value })">
-                    <span class="speed-value"><span id="led-brightness-label">50</span></span>
-                </div>
-                <div class="speed-input-group" style="margin-top: 12px;">
-                    <label for="led-speed" style="color: #a0a0a0; min-width: 80px;">Speed</label>
-                    <input type="range" id="led-speed" min="1" max="10" value="5"
-                           oninput="document.getElementById('led-speed-label').textContent = this.value"
-                           onchange="saveLeds({ speed: this.value })">
-                    <span class="speed-value"><span id="led-speed-label">5</span></span>
-                </div>
-                <small style="color: #606060; display: block; margin-top: 10px;">
-                    Brightness 100 is the firmware limit (100 of the LEDs' 255). While the LCD's Auto brightness is on,
-                    the room light sets the LED brightness (10 to 90); moving this slider turns Auto off.
-                    Speed is for Flash, Breathe and Rainbow. Changes apply and save at once; they need the login.
-                </small>
-            </div>
-
-            <div class="status-card">
-                <h3>System Status</h3>
-                <div class="status-item">
-                    <span class="status-label">Fan Status:</span>
-                    <span class="status-value" id="fan-status">Running</span>
-                </div>
-                <div class="status-item">
-                    <span class="status-label">Power Mode:</span>
-                    <span class="status-value" id="power-mode">Active</span>
-                </div>
-                <div class="status-item">
-                    <span class="status-label">Peripheral Power:</span>
-                    <span class="status-value" id="periph-power">--</span>
-                </div>
-                <div class="status-item">
-                    <span class="status-label">WiFi Signal:</span>
-                    <span class="status-value" id="wifi-signal">-55 dBm</span>
-                </div>
-                <div class="status-item">
-                    <span class="status-label">MQTT Connected:</span>
-                    <span class="status-value" id="mqtt-status">Yes</span>
-                </div>
-            </div>
-
-            <div class="status-card" id="notes-card" style="margin-top: 20px;">
-                <h3>Notes</h3>
-                <div class="emoji-bar" id="emoji-bar"></div>
-                <textarea id="notes" rows="8" spellcheck="true" placeholder="Notes for this fan: filter changes, what was set and why..."></textarea>
-                <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 10px;">
-                    <button type="button" class="btn-primary" onclick="saveNotes()">Save notes</button>
-                    <small id="notes-meta" style="color: #a0a0a0;"></small>
-                </div>
-                <small style="color: #606060; display: block; margin-top: 8px;">
-                    Plain text; emojis work (Windows: Win + . opens the emoji picker). Kept on the board,
-                    shared by every browser. Saving needs the login.
-                </small>
-            </div>
-
-            <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid rgba(255, 215, 0, 0.2);">
-                <a href="https://github.com/sergeant82d/Wifi_Fan_Knob" target="_blank" style="color: #ffd700; text-decoration: none; font-size: 0.9rem;">
-                    🔗 GitHub Repository
-                </a>
             </div>
         </div>
 
-        <!-- WiFi TAB -->
-        <div id="wifi" class="tab-content">
-            <div class="status-card">
-                <h3>Network Information</h3>
-                <div class="status-item">
-                    <span class="status-label">Connected SSID:</span>
-                    <span class="status-value" id="current-ssid">Home WiFi</span>
+        <div class="panel" id="leds-card">
+            <h2>LEDs</h2>
+            <p style="color: var(--muted); margin-bottom: 12px; font-size: 0.9rem;">
+                The five lights on the knob. They stay on in standby. Also in Home Assistant as "LEDs".
+            </p>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <button type="button" class="btn ghost" id="led-Off" onclick="setLedEffect('Off')">Off</button>
+                <button type="button" class="btn ghost" id="led-Solid" onclick="setLedEffect('Solid')">Solid</button>
+                <button type="button" class="btn ghost" id="led-Flash" onclick="setLedEffect('Flash')">Flash</button>
+                <button type="button" class="btn ghost" id="led-Breathe" onclick="setLedEffect('Breathe')">Breathe</button>
+                <button type="button" class="btn ghost" id="led-Rainbow" onclick="setLedEffect('Rainbow')">Rainbow</button>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px; margin-top: 16px;">
+                <label for="led-color" style="color: var(--muted); min-width: 80px;">Colour</label>
+                <input type="color" id="led-color" value="#ffd700" onchange="saveLeds({ color: this.value })"
+                       style="width: 60px; height: 36px; border: 2px solid var(--border); border-radius: 6px; background: none; cursor: pointer;">
+                <small style="color: var(--muted);">Not used by Rainbow</small>
+            </div>
+            <div class="speed-input-group" style="margin-top: 12px;">
+                <label for="led-brightness" style="color: var(--muted); min-width: 80px;">Brightness</label>
+                <input type="range" id="led-brightness" min="1" max="100" value="50"
+                       oninput="document.getElementById('led-brightness-label').textContent = this.value"
+                       onchange="saveLeds({ brightness: this.value })">
+                <span class="speed-value"><span id="led-brightness-label">50</span></span>
+            </div>
+            <div class="speed-input-group" style="margin-top: 12px;">
+                <label for="led-speed" style="color: var(--muted); min-width: 80px;">Speed</label>
+                <input type="range" id="led-speed" min="1" max="10" value="5"
+                       oninput="document.getElementById('led-speed-label').textContent = this.value"
+                       onchange="saveLeds({ speed: this.value })">
+                <span class="speed-value"><span id="led-speed-label">5</span></span>
+            </div>
+            <small style="color: var(--muted); display: block; margin-top: 10px;">
+                Brightness 100 is the firmware limit (100 of the LEDs' 255). While the LCD's Auto brightness is on,
+                the room light sets the LED brightness (10 to 90); moving this slider turns Auto off.
+                Speed is for Flash, Breathe and Rainbow. Changes apply and save at once; they need the login.
+            </small>
+        </div>
+
+        <div class="panel" id="notes-card">
+            <h2>Notes</h2>
+            <div class="emoji-bar" id="emoji-bar"></div>
+            <textarea id="notes" rows="8" spellcheck="true" placeholder="Notes for this fan: filter changes, what was set and why..."></textarea>
+            <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 10px;">
+                <button type="button" class="btn" onclick="saveNotes()">Save notes</button>
+                <small id="notes-meta" style="color: var(--muted);"></small>
+            </div>
+            <small style="color: var(--muted); display: block; margin-top: 8px;">
+                Plain text; emojis work (Windows: Win + . opens the emoji picker). Kept on the board,
+                shared by every browser. Saving needs the login.
+            </small>
+        </div>
+    </section>
+
+    <section class="page" id="page-fans">
+        <form onsubmit="saveFanSettings(event)">
+            <div class="panel">
+                <h2>Fan Profiles</h2>
+                <p style="color: var(--muted); margin-bottom: 15px; font-size: 0.9rem;">
+                    A fan profile holds one fan's measured speeds, plus its own Fan max RPM and presets
+                    (below). Auto Configure measures the fan connected now (about 2 minutes: full speed,
+                    then slower step by step until it stops) and sets the presets to 25 / 50 / 75 / 100 %
+                    of its top speed. You can edit them afterwards; saving keeps them with the active fan.
+                </p>
+                <div class="field">
+                    <label for="fan-profile">Active fan</label>
+                    <select id="fan-profile" onchange="activateFanProfile()"></select>
+                    <small id="fan-profile-info" style="color: var(--muted);"></small>
                 </div>
-                <div class="status-item">
-                    <span class="status-label">IP Address:</span>
-                    <span class="status-value" id="current-ip">192.168.1.100</span>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px;">
+                    <button type="button" class="btn ghost" onclick="renameFanProfile()">Rename</button>
+                    <button type="button" class="btn ghost danger" onclick="deleteFanProfile()">Delete</button>
                 </div>
-                <div class="status-item">
-                    <span class="status-label">Signal Strength:</span>
-                    <span class="status-value" id="current-signal">-55 dBm</span>
+                <div class="form">
+                    <div class="field">
+                        <label for="autoconfig-name">Fan name</label>
+                        <input type="text" id="autoconfig-name" maxlength="23" placeholder="e.g. Noctua 140">
+                    </div>
+                    <div class="field">
+                        <label for="autoconfig-slot">Save as</label>
+                        <select id="autoconfig-slot"></select>
+                    </div>
                 </div>
-                <div class="status-item">
-                    <span class="status-label">MAC Address:</span>
-                    <span class="status-value" id="current-mac" style="font-family: monospace; font-size: 0.9rem;">AA:BB:CC:DD:EE:FF</span>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <button type="button" class="btn" id="autoconfig-btn" onclick="startAutoConfig()">Auto Configure</button>
+                    <button type="button" class="btn ghost danger" id="autoconfig-cancel" onclick="cancelAutoConfig()" style="display: none;">Cancel</button>
+                </div>
+                <div id="autoconfig-status" style="margin-top: 10px; color: var(--muted);"></div>
+
+                <p style="color: var(--muted); margin: 20px 0 15px; font-size: 0.9rem;">
+                    Without a fan profile, speed is estimated in a straight line between these:
+                </p>
+                <div class="form">
+                    <div class="field">
+                        <label for="fan-min-pwm">Min PWM (start threshold)</label>
+                        <input type="number" id="fan-min-pwm" min="0" max="255" value="50" required>
+                        <small style="color: var(--muted);">0-255</small>
+                    </div>
+                    <div class="field">
+                        <label for="fan-max-pwm">Max PWM (full speed)</label>
+                        <input type="number" id="fan-max-pwm" min="0" max="255" value="200" required>
+                        <small style="color: var(--muted);">0-255</small>
+                    </div>
                 </div>
             </div>
 
+            <div class="panel">
+                <h2>Fan Presets</h2>
+                <p style="color: var(--muted); margin-bottom: 15px; font-size: 0.9rem;">
+                    Fan max RPM is your fan's rated top speed: the knob, LCD arc, speed slider and
+                    Home Assistant are limited to it. Presets are the speeds for the Low / Med / High / Max
+                    buttons here and on the LCD; they must be in order and no higher than the max.
+                </p>
+                <div class="field" style="margin-bottom: 15px;">
+                    <label for="fan-max-rpm">Fan max RPM</label>
+                    <input type="number" id="fan-max-rpm" min="100" max="20000" required>
+                </div>
+                <div class="form">
+                    <div class="field">
+                        <label for="preset-low">Low (RPM)</label>
+                        <input type="number" id="preset-low" required>
+                    </div>
+                    <div class="field">
+                        <label for="preset-medium">Med (RPM)</label>
+                        <input type="number" id="preset-medium" required>
+                    </div>
+                    <div class="field">
+                        <label for="preset-high">High (RPM)</label>
+                        <input type="number" id="preset-high" required>
+                    </div>
+                    <div class="field">
+                        <label for="preset-max">Max (RPM)</label>
+                        <input type="number" id="preset-max" required>
+                    </div>
+                </div>
+            </div>
+
+            <button type="submit" class="btn" style="margin-top: 15px;">Save Fan Settings</button>
+        </form>
+    </section>
+
+    <section class="page" id="page-ha">
+        <form onsubmit="saveConfig(event)">
+            <div class="panel">
+                <h2>MQTT</h2>
+                <p class="hint" style="margin: 0 0 14px;">The broker Home Assistant uses (e.g. the Mosquitto add-on). The knob announces its controls and sensors to HA by itself (auto-discovery).</p>
+                <div class="form">
+                    <div class="field">
+                        <label for="mqtt-broker">MQTT Broker IP</label>
+                        <input type="text" id="mqtt-broker" placeholder="192.168.1.50" required>
+                    </div>
+                    <div class="field">
+                        <label for="mqtt-port">Port</label>
+                        <input type="number" id="mqtt-port" value="1883" min="1" max="65535" required>
+                    </div>
+                    <div class="field">
+                        <label for="mqtt-user">Username</label>
+                        <input type="text" id="mqtt-user" placeholder="(optional)">
+                    </div>
+                    <div class="field">
+                        <label for="mqtt-pass">Password</label>
+                        <input type="password" id="mqtt-pass" placeholder="(optional)">
+                    </div>
+                </div>
+                <div class="field" style="margin-top: 15px;">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="mqtt-discovery" checked>
+                        <label for="mqtt-discovery" style="margin: 0;">Enable Home Assistant Auto-Discovery</label>
+                    </div>
+                </div>
+            </div>
+
+            <button type="submit" class="btn">Save</button>
+        </form>
+    </section>
+
+    <section class="page" id="page-network">
+        <div class="panel">
+            <h2>Network Information</h2>
+            <div class="status-item">
+                <span class="status-label">Connected SSID:</span>
+                <span class="status-value" id="current-ssid">Home WiFi</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">IP Address:</span>
+                <span class="status-value" id="current-ip">192.168.1.100</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Signal Strength:</span>
+                <span class="status-value" id="current-signal">-55 dBm</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">MAC Address:</span>
+                <span class="status-value" id="current-mac" style="font-family: monospace; font-size: 0.9rem;">AA:BB:CC:DD:EE:FF</span>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>WiFi network</h2>
             <form onsubmit="saveWiFi(event)">
-                <div class="form-grid">
-                    <div class="form-group">
+                <div class="form">
+                    <div class="field">
                         <label for="wifi-ssid">SSID</label>
                         <input type="text" id="wifi-ssid" placeholder="Network name" required>
                     </div>
-                    <div class="form-group">
+                    <div class="field">
                         <label for="wifi-pass">Password</label>
                         <input type="password" id="wifi-pass" placeholder="Network password">
                     </div>
                 </div>
-                <button type="submit" class="btn-primary" style="margin-top: 15px;">Connect to WiFi</button>
+                <button type="submit" class="btn" style="margin-top: 15px;">Connect to WiFi</button>
             </form>
 
-            <div style="margin-top: 20px;">
-                <button class="btn-secondary" onclick="scanWiFi()">Scan Available Networks</button>
-                <button class="btn-danger" onclick="forgetWiFi()">Forget Saved Network</button>
+            <div class="actions">
+                <button class="btn ghost" onclick="scanWiFi()">Scan Available Networks</button>
+                <button class="btn ghost danger" onclick="forgetWiFi()">Forget Saved Network</button>
             </div>
             <div id="wifi-networks" style="margin-top: 15px; display: grid; gap: 8px;"></div>
-
-            <div class="status-card" style="margin-top: 20px;">
-                <h3>Network Configuration</h3>
-                <p style="color: #a0a0a0; margin-bottom: 15px; font-size: 0.9rem;">
-                    By default, the device uses DHCP to get an IP address. Enable static IP for a fixed address.
-                </p>
-                <form onsubmit="saveNetworkConfig(event)">
-                    <div class="form-group" style="margin-bottom: 20px;">
-                        <label for="hostname">Device name</label>
-                        <input type="text" id="hostname" maxlength="31" pattern="[A-Za-z0-9]([A-Za-z0-9\-]*[A-Za-z0-9])?"
-                               placeholder="fanknob" required>
-                        <small style="color: #606060;">Open this page at <b>http://<span id="hostname-example">fanknob</span>.local:8080</b>
-                            on your network (most computers and iPhones; some Android phones don't support .local names).
-                            Letters, digits and hyphens.</small>
-                    </div>
-                    <div class="form-group" style="margin-bottom: 20px;">
-                        <div class="checkbox-group">
-                            <input type="checkbox" id="static-ip-enable" onchange="toggleStaticIP()">
-                            <label for="static-ip-enable" style="margin: 0;">Use Static IP Address</label>
-                        </div>
-                    </div>
-                    <div id="static-ip-fields" style="display: none;">
-                        <div class="form-grid">
-                            <div class="form-group">
-                                <label for="static-ip">IP Address</label>
-                                <input type="text" id="static-ip" placeholder="192.168.1.100" pattern="^(\d{1,3}\.){3}\d{1,3}$">
-                            </div>
-                            <div class="form-group">
-                                <label for="static-gateway">Gateway</label>
-                                <input type="text" id="static-gateway" placeholder="192.168.1.1" pattern="^(\d{1,3}\.){3}\d{1,3}$">
-                            </div>
-                            <div class="form-group">
-                                <label for="static-subnet">Subnet Mask</label>
-                                <input type="text" id="static-subnet" placeholder="255.255.255.0" pattern="^(\d{1,3}\.){3}\d{1,3}$">
-                            </div>
-                            <div class="form-group">
-                                <label for="static-dns">DNS Server (optional)</label>
-                                <input type="text" id="static-dns" placeholder="8.8.8.8" pattern="^(\d{1,3}\.){3}\d{1,3}$">
-                            </div>
-                        </div>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 15px;">
-                        <button type="submit" class="btn-primary">Save &amp; Restart</button>
-                        <span id="net-status" style="color: #a0a0a0; font-size: 0.9rem;">
-                            Saving restarts the board; it is offline for about 15 seconds.
-                        </span>
-                    </div>
-                </form>
-            </div>
-
-            <div class="status-card" style="margin-top: 20px;">
-                <h3>Hotspot Password</h3>
-                <p style="color: #a0a0a0; margin-bottom: 15px; font-size: 0.9rem;">
-                    Password for the <span id="ap-ssid">WiFi-Fan-Knob</span> hotspot, used when the
-                    board can't reach your WiFi. Applies the next time the hotspot starts.
-                </p>
-                <div class="status-item">
-                    <span class="status-label">Hotspot:</span>
-                    <span class="status-value" id="hotspot-state">--</span>
-                </div>
-                <form onsubmit="saveApPassword(event)">
-                    <div class="form-group">
-                        <label for="ap-pass">New Hotspot Password</label>
-                        <input type="password" id="ap-pass" minlength="8" maxlength="63" placeholder="8-63 characters" required>
-                    </div>
-                    <button type="submit" class="btn-primary" style="margin-top: 15px;">Save Hotspot Password</button>
-                </form>
-            </div>
         </div>
 
-        <!-- CONFIG TAB -->
-        <!-- FAN SETTINGS TAB -->
-        <div id="fan" class="tab-content">
-            <form onsubmit="saveFanSettings(event)">
-                <div class="status-card" style="margin-top: 20px;">
-                    <h3>Fan Profiles</h3>
-                    <p style="color: #a0a0a0; margin-bottom: 15px; font-size: 0.9rem;">
-                        A fan profile holds one fan's measured speeds, plus its own Fan max RPM and presets
-                        (below). Auto Configure measures the fan connected now (about 2 minutes: full speed,
-                        then slower step by step until it stops) and sets the presets to 25 / 50 / 75 / 100 %
-                        of its top speed. You can edit them afterwards; saving keeps them with the active fan.
-                    </p>
-                    <div class="form-group">
-                        <label for="fan-profile">Active fan</label>
-                        <select id="fan-profile" onchange="activateFanProfile()"></select>
-                        <small id="fan-profile-info" style="color: #a0a0a0;"></small>
+        <div class="panel">
+            <h2>Network Configuration</h2>
+            <p style="color: var(--muted); margin-bottom: 15px; font-size: 0.9rem;">
+                By default, the device uses DHCP to get an IP address. Enable static IP for a fixed address.
+            </p>
+            <form onsubmit="saveNetworkConfig(event)">
+                <div class="field" style="margin-bottom: 20px;">
+                    <label for="hostname">Device name</label>
+                    <input type="text" id="hostname" maxlength="31" pattern="[A-Za-z0-9]([A-Za-z0-9\-]*[A-Za-z0-9])?"
+                           placeholder="fanknob" required>
+                    <small style="color: var(--muted);">Open this page at <b>http://<span id="hostname-example">fanknob</span>.local:8080</b>
+                        on your network (most computers and iPhones; some Android phones don't support .local names).
+                        Letters, digits and hyphens.</small>
+                </div>
+                <div class="field" style="margin-bottom: 20px;">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="static-ip-enable" onchange="toggleStaticIP()">
+                        <label for="static-ip-enable" style="margin: 0;">Use Static IP Address</label>
                     </div>
-                    <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px;">
-                        <button type="button" class="btn-secondary" onclick="renameFanProfile()">Rename</button>
-                        <button type="button" class="btn-danger" onclick="deleteFanProfile()">Delete</button>
-                    </div>
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label for="autoconfig-name">Fan name</label>
-                            <input type="text" id="autoconfig-name" maxlength="23" placeholder="e.g. Noctua 140">
+                </div>
+                <div id="static-ip-fields" style="display: none;">
+                    <div class="form">
+                        <div class="field">
+                            <label for="static-ip">IP Address</label>
+                            <input type="text" id="static-ip" placeholder="192.168.1.100" pattern="^(\d{1,3}\.){3}\d{1,3}$">
                         </div>
-                        <div class="form-group">
-                            <label for="autoconfig-slot">Save as</label>
-                            <select id="autoconfig-slot"></select>
+                        <div class="field">
+                            <label for="static-gateway">Gateway</label>
+                            <input type="text" id="static-gateway" placeholder="192.168.1.1" pattern="^(\d{1,3}\.){3}\d{1,3}$">
                         </div>
-                    </div>
-                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                        <button type="button" class="btn-primary" id="autoconfig-btn" onclick="startAutoConfig()">Auto Configure</button>
-                        <button type="button" class="btn-danger" id="autoconfig-cancel" onclick="cancelAutoConfig()" style="display: none;">Cancel</button>
-                    </div>
-                    <div id="autoconfig-status" style="margin-top: 10px; color: #a0a0a0;"></div>
-
-                    <p style="color: #a0a0a0; margin: 20px 0 15px; font-size: 0.9rem;">
-                        Without a fan profile, speed is estimated in a straight line between these:
-                    </p>
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label for="fan-min-pwm">Min PWM (start threshold)</label>
-                            <input type="number" id="fan-min-pwm" min="0" max="255" value="50" required>
-                            <small style="color: #606060;">0-255</small>
+                        <div class="field">
+                            <label for="static-subnet">Subnet Mask</label>
+                            <input type="text" id="static-subnet" placeholder="255.255.255.0" pattern="^(\d{1,3}\.){3}\d{1,3}$">
                         </div>
-                        <div class="form-group">
-                            <label for="fan-max-pwm">Max PWM (full speed)</label>
-                            <input type="number" id="fan-max-pwm" min="0" max="255" value="200" required>
-                            <small style="color: #606060;">0-255</small>
+                        <div class="field">
+                            <label for="static-dns">DNS Server (optional)</label>
+                            <input type="text" id="static-dns" placeholder="8.8.8.8" pattern="^(\d{1,3}\.){3}\d{1,3}$">
                         </div>
                     </div>
                 </div>
-
-                <div class="status-card">
-                    <h3>Fan Presets</h3>
-                    <p style="color: #a0a0a0; margin-bottom: 15px; font-size: 0.9rem;">
-                        Fan max RPM is your fan's rated top speed: the knob, LCD arc, speed slider and
-                        Home Assistant are limited to it. Presets are the speeds for the Low / Med / High / Max
-                        buttons here and on the LCD; they must be in order and no higher than the max.
-                    </p>
-                    <div class="form-group" style="margin-bottom: 15px;">
-                        <label for="fan-max-rpm">Fan max RPM</label>
-                        <input type="number" id="fan-max-rpm" min="100" max="20000" required>
-                    </div>
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label for="preset-low">Low (RPM)</label>
-                            <input type="number" id="preset-low" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="preset-medium">Med (RPM)</label>
-                            <input type="number" id="preset-medium" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="preset-high">High (RPM)</label>
-                            <input type="number" id="preset-high" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="preset-max">Max (RPM)</label>
-                            <input type="number" id="preset-max" required>
-                        </div>
-                    </div>
+                <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 15px;">
+                    <button type="submit" class="btn">Save &amp; Restart</button>
+                    <span id="net-status" style="color: var(--muted); font-size: 0.9rem;">
+                        Saving restarts the board; it is offline for about 15 seconds.
+                    </span>
                 </div>
-
-                <button type="submit" class="btn-primary" style="margin-top: 15px;">Save Fan Settings</button>
             </form>
         </div>
 
-        <div id="config" class="tab-content">
-            <form onsubmit="saveConfig(event)">
-                <div class="status-card">
-                    <h3>Display & Interface</h3>
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label for="eye-style">Eye style (screensaver and standby)</label>
-                            <select id="eye-style" required></select>
-                        </div>
-                        <div class="form-group">
-                            <label for="standby-brightness">Standby brightness (%)</label>
-                            <input type="number" id="standby-brightness" min="0" max="100" value="10" required>
-                            <small style="color: #606060;">Screen brightness while the eye sleeps in standby. 0 = screen off</small>
-                        </div>
-                        <div class="form-group">
-                            <label for="screensaver-sec">Screensaver (dragon eye) after</label>
-                            <input type="number" id="screensaver-sec" min="0" max="3600" value="30" required>
-                            <small style="color: #606060;">Seconds with no knob, touch or speed change. 0 = off</small>
-                        </div>
-                        <div class="form-group">
-                            <label for="standby-after-min">Standby after screensaver (minutes)</label>
-                            <input type="number" id="standby-after-min" min="0" max="1440" value="10" required>
-                            <small style="color: #606060;">Screensaver on this long: the LCD asks whether to keep the fan running (straight to standby if the fan is off). Up to 1440 (24 h). 0 = never</small>
-                        </div>
-                        <div class="form-group">
-                            <label for="standby-prompt-sec">Standby prompt timeout (seconds)</label>
-                            <input type="number" id="standby-prompt-sec" min="5" max="300" value="30" required>
-                            <small style="color: #606060;">No answer on the LCD this long: standby. 5-300 (5 minutes)</small>
-                        </div>
-                        <div class="form-group">
-                            <label for="saver-pause-max-min">Screensaver pause limit (minutes)</label>
-                            <input type="number" id="saver-pause-max-min" min="0" max="1440" value="120" required>
-                            <small style="color: #606060;">The LCD Settings page's Screensaver switch pauses it until switched back, the fan stops, standby, a restart, or this long. 0 = no limit</small>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Second Save: the eye style above changes often; the rest is mostly set once. Both save the whole tab -->
-                <button type="submit" class="btn-primary" style="margin-bottom: 20px;">Save Configuration</button>
-
-                <div class="status-card">
-                    <h3>Clock</h3>
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label for="time-zone">Time Zone</label>
-                        <input type="text" id="tz-filter" placeholder="Search, e.g. London, Tokyo, Chicago" oninput="fillTimeZones()">
-                        <select id="time-zone" required style="margin-top: 6px;"></select>
-                        <button type="button" class="btn-secondary" onclick="useBrowserTimeZone()" style="margin-top: 6px; padding: 6px 12px;">Use this browser's time zone</button>
-                    </div>
-                    <div class="form-group">
-                        <label for="time-format">Time Format</label>
-                        <select id="time-format" required>
-                            <option value="12h" selected>12-Hour</option>
-                            <option value="24h">24-Hour</option>
-                        </select>
-                    </div>
-                </div>
-                </div>
-
-                <div class="status-card">
-                    <h3>MQTT Configuration</h3>
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label for="mqtt-broker">MQTT Broker IP</label>
-                            <input type="text" id="mqtt-broker" placeholder="192.168.1.50" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="mqtt-port">Port</label>
-                            <input type="number" id="mqtt-port" value="1883" min="1" max="65535" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="mqtt-user">Username</label>
-                            <input type="text" id="mqtt-user" placeholder="(optional)">
-                        </div>
-                        <div class="form-group">
-                            <label for="mqtt-pass">Password</label>
-                            <input type="password" id="mqtt-pass" placeholder="(optional)">
-                        </div>
-                    </div>
-                    <div class="form-group" style="margin-top: 15px;">
-                        <div class="checkbox-group">
-                            <input type="checkbox" id="mqtt-discovery" checked>
-                            <label for="mqtt-discovery" style="margin: 0;">Enable Home Assistant Auto-Discovery</label>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="status-card">
-                    <h3>Peripheral Power Switch</h3>
-                    <p style="color: #a0a0a0; margin-bottom: 15px; font-size: 0.9rem;">
-                        GPIO 4 transistor that switches the 12 V rail (the fan). The fan controller
-                        and sensors stay powered. On while awake, off in standby.
-                    </p>
-                    <div class="form-group">
-                        <label for="power-level">Switch turns power ON when GPIO 4 is</label>
-                        <select id="power-level" required>
-                            <option value="high">HIGH (e.g. N-channel / NPN driver)</option>
-                            <option value="low">LOW (e.g. P-channel high-side)</option>
-                        </select>
-                    </div>
-                </div>
-
-                <button type="submit" class="btn-primary" style="margin-top: 15px;">Save Configuration</button>
-            </form>
-
-            <div class="status-card" style="margin-top: 20px;">
-                <h3>Web Login (protects all changes)</h3>
-                <p style="color: #a0a0a0; margin-bottom: 15px; font-size: 0.9rem;">
-                    Required for every change on this page (fan, settings, WiFi, OTA).
-                    Changing an existing login requires being logged in.
-                </p>
-                <form onsubmit="saveLogin(event)">
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label for="login-new-user">New Username</label>
-                            <input type="text" id="login-new-user" maxlength="31" autocomplete="username" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="login-new-pass">New Password</label>
-                            <input type="password" id="login-new-pass" minlength="8" maxlength="31" placeholder="8-31 characters" autocomplete="new-password" required>
-                        </div>
-                    </div>
-                    <button type="submit" class="btn-secondary" style="margin-top: 15px;">Save Login</button>
-                </form>
+        <div class="panel">
+            <h2>Hotspot Password</h2>
+            <p style="color: var(--muted); margin-bottom: 15px; font-size: 0.9rem;">
+                Password for the <span id="ap-ssid">WiFi-Fan-Knob</span> hotspot, used when the
+                board can't reach your WiFi. Applies the next time the hotspot starts.
+            </p>
+            <div class="status-item">
+                <span class="status-label">Hotspot:</span>
+                <span class="status-value" id="hotspot-state">--</span>
             </div>
+            <form onsubmit="saveApPassword(event)">
+                <div class="field">
+                    <label for="ap-pass">New Hotspot Password</label>
+                    <input type="password" id="ap-pass" minlength="8" maxlength="63" placeholder="8-63 characters" required>
+                </div>
+                <button type="submit" class="btn" style="margin-top: 15px;">Save Hotspot Password</button>
+            </form>
+        </div>
+    </section>
 
-            <div class="status-card">
-                <h3>Factory Reset</h3>
-                <p style="color: #a0a0a0; margin-bottom: 15px; font-size: 0.9rem;">
-                    Erases ALL settings, including saved WiFi, the web login and the hotspot password,
-                    then reboots into hotspot mode.
-                </p>
-                <form onsubmit="resetConfig(event)">
-                    <div class="form-group">
-                        <label for="reset-pass">Confirm with your password</label>
-                        <input type="password" id="reset-pass" autocomplete="current-password" required>
-                    </div>
-                    <button type="submit" class="btn-danger" style="margin-top: 15px;">Reset to Defaults</button>
-                </form>
+    <section class="page" id="page-system">
+        <div class="panel">
+            <h2>Status</h2>
+            <div class="status-item">
+                <span class="status-label">Fan Status:</span>
+                <span class="status-value" id="fan-status">Running</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Power Mode:</span>
+                <span class="status-value" id="power-mode">Active</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Peripheral Power:</span>
+                <span class="status-value" id="periph-power">--</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">WiFi Signal:</span>
+                <span class="status-value" id="wifi-signal">-55 dBm</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">MQTT Connected:</span>
+                <span class="status-value" id="mqtt-status">Yes</span>
             </div>
         </div>
 
-        <!-- OTA TAB -->
-        <div id="ota" class="tab-content">
-            <div class="status-card">
-                <h3>Firmware Information</h3>
-                <div class="status-item">
-                    <span class="status-label">Current Version:</span>
-                    <span class="status-value" id="fw-version">--</span>
-                </div>
-                <div class="status-item">
-                    <span class="status-label">Build ID:</span>
-                    <span class="status-value" id="fw-build" style="font-family: monospace; font-size: 0.9rem;">--</span>
-                </div>
-                <div class="status-item">
-                    <span class="status-label">Running Slot:</span>
-                    <span class="status-value" id="app-slot">--</span>
-                </div>
-                <div class="status-item">
-                    <span class="status-label">Chip ID:</span>
-                    <span class="status-value" id="chip-id" style="font-family: monospace; font-size: 0.9rem;">--</span>
+        <div class="panel">
+            <h2>Firmware Information</h2>
+            <div class="status-item">
+                <span class="status-label">Current Version:</span>
+                <span class="status-value" id="fw-version">--</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Build ID:</span>
+                <span class="status-value" id="fw-build" style="font-family: monospace; font-size: 0.9rem;">--</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Running Slot:</span>
+                <span class="status-value" id="app-slot">--</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Chip ID:</span>
+                <span class="status-value" id="chip-id" style="font-family: monospace; font-size: 0.9rem;">--</span>
+            </div>
+            <p class="hint"><a href="https://github.com/sergeant82d/Wifi_Fan_Knob" target="_blank">GitHub repository</a></p>
+        </div>
+
+        <form onsubmit="saveConfig(event)">
+            <div class="panel">
+                <h2>Display & Interface</h2>
+                <div class="form">
+                    <div class="field">
+                        <label for="eye-style">Eye style (screensaver and standby)</label>
+                        <select id="eye-style" required></select>
+                    </div>
+                    <div class="field">
+                        <label for="standby-brightness">Standby brightness (%)</label>
+                        <input type="number" id="standby-brightness" min="0" max="100" value="10" required>
+                        <small style="color: var(--muted);">Screen brightness while the eye sleeps in standby. 0 = screen off</small>
+                    </div>
+                    <div class="field">
+                        <label for="screensaver-sec">Screensaver (dragon eye) after</label>
+                        <input type="number" id="screensaver-sec" min="0" max="3600" value="30" required>
+                        <small style="color: var(--muted);">Seconds with no knob, touch or speed change. 0 = off</small>
+                    </div>
+                    <div class="field">
+                        <label for="standby-after-min">Standby after screensaver (minutes)</label>
+                        <input type="number" id="standby-after-min" min="0" max="1440" value="10" required>
+                        <small style="color: var(--muted);">Screensaver on this long: the LCD asks whether to keep the fan running (straight to standby if the fan is off). Up to 1440 (24 h). 0 = never</small>
+                    </div>
+                    <div class="field">
+                        <label for="standby-prompt-sec">Standby prompt timeout (seconds)</label>
+                        <input type="number" id="standby-prompt-sec" min="5" max="300" value="30" required>
+                        <small style="color: var(--muted);">No answer on the LCD this long: standby. 5-300 (5 minutes)</small>
+                    </div>
+                    <div class="field">
+                        <label for="saver-pause-max-min">Screensaver pause limit (minutes)</label>
+                        <input type="number" id="saver-pause-max-min" min="0" max="1440" value="120" required>
+                        <small style="color: var(--muted);">The LCD Settings page's Screensaver switch pauses it until switched back, the fan stops, standby, a restart, or this long. 0 = no limit</small>
+                    </div>
                 </div>
             </div>
 
+            <!-- Own Save: the eye style changes often; the rest is mostly set once. Both forms save all their settings -->
+            <button type="submit" class="btn">Save</button>
+        </form>
+
+        <div class="panel">
+            <h2>Firmware update (OTA)</h2>
             <form onsubmit="uploadFirmware(event)">
                 <div class="file-upload" onclick="document.getElementById('firmware-file').click()">
                     <input type="file" id="firmware-file" accept=".bin" onchange="selectFile(this)">
                     <div class="upload-text">📁 Click to select firmware file or drag & drop</div>
                     <div class="upload-hint">Supported: .bin (binary) files only</div>
-                    <div style="margin-top: 15px; color: #ffd700; font-weight: 600;" id="file-name"></div>
+                    <div style="margin-top: 15px; color: var(--accent); font-weight: 600;" id="file-name"></div>
                 </div>
 
-                <div style="margin-top: 20px;">
-                    <button type="submit" class="btn-primary" id="upload-btn" disabled>Upload & Reboot</button>
+                <div class="actions">
+                    <button type="submit" class="btn" id="upload-btn" disabled>Upload & Reboot</button>
                 </div>
             </form>
-
-            <div style="margin-top: 30px; padding: 20px; background: rgba(255, 215, 0, 0.05); border-radius: 6px; border-left: 4px solid rgba(255, 215, 0, 0.3);">
-                <h4 style="color: #ffd700; margin-bottom: 10px;">⚠️ Important</h4>
-                <ul style="list-style: none; color: #a0a0a0; font-size: 0.9rem;">
-                    <li>✓ Do NOT power off during upload</li>
-                    <li>✓ Ensure stable WiFi connection</li>
-                    <li>✓ Upload may take 30-60 seconds</li>
-                    <li>✓ Device will reboot automatically after completion</li>
-                </ul>
-            </div>
+            <ul class="hint" style="margin-top: 14px; padding-left: 18px;">
+                <li>Do NOT power off during the upload; keep the WiFi steady.</li>
+                <li>Takes 30-60 seconds; the board restarts by itself when done.</li>
+            </ul>
         </div>
+
+        <form onsubmit="saveConfig(event)">
+            <div class="panel">
+                <h2>Clock</h2>
+            <div class="form">
+                <div class="field">
+                    <label for="time-zone">Time Zone</label>
+                    <input type="text" id="tz-filter" placeholder="Search, e.g. London, Tokyo, Chicago" oninput="fillTimeZones()">
+                    <select id="time-zone" required style="margin-top: 6px;"></select>
+                    <button type="button" class="btn ghost" onclick="useBrowserTimeZone()" style="margin-top: 6px; padding: 6px 12px;">Use this browser's time zone</button>
+                </div>
+                <div class="field">
+                    <label for="time-format">Time Format</label>
+                    <select id="time-format" required>
+                        <option value="12h" selected>12-Hour</option>
+                        <option value="24h">24-Hour</option>
+                    </select>
+                </div>
+            </div>
+            </div>
+
+            <div class="panel">
+                <h2>Peripheral Power Switch</h2>
+                <p style="color: var(--muted); margin-bottom: 15px; font-size: 0.9rem;">
+                    GPIO 4 transistor that switches the 12 V rail (the fan). The fan controller
+                    and sensors stay powered. On while awake, off in standby.
+                </p>
+                <div class="field">
+                    <label for="power-level">Switch turns power ON when GPIO 4 is</label>
+                    <select id="power-level" required>
+                        <option value="high">HIGH (e.g. N-channel / NPN driver)</option>
+                        <option value="low">LOW (e.g. P-channel high-side)</option>
+                    </select>
+                </div>
+            </div>
+
+            <button type="submit" class="btn">Save</button>
+        </form>
+
+        <div class="panel">
+            <h2>Web Login (protects all changes)</h2>
+            <p style="color: var(--muted); margin-bottom: 15px; font-size: 0.9rem;">
+                Required for every change on this page (fan, settings, WiFi, OTA).
+                Changing an existing login requires being logged in.
+            </p>
+            <form onsubmit="saveLogin(event)">
+                <div class="form">
+                    <div class="field">
+                        <label for="login-new-user">New Username</label>
+                        <input type="text" id="login-new-user" maxlength="31" autocomplete="username" required>
+                    </div>
+                    <div class="field">
+                        <label for="login-new-pass">New Password</label>
+                        <input type="password" id="login-new-pass" minlength="8" maxlength="31" placeholder="8-31 characters" autocomplete="new-password" required>
+                    </div>
+                </div>
+                <button type="submit" class="btn ghost" style="margin-top: 15px;">Save Login</button>
+            </form>
+        </div>
+
+        <div class="panel">
+            <h2>Factory Reset</h2>
+            <p style="color: var(--muted); margin-bottom: 15px; font-size: 0.9rem;">
+                Erases ALL settings, including saved WiFi, the web login and the hotspot password,
+                then reboots into hotspot mode.
+            </p>
+            <form onsubmit="resetConfig(event)">
+                <div class="field">
+                    <label for="reset-pass">Confirm with your password</label>
+                    <input type="password" id="reset-pass" autocomplete="current-password" required>
+                </div>
+                <button type="submit" class="btn ghost danger" style="margin-top: 15px;">Reset to Defaults</button>
+            </form>
+        </div>
+    </section>
+
+  </main>
+</div>
+
+<dialog id="login-dialog">
+  <form onsubmit="logIn(event)">
+    <h2>Log in</h2>
+    <div class="field"><label for="login-user">User name</label>
+      <input type="text" id="login-user" autocomplete="username" required></div>
+    <div class="field"><label for="login-pass">Password</label>
+      <input type="password" id="login-pass" autocomplete="current-password" required></div>
+    <div class="actions">
+      <button type="submit" class="btn">Log in</button>
+      <button type="button" class="btn ghost" onclick="document.getElementById('login-dialog').close()">Cancel</button>
     </div>
+    <p class="hint">Needed for every change; viewing needs none.</p>
+  </form>
+</dialog>
 
-    <script>
-        function switchTab(tabName) {
-            const contents = document.querySelectorAll('.tab-content');
-            const buttons = document.querySelectorAll('.tab-btn');
-
-            contents.forEach(tab => tab.classList.remove('active'));
-            buttons.forEach(btn => btn.classList.remove('active'));
-
-            document.getElementById(tabName).classList.add('active');
-            event.target.classList.add('active');
-            if (tabName === 'home') loadLcd();  // Don't wait up to 2 s for the LCD view
+<script>
+        // Tabs (D:\GitHub\WEB_STYLE.md): the URL #hash keeps the tab over a reload or bookmark
+        function showTab(name) {
+            const t = document.querySelector('.tab[data-page="' + name + '"]') || document.querySelector('.tab');
+            document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x === t));
+            document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + t.dataset.page));
+            document.getElementById('page-title').textContent = t.textContent.trim();
+            if (t.dataset.page === 'dashboard') loadLcd();  // Don't wait up to 2 s for the LCD view
         }
+        document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
+            history.replaceState(null, '', '#' + t.dataset.page);
+            showTab(t.dataset.page);
+        });
+        document.addEventListener('DOMContentLoaded', () => showTab(location.hash.slice(1)));
 
         // Slider follows the device's target until the user moves it. While dragging, the speed is
         // sent at most 4 times a second, and once more on release (errors shown only then).
@@ -1174,7 +900,7 @@
             const mode = powerMode === 'Standby' ? 'standby'
                        : powerMode === 'Active (screensaver)' ? 'screensaver' : 'active';
             ['active', 'screensaver', 'standby'].forEach(m => {
-                document.getElementById('mode-' + m).className = m === mode ? 'btn-primary' : 'btn-secondary';
+                document.getElementById('mode-' + m).className = m === mode ? 'btn' : 'btn ghost';
             });
             document.getElementById('mode-note').textContent = powerMode === 'Active (standby prompt)'
                 ? 'The LCD is asking whether to keep the fan running. Active keeps it running; Standby stops it.'
@@ -1182,13 +908,13 @@
                 : '';
         }
 
-        // LEDs card (Home tab): Off is the "on" switch; the effect is kept for next time
+        // LEDs card (Dashboard): Off is the "on" switch; the effect is kept for next time
         let ledState = null;
         function showLeds(l) {
             ledState = l;
             const sel = l.on ? l.effect : 'Off';
             ['Off', 'Solid', 'Flash', 'Breathe', 'Rainbow'].forEach(e => {
-                document.getElementById('led-' + e).className = e === sel ? 'btn-primary' : 'btn-secondary';
+                document.getElementById('led-' + e).className = e === sel ? 'btn' : 'btn ghost';
             });
             document.getElementById('led-color').value = l.color.toLowerCase();
             document.getElementById('led-brightness').max = l.brightnessMax;
@@ -1270,20 +996,29 @@
             return user ? { 'Authorization': 'Basic ' + btoa(user + ':' + pass) } : {};
         }
 
+        // Top bar: who is logged in, and the Log in / Log out button (login form in a dialog)
         function updateLoginBar() {
-            const state = document.getElementById('login-state');
-            const form = document.getElementById('login-form');
-            const out = document.getElementById('logout-btn');
-            form.style.display = 'none';
-            out.style.display = 'none';
+            const who = document.getElementById('who');
+            const btn = document.getElementById('btn-login');
+            btn.hidden = loginSetOnDevice === false;
             if (loginSetOnDevice === false) {
-                state.textContent = 'No login set. Changes are disabled until you set one on the Config tab.';
+                who.textContent = 'No login set: changes are off until one is set (System tab)';
             } else if (login) {
-                state.textContent = 'Logged in as ' + login.user;
-                out.style.display = 'inline-block';
+                who.innerHTML = 'Logged in as <b></b>';
+                who.querySelector('b').textContent = login.user;
+                btn.textContent = 'Log out';
             } else {
-                state.textContent = 'Log in to make changes:';
-                form.style.display = 'flex';
+                who.textContent = 'Not logged in';
+                btn.textContent = 'Log in';
+            }
+        }
+
+        function loginButton() {
+            if (login) {
+                logOut();
+            } else {
+                document.getElementById('login-dialog').showModal();
+                document.getElementById('login-user').focus();
             }
         }
 
@@ -1294,6 +1029,7 @@
             try {
                 await postForm('/api/login', {}, authHeader(user, pass));
                 document.getElementById('login-pass').value = '';
+                document.getElementById('login-dialog').close();
                 setLogin({ user, pass });
             } catch (e) {
                 alert('Login failed: ' + e.message);
@@ -1405,7 +1141,7 @@
         }
         document.addEventListener('DOMContentLoaded', () => fillTimeZones('America/Chicago'));
 
-        // Fill the Config tab from the device's current settings
+        // Fill every tab's settings from the device
         async function loadConfig() {
             try {
                 const c = await (await fetch('/api/config')).json();
@@ -1467,22 +1203,27 @@
         }
         document.addEventListener('DOMContentLoaded', loadConfig);
 
-        // Live network info: header, Home tab signal, WiFi tab block
+        // Live status: sidebar, top bar, every tab (every 2 s)
         async function loadStatus() {
             const set = (id, text) => { document.getElementById(id).textContent = text; };
             try {
                 const s = await (await fetch('/api/status')).json();
                 const signal = s.rssi === null ? 'n/a (AP mode)' : s.rssi + ' dBm';
                 set('device-ip', s.ip);
-                set('device-status', s.mode === 'WiFi' ? 'WiFi connected to "' + s.ssid + '"'
-                                                       : 'Hotspot "' + s.ssid + '"');
+                set('device-status', s.mode === 'WiFi' ? 'WiFi: ' + s.ssid : 'Hotspot: ' + s.ssid);
+                set('clock', s.clock || '--:--');
+                // Sidebar lights: green = working, orange = hotspot, red = not working
+                set('light-wifi', s.mode === 'WiFi' ? 'WiFi ' + signal : 'Hotspot on');
+                document.getElementById('dot-wifi').className = 'dot ' + (s.mode === 'WiFi' ? 'ok' : 'warn');
+                document.getElementById('dot-mqtt').className = 'dot ' + (s.mqtt_connected ? 'ok' : 'bad');
+                document.getElementById('dot-fan').className = 'dot ' + (s.fan_controller ? 'ok' : 'bad');
                 set('wifi-signal', signal);
                 set('current-ssid', s.ssid);
                 set('current-ip', s.ip);
                 set('current-signal', signal);
                 set('current-mac', s.mac);
 
-                // Home tab
+                // Dashboard
                 set('rpm-current', s.target_rpm);
                 showPresets(s.target_rpm);
                 set('rpm-measured', s.fan_controller ? s.fan_rpm : '--');
@@ -1521,7 +1262,7 @@
                     set('speed-display', s.target_rpm);
                 }
 
-                // WiFi tab hotspot state; login bar
+                // Network tab hotspot state; login
                 set('ap-ssid', s.ap_ssid);
                 set('hotspot-state', s.hotspot_on ? 'On' : 'Off');
                 if (s.login_set !== loginSetOnDevice) {
@@ -1529,24 +1270,25 @@
                     updateLoginBar();
                 }
 
-                // OTA tab
+                // System tab: firmware
                 set('fw-version', s.fw_version);
                 set('fw-build', s.fw_build);
                 set('app-slot', s.app_slot);
                 set('chip-id', s.chip_id);
             } catch (e) {
                 set('device-status', 'Offline');
+                ['dot-wifi', 'dot-mqtt', 'dot-fan'].forEach(id => document.getElementById(id).className = 'dot bad');
             }
         }
         document.addEventListener('DOMContentLoaded', loadStatus);
         setInterval(loadStatus, 2000);  // Knob changes show within ~2 s
 
-        // LCD view (Home tab): /api/lcd is the knob's screen as raw 240x240 RGB565 (little-endian).
+        // LCD view (Dashboard): /api/lcd is the knob's screen as raw 240x240 RGB565 (little-endian).
         // Fetched only while the Home tab shows and the page is visible; the board captures only
         // while asked. 503 = no copy yet (the first request starts capturing): retry soon.
         let lcdBusy = false;
         async function loadLcd() {
-            if (lcdBusy || document.hidden || !document.getElementById('home').classList.contains('active')) return;
+            if (lcdBusy || document.hidden || !document.getElementById('page-dashboard').classList.contains('active')) return;
             lcdBusy = true;
             try {
                 const r = await fetch('/api/lcd', { cache: 'no-store' });
@@ -1578,7 +1320,7 @@
         document.addEventListener('DOMContentLoaded', loadLcd);
         document.addEventListener('visibilitychange', loadLcd);
 
-        // Notes (Home tab): kept on the board (/api/notes), up to 4000 UTF-8 bytes
+        // Notes (Dashboard): kept on the board (/api/notes), up to 4000 UTF-8 bytes
         const NOTES_MAX = 4000;
         const NOTE_EMOJIS = ['\u2705', '\u26A0\uFE0F', '\u274C', '\u2757', '\uD83D\uDD27', '\uD83C\uDF21\uFE0F',
             '\uD83D\uDCA8', '\uD83D\uDD0C', '\uD83D\uDCC5', '\uD83D\uDCDD', '\uD83D\uDCA1', '\uD83D\uDC4D'];
@@ -1590,7 +1332,7 @@
             const meta = document.getElementById('notes-meta');
             meta.textContent = n + ' / ' + NOTES_MAX + ' bytes' + (t !== notesSaved ? ' \u00b7 unsaved changes' : '') +
                 (notesLastSaved ? ' \u00b7 ' + notesLastSaved : '');
-            meta.style.color = n > NOTES_MAX ? '#ff6464' : '#a0a0a0';
+            meta.style.color = n > NOTES_MAX ? 'var(--error)' : '';
         }
 
         function lastSavedText(r) {
@@ -1645,7 +1387,7 @@
             if (document.getElementById('notes').value !== notesSaved) { e.preventDefault(); e.returnValue = ''; }
         });
 
-        // Fan profiles (Config tab)
+        // Fan profiles (Fan Control tab)
         let fanProfiles = null;
         let autoconfigTimer = null;
 
@@ -1813,7 +1555,7 @@
         async function resetConfig(event) {
             event.preventDefault();
             if (!login) {
-                alert('Log in first (top of the page).');
+                alert('Log in first (top right of the page).');
                 return;
             }
             if (!confirm('Reset ALL settings to factory defaults, including saved WiFi and the web login? The device will reboot into hotspot mode.')) return;
@@ -1916,7 +1658,7 @@
             const xhr = new XMLHttpRequest();
             xhr.open('POST', '/api/ota');
             if (!login) {
-                alert('Log in first (top of the page).');
+                alert('Log in first (top right of the page).');
                 button.disabled = false;
                 return;
             }
@@ -1940,6 +1682,6 @@
             status.textContent = 'Uploading... 0%';
             xhr.send(form);
         }
-    </script>
+</script>
 </body>
 </html>

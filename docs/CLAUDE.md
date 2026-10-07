@@ -58,7 +58,7 @@ cd Wifi_Fan_Knob
 | `include/config.h` / `src/config.cpp` | ✅ Working | SPIFFS JSON config load/save/validate/defaults |
 | `include/lv_conf.h` | ✅ Minimal | LVGL 8 config (240×240, 16-bit) |
 | `include/webserver.h` / `src/webserver.cpp` | 🟡 Partial | `/` → embedded index.html; `GET /api/status` (network + target RPM/range, fan controller, power mode); `POST /api/fan` (target RPM); `POST /api/ota` (firmware upload); `/api/wifi` save/forget/scan (scan async: 202→200); `GET/POST /api/config`, `POST /api/config/reset` |
-| `web/index.html` | ✅ Working | 5-tab web UI: Home, WiFi, Fan Settings, Config, OTA |
+| `web/index.html` | ✅ Working | Web UI, left sidebar (`D:\GitHub\WEB_STYLE.md`): Dashboard, Fan Control, Home Assistant, Network, System |
 | `include/mqtt.h` / `src/mqtt.cpp` | ✅ Working | MQTT (PubSubClient) + Home Assistant discovery in own task |
 | `include/fan_control.h` / `src/fan_control.cpp` | ✅ Working | Target RPM → EMC2101 PWM (12 kHz, 30 steps), tach RPM, Auto Configure |
 | `include/fan_profiles.h` / `src/fan_profiles.cpp` | ✅ Working | Up to 5 fan profiles (`/fans.json`): measured table, max RPM, presets |
@@ -401,6 +401,22 @@ See `platformio.ini`. Libraries:
     `/api/status` `backlight`, every 2 s); the LEDs card's brightness slider shows the set
     LED brightness, like HA.
   - LCD Settings page: the slider follows Auto's live level, labelled "Auto NN%".
+- Web page, left sidebar (verified 2026-10-07 by the user on PC and phone): follows the
+  all-projects standard `D:\GitHub\WEB_STYLE.md` (reference ETH_Touch_PWM). Tabs (old name):
+  **Dashboard** (Home: RPM, presets, manual speed, FAN OFF, Display Mode, Air, Presence & Light,
+  LCD + brightness, LEDs, Notes), **Fan Control** (Fan Settings), **Home Assistant** (MQTT, was
+  on Config), **Network** (WiFi), **System** (Status, Firmware Information, Display & Interface
+  + Save, Firmware update (OTA), Clock + Peripheral Power + Save, Web Login, Factory Reset;
+  from Config and OTA). Old docs and commits use the old names. The System Status card became
+  the sidebar lights (WiFi / MQTT / Fan controller; its rows are System → Status). The settings
+  form is three forms (Home Assistant, System x2) that all call `saveConfig()`, which posts every
+  field of all three (`POST /api/config` needs them all). Top bar: page title, the board's
+  clock (`/api/status` `clock`, as the LCD shows it; absent until NTP), login state and a
+  Log in / Log out button (`<dialog>`). URL `#hash` keeps the tab. Phones (<= 760 px): sidebar
+  becomes a top strip; on the Dashboard the LCD card's two parts (`#lcd-viewer`,
+  `#lcd-brightness`) become separate cards (`display: contents`): picture first, Brightness
+  between Presence & Light and LEDs (user). Colours: the standard variables, Navy & gold only.
+  No Restart button yet (the board has no restart endpoint).
 - Photo eyes, Dragon 2-11 (verified on the board 2026-09-27 by the user: Dragons 3-10 all
   fine; Dragon 11 added from `23-4.png` / `24-4.png`, "works great"; `docs/PHOTO_EYES.md`):
   the artist's open/shut pairs (`assets/eye_art/`) animated by `photo_eye.cpp`: iris moves
@@ -694,15 +710,9 @@ STANDBY (1)
 4. Field testing, including the industrial fans once they have power.
 
 ### Later (user notes)
-- **Web page: left-side tabs (user 2026-10-06), at the next web page change.** Use the layout
-  of ETH_Touch_PWM (`D:\GitHub\VSCodeProjects\ETH_Touch_PWM\web\index.html`: `.sidebar` of
-  240 px with `<nav class="tabs">`; on phones it becomes a top strip) instead of the top tab
-  bar, with the standard tab names (Dashboard, Fan Control, Home Assistant, Network, System;
-  user 2026-10-07; standard in `D:\GitHub\WEB_STYLE.md`). Layout only: no theme picker
-  (dropped 2026-09-28; confirmed 2026-10-07, Navy & gold only; **may be revisited**). ETH's CSS uses colour
-  variables, this page fixed colours, so adapt rather than copy. Home tab order as of
-  2026-10-06: RPM, presets, manual speed, FAN OFF, Display Mode, Air, Presence & Light, LCD
-  (+ brightness), LEDs, System Status, Notes; on phones the LCD card first.
+- **Theme picker (may be revisited, user 2026-10-07):** the page has Navy & gold only. The
+  colours are already the standard variables, so adding ETH_Touch_PWM's picker means its
+  System "Appearance" panel, the preset blocks and a saved choice on the board.
 - **Air quality sensors + Auto mode** (sensors fitted and read 2026-10-06, see Verified; Auto mode not started): **SGP41** (VOC + NOx) with an **SHT41**
   (temperature + humidity) on the main I2C bus (user 2026-09-27; replaces the BME688 plan of
   2026-09-26). Addresses 0x59 (SGP41) and 0x44 (SHT41): no clash with EMC2101 0x4C or APDS9999

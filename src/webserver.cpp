@@ -45,7 +45,7 @@ static bool authorized(AsyncWebServerRequest *request) {
 // Sends 403/401 and returns false unless the request carries the web login
 static bool require_login(AsyncWebServerRequest *request) {
   if (!login_set()) {
-    request->send(403, "text/plain", "No login set. Set one on the Config tab first.");
+    request->send(403, "text/plain", "No login set. Set one on the System tab first.");
     return false;
   }
   if (!authorized(request)) {
@@ -308,6 +308,14 @@ void init_webserver() {
     doc["chip_id"] = config.chipId;
     doc["app_slot"] = esp_ota_get_running_partition()->label;
     doc["login_set"] = login_set();
+    time_t now = time(nullptr);  // Board clock for the web page's top bar, like the LCD's (none until NTP)
+    if (now > 24 * 3600) {
+      struct tm t;
+      localtime_r(&now, &t);
+      char clock[12];
+      strftime(clock, sizeof(clock), strcmp(config.display.timeFormat, "24h") == 0 ? "%H:%M" : "%I:%M %p", &t);
+      doc["clock"] = clock;
+    }
     doc["ap_ssid"] = "WiFi-Fan-Knob-" + String((uint32_t)(ESP.getEfuseMac() >> 24), HEX);
     doc["hotspot_on"] = (WiFi.getMode() & WIFI_AP) != 0;
     String body;
@@ -412,7 +420,7 @@ void init_webserver() {
         ota_error_code = 500;
         if (Update.isRunning()) Update.abort();  // Leftover from an interrupted upload
         if (!login_set()) {
-          ota_error = "No login set. Set one on the Config tab first.";
+          ota_error = "No login set. Set one on the System tab first.";
           ota_error_code = 403;
         } else if (!authorized(request)) {
           ota_error = "Login required (log in at the top of the page)";
@@ -650,12 +658,12 @@ void init_webserver() {
     restart_after_response(request);
   });
 
-  // Current settings for the Config tab (no passwords)
+  // Current settings for the web page (no passwords)
   server->on(AsyncURIMatcher::exact("/api/config"), HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(200, "application/json", getConfigAsJson());
   });
 
-  // Save Config tab; all fields validated before anything is changed
+  // Save the settings forms (System and Home Assistant tabs); all fields validated before anything is changed
   server->on(AsyncURIMatcher::exact("/api/config"), HTTP_POST, [](AsyncWebServerRequest *request) {
     if (!require_login(request)) return;
     String error = apply_config_form(request);
@@ -690,7 +698,7 @@ void init_webserver() {
     request->send(200, "text/plain", "Fan settings saved.");
   });
 
-  // Fan profiles (Config tab): list + Auto Configure progress
+  // Fan profiles (Fan Control tab): list + Auto Configure progress
   server->on(AsyncURIMatcher::exact("/api/fans"), HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(200, "application/json", fan_profiles_json());
   });

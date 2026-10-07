@@ -23,12 +23,12 @@ Some things need no code at all. They're on the web page:
 
 | Setting | Web page tab |
 |---|---|
-| LCD brightness, and Auto (follows the room light; Dark / Bright levels) | Home → LCD |
-| Fan max RPM (top of the arc, knob and all speed controls) | Config → Fan Presets |
-| Preset speeds (Low / Med / High / Max) | Config → Fan Presets |
-| 12 / 24-hour clock, time zone | Config |
-| Screensaver delay (0 = off) | Config → Display & Interface |
-| Eye style (Dragon, Cat, Owl, …) | Config → Display & Interface |
+| LCD brightness, and Auto (follows the room light; Dark / Bright levels) | Dashboard → LCD (on phones: the Brightness card) |
+| Fan max RPM (top of the arc, knob and all speed controls) | Fan Control → Fan Presets |
+| Preset speeds (Low / Med / High / Max) | Fan Control → Fan Presets |
+| 12 / 24-hour clock, time zone | System → Clock |
+| Screensaver delay (0 = off) | System → Display & Interface |
+| Eye style (Dragon, Cat, Owl, …) | System → Display & Interface |
 
 ### Getting a change onto the screen
 
@@ -184,7 +184,7 @@ lv_color_t c = lit    ? lv_color_hex(THEME_GOLD)
                       : lv_color_hex(THEME_PANEL);
 ```
 
-**Speeds:** each segment's speed comes from the preset speeds on the web page (Config →
+**Speeds:** each segment's speed comes from the preset speeds on the web page (Fan Control →
 Fan Presets). Off is always 0. The list is in `seg_rpm()`.
 
 **Adding or removing a segment** means changing three things so they agree:
@@ -388,7 +388,7 @@ The IP box and the information text are updated once a second (`update_status_bo
 ### The Auto Configure screen
 
 A separate screen (not a swipe page) that appears by itself while Auto Configure runs (web
-page → Config → Fan Profiles). It uses the theme **reversed**, a gold background with dark
+page → Fan Control → Fan Profiles). It uses the theme **reversed**, a gold background with dark
 blue text, so it can't be mistaken for anything else. Built in `create_config_screen()`,
 updated once a second by `update_config_screen()`:
 
@@ -420,13 +420,13 @@ In `create_menu()` and `menu_highlight()`:
 
 | To change | Where |
 |---|---|
-| Screensaver delay, or turn it off | Web page → Config → Display & Interface (seconds; 0 = off) |
-| Eye style | Web page → Config → Display & Interface |
-| Standby brightness (0 = screen off) | Web page → Config → Display & Interface |
-| How long the screensaver runs before asking "Keep the fan running?" (0 = never) | Web page → Config → Display & Interface → Standby after screensaver (minutes) |
-| How long that question waits for an answer before standby | Web page → Config → Display & Interface → Standby prompt timeout (seconds) |
+| Screensaver delay, or turn it off | Web page → System → Display & Interface (seconds; 0 = off) |
+| Eye style | Web page → System → Display & Interface |
+| Standby brightness (0 = screen off) | Web page → System → Display & Interface |
+| How long the screensaver runs before asking "Keep the fan running?" (0 = never) | Web page → System → Display & Interface → Standby after screensaver (minutes) |
+| How long that question waits for an answer before standby | Web page → System → Display & Interface → Standby prompt timeout (seconds) |
 | Pause the screensaver for now (not saved) | LCD Settings page → Screensaver switch |
-| How long that pause lasts at most (0 = no limit) | Web page → Config → Display & Interface → Screensaver pause limit (minutes) |
+| How long that pause lasts at most (0 = no limit) | Web page → System → Display & Interface → Screensaver pause limit (minutes) |
 | The question's look: text, buttons, countdown | `create_prompt()` in `src/ui.cpp` |
 | How the eye sleeps in standby (how long it stays shut, twitches, peeks) | `sleep_openness()` in `src/dragon_eye.cpp` |
 | Eye speed in standby (15 frames per second) | `STANDBY_EYE_FPS` in `src/main.cpp` |
@@ -463,7 +463,7 @@ running goes back to the screensaver (and the time starts again); no answer mean
 the fan is already off, there's nothing to ask: it goes straight to standby.
 
 **Modes are like radio buttons.** Active, Screensaver and Standby: exactly one is on. The web
-Home tab's Display Mode buttons and Home Assistant's switches can pick any of them directly.
+Dashboard's Display Mode buttons and Home Assistant's switches can pick any of them directly.
 
 **Waking from standby (wake gestures).** A bump shouldn't wake the board, so the eye
 reacts first:

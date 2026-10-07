@@ -41,9 +41,6 @@ How this list works (the all-projects format, agreed 2026-10-07; from ETH_Touch_
       arrives: wire it to the always-on 3.3 V and SDA/SCL (GPIO 38/39), check the boot log lists
       0x69, test (away, sitting, leaning in, hot iron with nobody there, a long still sit), then
       the "presence for X seconds wakes the screen" rule
-- [ ] `[Web]` Left-side tabs (ETH_Touch_PWM layout, `D:\GitHub\WEB_STYLE.md`), standard tab names
-      Dashboard, Fan Control, Home Assistant, Network, System (user, 2026-10-07). No theme
-      picker for now; Navy & gold only, may be revisited (user, 2026-10-07)
 - [ ] `[Docs]` Split the big `docs/CLAUDE.md` into a short root `CLAUDE.md` and
       `docs/PROJECT_HISTORY.md`, like the other projects (user, 2026-10-07; a separate step)
 - [ ] `[Board]` GPIO 4 pull-down resistor: waits on the FPC breakout for GPIO 4 access
@@ -51,6 +48,12 @@ How this list works (the all-projects format, agreed 2026-10-07; from ETH_Touch_
 
 ## Done
 
+- [x] `[Web]` Left-side tabs (ETH_Touch_PWM layout, `D:\GitHub\WEB_STYLE.md`), standard tab names
+      Dashboard, Fan Control, Home Assistant, Network, System. Sidebar lights WiFi / MQTT / Fan
+      controller, top bar with the board's clock and a login dialog; Navy & gold only (no theme
+      picker; may be revisited). Your layout changes: OTA below Display & Interface on System;
+      on phones only the LCD picture first, Brightness / Auto as its own card between Presence
+      & Light and LEDs. Checked by the user on PC and phone (2026-10-07, this commit)
 - [x] `[Docs]` TODO.md in the all-projects format (Your notes / Open / Done, tags); the items
       carried over word for word (2026-10-07, this commit)
 - [x] `[Web]` `[HA]` Need to add some control over the built-in/hardwired RGB LEDs. Take cues from
