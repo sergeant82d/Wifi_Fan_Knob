@@ -45,9 +45,16 @@ How this list works (the all-projects format, agreed 2026-10-07; from ETH_Touch_
       `docs/PROJECT_HISTORY.md`, like the other projects (user, 2026-10-07; a separate step)
 - [ ] `[Board]` GPIO 4 pull-down resistor: waits on the FPC breakout for GPIO 4 access
       (status report 05)
+- [ ] `[LCD]` Swiping between LCD pages is barely usable and very unfriendly: relook at the swipe
+      functions (user, 2026-10-07; after the docs split)
 
 ## Done
 
+- [x] `[LCD]` `[Web]` `[HA]` Restart button (your request): LCD on a new System page (left-most;
+      firmware version, uptime, Restart held 2 s, fills while held), web System tab card above
+      Factory Reset (confirm, login), HA button "Restart" (ignored in the first 30 s after boot,
+      so a stray retained message can't loop it). All three checked by the user (2026-10-07,
+      this commit)
 - [x] `[Web]` Left-side tabs (ETH_Touch_PWM layout, `D:\GitHub\WEB_STYLE.md`), standard tab names
       Dashboard, Fan Control, Home Assistant, Network, System. Sidebar lights WiFi / MQTT / Fan
       controller, top bar with the board's clock and a login dialog; Navy & gold only (no theme

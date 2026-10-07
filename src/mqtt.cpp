@@ -234,6 +234,14 @@ static void publish_discovery() {
     doc["state_class"] = "measurement";
     publish_config("sensor", "illuminance", doc);
   }
+  {
+    StaticJsonDocument<768> doc;
+    doc["name"] = "Restart";
+    doc["command_topic"] = topic("restart/set");
+    doc["device_class"] = "restart";
+    doc["entity_category"] = "config";
+    publish_config("button", "restart", doc);
+  }
   // Screensaver was briefly a binary_sensor: an empty retained config removes that entity
   client.publish((String("homeassistant/binary_sensor/") + dev_id + "/screensaver/config").c_str(), "", true);
   Serial.println("[MQTT] Home Assistant discovery published");
@@ -380,6 +388,10 @@ static void on_message(char *t, byte *payload, unsigned int len) {
       (tp == topic("auto_min/set") ? config.display.autoMin : config.display.autoMax) = v;
       saveConfig();
     }
+  } else if (tp == topic("restart/set")) {
+    // HA sends "PRESS" (not retained). Ignored in the first 30 s after boot, so a retained
+    // message left on the broker by mistake can't make the board restart over and over.
+    if (msg == "PRESS" && millis() > 30000) power_request_restart("Home Assistant");
   } else if (tp == topic("leds/set")) {
     // JSON with any of state, brightness, color {r,g,b}, effect; missing = unchanged
     StaticJsonDocument<256> in;
@@ -434,6 +446,7 @@ static void try_connect() {
   client.subscribe(topic("auto_max/set").c_str());
   client.subscribe(topic("screensaver/set").c_str());
   client.subscribe(topic("leds/set").c_str());
+  client.subscribe(topic("restart/set").c_str());
   client.subscribe(topic("led_speed/set").c_str());
   publish_state(true);
 }

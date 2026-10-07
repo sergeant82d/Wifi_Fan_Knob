@@ -629,6 +629,14 @@ void power_request_screensaver(bool on) {
   power_request_mode(on ? POWER_SCREENSAVER : POWER_ACTIVE);
 }
 
+static volatile unsigned long restart_at = 0;  // millis() to restart at (0 = none)
+
+void power_request_restart(const char *from) {
+  Serial.printf("[SYSTEM] Restart requested (%s)\n", from);
+  restart_at = millis() + 500;
+  if (restart_at == 0) restart_at = 1;
+}
+
 static bool eye_showing() {
   return saver_on || power_is_standby();
 }
@@ -832,6 +840,8 @@ void loop() {
     Serial.print("Time synced: ");
     Serial.println(ctime(&now));
   }
+
+  if (restart_at && (long)(millis() - restart_at) >= 0) ESP.restart();  // power_request_restart()
 
   // Handle encoder rotation
   fan_update();

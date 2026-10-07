@@ -68,6 +68,7 @@ static void create_prompt(lv_obj_t *parent);
 static void create_main_page(lv_obj_t *tile);
 static void create_settings_page(lv_obj_t *tile);
 static void create_qr_page(lv_obj_t *tile);
+static void create_system_page(lv_obj_t *tile);
 static void create_page_dots(lv_obj_t *parent);
 static void tap_back_cb(lv_event_t *);
 static void create_menu(lv_obj_t *parent);
@@ -80,12 +81,13 @@ struct Page {
   void (*create)(lv_obj_t *tile);   // Builds the page's widgets on its tile
 };
 static const Page PAGES[] = {
+  {"System", create_system_page},
   {"QR code", create_qr_page},
   {"Settings", create_settings_page},
   {"Main", create_main_page},
 };
-static const int SETTINGS_PAGE = 1;
-static const int MAIN_PAGE = 2;
+static const int SETTINGS_PAGE = 2;
+static const int MAIN_PAGE = 3;
 static const int PAGE_COUNT = sizeof(PAGES) / sizeof(PAGES[0]);
 static lv_obj_t *page_dots[PAGE_COUNT];
 
@@ -670,6 +672,88 @@ static void update_info() {
 }
 
 // ============================================================================
+// SYSTEM PAGE (left-most): firmware version, uptime, and Restart. The button must be held
+// RESTART_HOLD_MS (it fills while held), so a stray tap can't restart the board.
+// ============================================================================
+
+static const uint32_t RESTART_HOLD_MS = 2000;
+static const int RESTART_W = 150;
+static lv_obj_t *sys_info = nullptr;
+static lv_obj_t *restart_fill = nullptr;
+static lv_obj_t *restart_label = nullptr;
+static uint32_t restart_press_at = 0;     // lv_tick when the hold started (0 = not held)
+
+static void restart_cb(lv_event_t *e) {
+  lv_event_code_t code = lv_event_get_code(e);
+  if (code == LV_EVENT_PRESSED) {
+    restart_press_at = lv_tick_get();
+    if (restart_press_at == 0) restart_press_at = 1;
+  } else if (code == LV_EVENT_PRESSING && restart_press_at) {
+    uint32_t held = lv_tick_elaps(restart_press_at);
+    lv_obj_set_width(restart_fill, min(held, RESTART_HOLD_MS) * RESTART_W / RESTART_HOLD_MS);
+    if (held >= RESTART_HOLD_MS) {
+      restart_press_at = 0;
+      lv_label_set_text(restart_label, "Restarting...");
+      power_request_restart("LCD");
+    }
+  } else if (code == LV_EVENT_RELEASED || code == LV_EVENT_PRESS_LOST) {
+    restart_press_at = 0;
+    lv_obj_set_width(restart_fill, 0);
+  }
+}
+
+static void create_system_page(lv_obj_t *tile) {
+  page_title(tile, "System");
+
+  sys_info = lv_label_create(tile);
+  lv_obj_set_style_text_font(sys_info, &lv_font_montserrat_14, 0);
+  lv_obj_set_style_text_color(sys_info, lv_color_hex(THEME_TEXT_DIM), 0);
+  lv_obj_set_style_text_align(sys_info, LV_TEXT_ALIGN_CENTER, 0);
+  lv_label_set_text(sys_info, "");
+  lv_obj_align(sys_info, LV_ALIGN_CENTER, 0, -38);
+
+  lv_obj_t *btn = lv_obj_create(tile);  // Plain object: the fill bar inside shows the hold
+  lv_obj_set_size(btn, RESTART_W, 52);
+  lv_obj_align(btn, LV_ALIGN_CENTER, 0, 18);
+  lv_obj_clear_flag(btn, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_add_flag(btn, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_set_style_pad_all(btn, 0, 0);
+  lv_obj_set_style_radius(btn, 10, 0);
+  lv_obj_set_style_bg_color(btn, lv_color_hex(THEME_PANEL), 0);
+  lv_obj_set_style_border_color(btn, lv_color_hex(THEME_ALERT), 0);
+  lv_obj_set_style_border_width(btn, 2, 0);
+  lv_obj_add_event_cb(btn, restart_cb, LV_EVENT_ALL, nullptr);
+
+  restart_fill = lv_obj_create(btn);
+  lv_obj_set_size(restart_fill, 0, LV_PCT(100));
+  lv_obj_align(restart_fill, LV_ALIGN_LEFT_MID, 0, 0);
+  lv_obj_clear_flag(restart_fill, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_style_radius(restart_fill, 0, 0);
+  lv_obj_set_style_border_width(restart_fill, 0, 0);
+  lv_obj_set_style_bg_color(restart_fill, lv_color_hex(THEME_ALERT), 0);
+
+  restart_label = lv_label_create(btn);
+  lv_obj_set_style_text_color(restart_label, lv_color_hex(THEME_TEXT), 0);
+  lv_label_set_text(restart_label, "Restart");
+  lv_obj_center(restart_label);
+
+  lv_obj_t *hint = lv_label_create(tile);
+  lv_obj_set_style_text_font(hint, &lv_font_montserrat_14, 0);
+  lv_obj_set_style_text_color(hint, lv_color_hex(THEME_TEXT_DIM), 0);
+  lv_obj_set_style_text_align(hint, LV_TEXT_ALIGN_CENTER, 0);
+  lv_label_set_text(hint, "Hold 2 s to restart\n(the fan stops)");
+  lv_obj_align(hint, LV_ALIGN_CENTER, 0, 72);
+}
+
+static void update_system_info() {
+  uint32_t s = millis() / 1000;
+  char text[64];
+  snprintf(text, sizeof(text), "Firmware %s\nUp %lud %luh %lum", config.firmwareVersion,
+           (unsigned long)(s / 86400), (unsigned long)(s % 86400 / 3600), (unsigned long)(s % 3600 / 60));
+  if (strcmp(text, lv_label_get_text(sys_info)) != 0) lv_label_set_text(sys_info, text);
+}
+
+// ============================================================================
 // QR CODE PAGE: scan to open the web page (by IP: many Android phones can't open .local
 // names; port 80 redirects to the web port). On the hotspot a phone has to join it first,
 // so that QR shows first and a tap on the code switches to the page link and back.
@@ -984,6 +1068,7 @@ void ui_update() {
   update_clock();
   update_status_box();
   update_info();
+  update_system_info();
   update_qr_page();
 }
 

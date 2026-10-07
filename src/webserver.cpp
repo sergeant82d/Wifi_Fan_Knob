@@ -540,6 +540,14 @@ void init_webserver() {
     request->send(200, "text/plain", "LEDs saved");
   });
 
+  // Restart (System tab): like a power cycle, nothing changes; restarts once the reply is sent
+  server->on(AsyncURIMatcher::exact("/api/restart"), HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (!require_login(request)) return;
+    Serial.println("[SYSTEM] Restart requested (web)");
+    restart_after_response(request);
+    request->send(200, "text/plain", "Restarting. The page reloads in about 15 seconds.");
+  });
+
   // Display mode, like radio buttons: active, screensaver or standby (exactly one is on)
   server->on(AsyncURIMatcher::exact("/api/mode"), HTTP_POST, [](AsyncWebServerRequest *request) {
     if (!require_login(request)) return;

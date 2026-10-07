@@ -416,7 +416,13 @@ See `platformio.ini`. Libraries:
   becomes a top strip; on the Dashboard the LCD card's two parts (`#lcd-viewer`,
   `#lcd-brightness`) become separate cards (`display: contents`): picture first, Brightness
   between Presence & Light and LEDs (user). Colours: the standard variables, Navy & gold only.
-  No Restart button yet (the board has no restart endpoint).
+- Restart (verified 2026-10-07 by the user: LCD, web, HA): `power_request_restart(from)`
+  (`power.h`, `main.cpp`) restarts ~0.5 s later from `loop()`; nothing saved or lost, the fan
+  starts stopped. LCD: System page (left-most, `create_system_page()`: firmware version,
+  uptime, Restart held `RESTART_HOLD_MS` 2 s, fills red while held). Web: System tab "Restart"
+  card above Factory Reset, `POST /api/restart` (login; restarts after the reply). HA: button
+  "Restart" (`device_class` restart, `<base>/restart/set`, payload PRESS), ignored in the first
+  30 s after boot so a retained message can't make it restart over and over.
 - Photo eyes, Dragon 2-11 (verified on the board 2026-09-27 by the user: Dragons 3-10 all
   fine; Dragon 11 added from `23-4.png` / `24-4.png`, "works great"; `docs/PHOTO_EYES.md`):
   the artist's open/shut pairs (`assets/eye_art/`) animated by `photo_eye.cpp`: iris moves

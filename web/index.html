@@ -790,6 +790,14 @@ dialog .field { margin-bottom: 12px; }
         </div>
 
         <div class="panel">
+            <h2>Restart</h2>
+            <p class="hint" style="margin: 0 0 14px;">Restarts the board, like a power cycle: no setting is changed
+                or lost. The fan stops; the page is back in about 15 seconds. Also on the LCD's System page
+                (hold 2 s) and in Home Assistant ("Restart").</p>
+            <button type="button" class="btn ghost danger" onclick="restartBoard()">Restart</button>
+        </div>
+
+        <div class="panel">
             <h2>Factory Reset</h2>
             <p style="color: var(--muted); margin-bottom: 15px; font-size: 0.9rem;">
                 Erases ALL settings, including saved WiFi, the web login and the hotspot password,
@@ -1548,6 +1556,16 @@ dialog .field { margin-bottom: 12px; }
                 loadConfig();  // Home tab preset buttons show the new speeds
             } catch (e) {
                 alert('Save failed: ' + e.message);
+            }
+        }
+
+        async function restartBoard() {
+            if (!confirm('Restart the board? The fan stops; no setting changes. Back in about 15 seconds.')) return;
+            try {
+                alert(await postForm('/api/restart', {}));
+                setTimeout(() => location.reload(), 15000);
+            } catch (e) {
+                alert('Restart failed: ' + e.message);
             }
         }
 

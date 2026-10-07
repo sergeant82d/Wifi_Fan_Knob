@@ -17,6 +17,11 @@ bool power_standby_prompt_on();            // LCD asking "Keep the fan running?"
 void power_set_saver_paused(bool paused);
 bool power_saver_paused();
 
+// Restart, like a power cycle (nothing saved or lost; the fan starts stopped). From the LCD
+// System page and Home Assistant; loop() restarts ~0.5 s later so replies can go out. Safe from
+// any task. The web page restarts after its reply instead (webserver.cpp).
+void power_request_restart(const char *from);
+
 // Peripheral power switch (GPIO 4): on while awake, off in standby.
 // Level (active HIGH/LOW) comes from config.power.activeHigh.
 bool power_peripherals_on();

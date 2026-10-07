@@ -257,12 +257,13 @@ of `ui.cpp`:
 
 ```cpp
 static const Page PAGES[] = {
+  {"System", create_system_page},
   {"QR code", create_qr_page},
   {"Settings", create_settings_page},
   {"Main", create_main_page},
 };
-static const int SETTINGS_PAGE = 1;
-static const int MAIN_PAGE = 2;
+static const int SETTINGS_PAGE = 2;
+static const int MAIN_PAGE = 3;
 ```
 
 Each row is a **name** (shown in the knob menu) and a **function that builds the page**.
@@ -274,10 +275,10 @@ Everything else follows this table automatically:
 * tap-empty-space-to-return-to-Main, on every page except Main
 
 **Keep `MAIN_PAGE` and `SETTINGS_PAGE` pointing at the right rows** whenever you reorder:
-the board starts and wakes on `MAIN_PAGE`, and the knob uses both. The order is QR code,
-Settings, Main: swipe right from Main to reach Settings, and again for the QR code. With the fan stopped, a left knob turn also opens Settings.
+the board starts and wakes on `MAIN_PAGE`, and the knob uses both. The order is System, QR code,
+Settings, Main: swipe right from Main to reach Settings, again for the QR code, and again for System. With the fan stopped, a left knob turn also opens Settings.
 On any other page, each knob click moves one page the way it turns, like a swipe (left from
-Settings to the QR code, right back to Settings and Main), speed unchanged: `ui_step_page()`.
+Settings to the QR code and System, right back to Settings and Main), speed unchanged: `ui_step_page()`.
 
 ### Reordering, renaming or removing a page
 
@@ -301,6 +302,7 @@ static void create_about_page(lv_obj_t *tile);      // ← add
 
 ```cpp
 static const Page PAGES[] = {
+  {"System", create_system_page},
   {"QR code", create_qr_page},
   {"Settings", create_settings_page},
   {"Main", create_main_page},
@@ -324,7 +326,7 @@ static void create_about_page(lv_obj_t *tile) {
 }
 ```
 
-Upload. There's now a fourth dot, "About" is in the knob menu, and a tap on the page returns
+Upload. There's now a fifth dot, "About" is in the knob menu, and a tap on the page returns
 to Main.
 
 **A button on a new page** looks like this (copy it inside your page function):
@@ -365,9 +367,23 @@ In `create_settings_page()`, in the same dark blue and gold as Main:
   `status_flash_cb()`, speed in `lv_timer_create(status_flash_cb, 500, ...)`).
 * network name and MQTT status at `y = 74`
 
+### The System page
+
+The left-most page, left of the QR code. In `create_system_page()` and `update_system_info()`
+(once a second from `ui_update()`):
+* title at `y = -80`
+* firmware version and uptime ("Up 0d 2h 15m") at `y = -38`, dim grey
+* **Restart** button at `y = 18`: 150 x 52, slate blue with a red border. It must be **held
+  2 seconds** (`RESTART_HOLD_MS`); while held it fills with red from the left, and letting go
+  early empties it, so a stray tap can't restart the board. At 2 s it reads "Restarting..." and
+  calls `power_request_restart()`; the board restarts half a second later, like a power cycle
+  (nothing saved or lost; the fan starts stopped). The same restart is on the web page (System
+  tab) and in Home Assistant (button "Restart").
+* "Hold 2 s to restart (the fan stops)" at `y = 72`
+
 ### The QR code page
 
-Left of Settings (the left-most page). A phone scans it to open the web page. In `create_qr_page()` and
+Between System and Settings. A phone scans it to open the web page. In `create_qr_page()` and
 `update_qr_page()` (runs once a second from `ui_update()`; redraws only when something changed):
 * title at `y = -80`: "Open web page", "Join hotspot" or "Not connected"
 * the QR code at `y = 6`: `QR_SIZE` (112) pixels, black on white, with a 6-pixel white border
