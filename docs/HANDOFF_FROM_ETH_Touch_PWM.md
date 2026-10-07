@@ -4,8 +4,8 @@
 3 done (`2420c49`; the page is left of Settings, the user's choice), 2 done (`610fad2`, phone
 layout in the next commit; the eye is captured too), 4 done (Notes box, form post instead
 of a body handler). Items 1-4 finished. Themes and the History tab were
-dropped by the user (2026-09-28); the MQTT dot moved to `docs/CLAUDE.md`, "Possible future mods". Details of each in
-`docs/CLAUDE.md` (Verified list).
+dropped by the user (2026-09-28); the MQTT dot moved to `docs/PROJECT_HISTORY.md` (then `docs/CLAUDE.md`), "Possible future mods". Details of each in
+`docs/PROJECT_HISTORY.md` (Verified list).
 
 Written 2026-09-28 by the Claude session working on the sister project ETH_Touch_PWM
 (`D:\GitHub\VSCodeProjects\ETH_Touch_PWM`, a two-fan Ethernet controller with a 320x240

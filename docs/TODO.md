@@ -41,8 +41,6 @@ How this list works (the all-projects format, agreed 2026-10-07; from ETH_Touch_
       arrives: wire it to the always-on 3.3 V and SDA/SCL (GPIO 38/39), check the boot log lists
       0x69, test (away, sitting, leaning in, hot iron with nobody there, a long still sit), then
       the "presence for X seconds wakes the screen" rule
-- [ ] `[Docs]` Split the big `docs/CLAUDE.md` into a short root `CLAUDE.md` and
-      `docs/PROJECT_HISTORY.md`, like the other projects (user, 2026-10-07; a separate step)
 - [ ] `[Board]` GPIO 4 pull-down resistor: waits on the FPC breakout for GPIO 4 access
       (status report 05)
 - [ ] `[LCD]` Swiping between LCD pages is barely usable and very unfriendly: relook at the swipe
@@ -50,6 +48,9 @@ How this list works (the all-projects format, agreed 2026-10-07; from ETH_Touch_
 
 ## Done
 
+- [x] `[Docs]` Split the big `docs/CLAUDE.md` into a short root `CLAUDE.md` and
+      `docs/PROJECT_HISTORY.md`, like the other projects: the guide renamed (history kept),
+      with a current-status section; the root file rewritten short (2026-10-07, this commit)
 - [x] `[LCD]` `[Web]` `[HA]` Restart button (your request): LCD on a new System page (left-most;
       firmware version, uptime, Restart held 2 s, fills while held), web System tab card above
       Factory Reset (confirm, login), HA button "Restart" (ignored in the first 30 s after boot,

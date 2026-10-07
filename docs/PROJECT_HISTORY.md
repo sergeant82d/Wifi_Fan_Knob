@@ -1,23 +1,26 @@
-# WiFi Fan Knob - Claude Code Guide
+# Project history
 
-(The short root `CLAUDE.md` loads automatically in every session and points here.)
+The long guide to the WiFi Fan Knob: what each part does and why, hardware notes, gotchas,
+decisions and plans. Read it before starting work. The short root `CLAUDE.md` loads in every
+session and points here; open items are in `docs/TODO.md`. (This file was `docs/CLAUDE.md`
+until 2026-10-07; older notes, commits and status reports use that name.)
 
-**Project**: ESP32-S3 PWM Fan Controller with Rotary Display + Home Assistant  
-**Repository**: https://github.com/sergeant82d/Wifi_Fan_Knob.git  
-**Repo root**: `D:\GitHub\VSCodeProjects\Wifi_Bench_Fan\Wifi_Fan_Knob`  
-**PlatformIO project**: the repo root (`platformio.ini` is at the top level)  
-**Status**: Hardware bring-up in progress — display, WiFi AP, SPIFFS and webserver verified on the board  
-**Last updated**: 2026-10-07 (Auto brightness from the APDS-9999, LEDs included; LEDs stay on in standby)
+**Repository**: https://github.com/sergeant82d/Wifi_Fan_Knob.git
+**Repo root / PlatformIO project**: `D:\GitHub\VSCodeProjects\Wifi_Bench_Fan\Wifi_Fan_Knob`
 
+## Current status (2026-10-07)
 
-1. Don’t assume. Don’t hide confusion. Surface tradeoffs.
-
-2. Minimum code that solves the problem. Nothing speculative.
-
-3. Touch only what you must. Clean up only your own mess.
-
-4. Define success criteria. Loop until verified.
-
+- **Board:** Elecrow CrowPanel 1.28" rotary display (ESP32-S3), COM13, `http://192.168.10.102:8080`
+  (static IP). Platform pinned to pioarduino 51.03.04 = Arduino core 3.0.4. Flash 86.6 % of the
+  6.25 MB app slot (room for about 4 more photo eyes).
+- **Working and checked on the board:** fan control through the EMC2101 with fan profiles and
+  Auto Configure (NF-P12 fitted; the 140 mm fan died 2026-10-06), LCD pages System / QR code /
+  Settings / Main with the knob, eyes (10 Uncanny + photo Dragons 2-11), web page (left sidebar,
+  `D:\GitHub\WEB_STYLE.md`), Home Assistant over MQTT, RGB LEDs, SHT41 + SGP41 air readings,
+  APDS-9999 light level with Auto brightness, restart (LCD / web / HA), notes, web LCD view, OTA.
+- **Waiting:** AMG8833 thermal camera (presence); Auto mode from the VOC Index (thresholds from
+  a few days of HA history); relook at LCD swiping; FPC breakout (fan PWM to the UART0
+  connector, GPIO 4 pull-down). Details and the rest: `docs/TODO.md`.
 
 ---
 
@@ -63,7 +66,7 @@ cd Wifi_Fan_Knob
 | `include/fan_control.h` / `src/fan_control.cpp` | ✅ Working | Target RPM → EMC2101 PWM (12 kHz, 30 steps), tach RPM, Auto Configure |
 | `include/fan_profiles.h` / `src/fan_profiles.cpp` | ✅ Working | Up to 5 fan profiles (`/fans.json`): measured table, max RPM, presets |
 | `lib/Adafruit_EMC2101/` | Vendored | Adafruit EMC2101 driver (local copy, not from registry) |
-| `include/ui.h` / `src/ui.cpp` | ✅ Working | LVGL tileview pages (Main / Settings), segments, knob menu |
+| `include/ui.h` / `src/ui.cpp` | ✅ Working | LVGL tileview pages (System / QR code / Settings / Main), segments, knob menu |
 | `include/dragon_eye.h` / `src/dragon_eye.cpp` | ✅ Working | Animated eye (standby + screensaver), native 240x240 |
 | `include/eye_styles.h` / `src/eye_styles.cpp` | ✅ Working | The eye styles: 10 Uncanny Eyes (`include/eyes/*Eye.h` = Adafruit tables) + photo eyes |
 | `include/lcd_view.h` / `src/lcd_view.cpp` | ✅ Working | Web LCD view: copies of the screen for `GET /api/lcd` (LVGL snapshot; eye rows copied as drawn) |
@@ -76,6 +79,8 @@ cd Wifi_Fan_Knob
 
 | File | Purpose |
 |------|---------|
+| `PROJECT_HISTORY.md` | This file: the long guide (was `docs/CLAUDE.md` until 2026-10-07) |
+| `TODO.md` | The user's list: Your notes / Open / Done, tags (all-projects format) |
 | `DISPLAY_GUIDE.md` | How to change the LCD: colours, fonts, segments, pages (human-readable) |
 | `PHOTO_EYES.md` | Photo eyes: how they animate, adding a new one (`tools/photo_eye.py`, `eye.json`), artist spec |
 | `EYE_IMAGE_PROMPT.md` | Prompt: cut a picture from a `*_dragon-eyes-8.5x11.jpg` sheet and show it on the LCD (test build); eyelid image spec for the artist |
@@ -816,8 +821,15 @@ Not issues now; kept so they can be looked at again later (user, 2026-09-27).
 
 ## Quick Reference
 
-- Webserver: `http://192.168.4.1:8080` in AP mode (no auth)
+- Webserver: `http://192.168.4.1:8080` in AP mode (viewing needs no login; changes need the web login)
 - MQTT broker default: `192.168.10.50:1883` (configurable)
 - WiFi AP: `WiFi-Fan-Knob-XXXXXX` / `12345678`
 - Serial: 115200 baud
 - Config: `/config.json` on SPIFFS, auto-created on boot if missing
+
+---
+
+## Log
+
+One report per session day in `docs/Status_Reports/` (table above); every change is in the git
+log, and finished to-do items with dates and commits are under Done in `docs/TODO.md`.

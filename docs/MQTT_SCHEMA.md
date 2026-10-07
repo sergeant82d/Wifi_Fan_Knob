@@ -1,5 +1,5 @@
 > **Superseded (2026-09-23):** this was the pre-hardware design. The implemented schema is in
-> `src/mqtt.cpp` and summarised in `docs/CLAUDE.md` (MQTT / Home Assistant). Main differences:
+> `src/mqtt.cpp` and summarised in `docs/PROJECT_HISTORY.md` (MQTT / Home Assistant). Main differences:
 > chip ID in unique IDs and topics, availability via Last Will instead of an "MQTT Connected"
 > sensor, a Standby switch instead of the Power Mode sensor, and no RPM sensor until the EMC2101
 > is fitted.

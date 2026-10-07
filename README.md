@@ -7,7 +7,8 @@ ESP32-S3 fan controller for a solder fume extractor, built on the Elecrow CrowPa
 
 ## Documentation
 
-- [Project guide](docs/CLAUDE.md): features, pins, build notes and the to-do list
+- [Project history](docs/PROJECT_HISTORY.md): features, pins, build notes, decisions and plans
+- [To-do list](docs/TODO.md)
 - [Display guide](docs/DISPLAY_GUIDE.md): how to change the LCD's colours, fonts, buttons and pages
 - [Status reports](docs/Status_Reports/): end-of-day reports
 - [Configuration](docs/SPIFFS_CONFIG_SCHEMA.md): settings structure
