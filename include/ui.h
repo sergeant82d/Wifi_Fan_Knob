@@ -10,7 +10,7 @@ void ui_set_attention(bool attention);   // Flash status box red/white while tru
 void ui_set_standby(bool standby);       // Switch between main and standby screens
 void ui_show_main();                     // Slide back to the Main page
 bool ui_on_main_page();
-void ui_step_page(int delta);            // One page left (delta < 0; left of the first wraps to the last) or right (> 0)
+void ui_step_page(int delta);            // One page left (delta < 0) or right (> 0); wraps at both ends
 bool ui_menu_open();                     // Knob page menu showing?
 void ui_menu_button();                   // Short press: open menu, or go to the chosen page
 void ui_menu_turn(int delta);            // Knob turn while the menu is open

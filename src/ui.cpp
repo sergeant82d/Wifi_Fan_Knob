@@ -454,8 +454,11 @@ bool ui_on_main_page() {
 
 void ui_step_page(int delta) {
   int page = current_page() + (delta > 0 ? 1 : -1);
-  if (page < 0) page = PAGE_COUNT - 1;  // Left from System wraps to Settings, then on to Main (user, 2026-10-07)
-  if (delta != 0 && page < PAGE_COUNT) show_page(page);
+  // The knob wraps at both ends (user, 2026-10-07): left from System to Settings, right from
+  // Settings to System. Swipes don't wrap (tried; LVGL's edge gestures were unreliable).
+  if (page < 0) page = PAGE_COUNT - 1;
+  if (page >= PAGE_COUNT) page = 0;
+  if (delta != 0) show_page(page);
 }
 
 static void page_changed_cb(lv_event_t *) {

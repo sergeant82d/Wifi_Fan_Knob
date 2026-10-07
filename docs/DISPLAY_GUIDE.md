@@ -285,8 +285,9 @@ on it, and taps and the knob use it. The order is System, QR code, Main, Setting
 2026-10-07): swipe left from Main for Settings; swipe right from Main for the QR code, and
 again for System. On Main with the fan stopped, a left knob turn also goes one page left (to
 the QR code). On any other page, each knob click moves one page the way it turns, like a
-swipe, speed unchanged: `ui_step_page()`. Turning left keeps cycling: left from System wraps
-to Settings, then on to Main (user, 2026-10-07); turning right stops at Settings.
+swipe, speed unchanged: `ui_step_page()`. The knob wraps at both ends (user, 2026-10-07):
+left from System to Settings, right from Settings to System. Swipes stop at the ends (a
+swipe wrap was tried and didn't work reliably).
 
 ### Reordering, renaming or removing a page
 

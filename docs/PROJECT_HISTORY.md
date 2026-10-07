@@ -66,7 +66,7 @@ cd Wifi_Fan_Knob
 | `include/fan_control.h` / `src/fan_control.cpp` | ✅ Working | Target RPM → EMC2101 PWM (12 kHz, 30 steps), tach RPM, Auto Configure |
 | `include/fan_profiles.h` / `src/fan_profiles.cpp` | ✅ Working | Up to 5 fan profiles (`/fans.json`): measured table, max RPM, presets |
 | `lib/Adafruit_EMC2101/` | Vendored | Adafruit EMC2101 driver (local copy, not from registry) |
-| `include/ui.h` / `src/ui.cpp` | ✅ Working | LVGL tileview pages (System / QR code / Main / Settings since 2026-10-07; knob left wraps from System to Settings), segments, knob menu |
+| `include/ui.h` / `src/ui.cpp` | ✅ Working | LVGL tileview pages (System / QR code / Main / Settings since 2026-10-07; the knob wraps at both ends; swipes don't, a swipe wrap was tried and was unreliable), segments, knob menu |
 | `include/dragon_eye.h` / `src/dragon_eye.cpp` | ✅ Working | Animated eye (standby + screensaver), native 240x240 |
 | `include/eye_styles.h` / `src/eye_styles.cpp` | ✅ Working | The eye styles: 10 Uncanny Eyes (`include/eyes/*Eye.h` = Adafruit tables) + photo eyes |
 | `include/lcd_view.h` / `src/lcd_view.cpp` | ✅ Working | Web LCD view: copies of the screen for `GET /api/lcd` (LVGL snapshot; eye rows copied as drawn) |
