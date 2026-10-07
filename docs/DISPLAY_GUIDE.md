@@ -23,7 +23,7 @@ Some things need no code at all. They're on the web page:
 
 | Setting | Web page tab |
 |---|---|
-| LCD brightness | Home |
+| LCD brightness, and Auto (follows the room light; Dark / Bright levels) | Home → LCD |
 | Fan max RPM (top of the arc, knob and all speed controls) | Config → Fan Presets |
 | Preset speeds (Low / Med / High / Max) | Config → Fan Presets |
 | 12 / 24-hour clock, time zone | Config |
@@ -352,7 +352,9 @@ static void my_button_cb(lv_event_t *) {
 
 In `create_settings_page()`, in the same dark blue and gold as Main:
 * title at `y = -80`
-* brightness label (`y = -52`) and slider (`y = -28`; 150 wide, range 10–100 %; gold fill and knob)
+* brightness label (`y = -52`) and slider (`y = -28`; 150 wide, range 10–100 %; gold fill and knob).
+  With Auto brightness on, the slider follows the Auto level and the label reads "Auto NN%";
+  moving the slider turns Auto off
 * **Screensaver** label and switch at `y = 6` (`saver_switch`; gold when on). Off pauses the
   screensaver without saving anything: it comes back on when switched back, when the fan stops,
   at standby, after the web's "Screensaver pause limit", or on restart. While it's off, a

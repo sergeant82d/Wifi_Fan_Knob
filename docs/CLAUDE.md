@@ -7,7 +7,7 @@
 **Repo root**: `D:\GitHub\VSCodeProjects\Wifi_Bench_Fan\Wifi_Fan_Knob`  
 **PlatformIO project**: the repo root (`platformio.ini` is at the top level)  
 **Status**: Hardware bring-up in progress — display, WiFi AP, SPIFFS and webserver verified on the board  
-**Last updated**: 2026-10-06 (RGB LEDs; air sensors SHT41 + SGP41; TACH pull-up replaced, 140 mm fan dead)
+**Last updated**: 2026-10-07 (Auto brightness from the APDS-9999, LEDs included; LEDs stay on in standby)
 
 
 1. Don’t assume. Don’t hide confusion. Surface tradeoffs.
@@ -200,7 +200,7 @@ See `platformio.ini`. Libraries:
   both fields' characters/lengths only; the page supplies the rule from its table.
 - LCD pages (verified): horizontal LVGL tileview; Settings is left of Main (swipe right from Main). Main: RPM arc (drag
   along the ring to set speed, snaps to rpmStep; ring-only hit test (needs LV_OBJ_FLAG_ADV_HITTEST, off by default) + 8 px ext area (stops at the segments' outer edge, SEG_R_OUT) so
-  mid-screen swipes still page), target RPM, actual RPM, clock. Settings: brightness slider (live; saveConfig on release) +
+  mid-screen swipes still page), target RPM, actual RPM, clock. Settings: brightness slider (live; saveConfig on release; turns Auto brightness off; shows "Auto NN%" while Auto runs) +
   IP box + SSID/MQTT info. Page dots in the arc's bottom gap. Knob turns and wake return to Main.
   Pages come from the `PAGES` table in `ui.cpp` (name + builder); tiles, dots and the knob
   menu follow it, so adding a page = one builder + one table row (keep `MAIN_PAGE` /
@@ -341,7 +341,7 @@ See `platformio.ini`. Libraries:
   NeoPixel library, drawn by `leds_update()` in `loop()` (max 50/s, sent only on change).
   Effects Solid, Flash (2 s period at speed 1, 0.2 s at 10), Breathe (8 s .. 0.8 s, squared
   fade), Rainbow (hues spread over the 5 LEDs, a turn in 10 s .. 1 s). Off is the "on" flag, so
-  the effect is kept. Off in standby. **Brightness cap `LED_BRIGHTNESS_MAX` = 100 of 255 (user
+  the effect is kept. Stays on in standby (user 2026-10-07; was off). **Brightness cap `LED_BRIGHTNESS_MAX` = 100 of 255 (user
   2026-10-06)**: applied when drawing, also the top of the web slider and HA's 100 %.
   `config.leds` = on, effect, color (0xRRGGBB), brightness 1-100, speed 1-10; defaults off,
   gold 0xFFD700, 50, 5. Web: Home tab "LEDs" card (under Display Mode), `POST /api/leds`
@@ -378,6 +378,20 @@ See `platformio.ini`. Libraries:
   the AMG8833 thermal camera (on the user's hardware list) or an mmWave radar.**
   The chip is always powered and keeps its registers over a board restart, so
   `presence_begin()` writes the datasheet reset values (PS_VCSEL 0x36, 8 pulses) every boot.
+- Auto brightness (verified 2026-10-07 by the user: response speed, LEDs following, standby,
+  slider turning Auto off): `config.display.autoBrightness` / `autoMin` (Dark, default 20 %) /
+  `autoMax` (Bright, default 100 %). `auto_brightness_update()` in `main.cpp`: APDS-9999 lux
+  sampled once a second, log10 averaged over `AUTO_AVG_S` = 5 s, mapped on a log scale from
+  5 lx (Dark) to 500 lx (Bright); the backlight fades 1 % per `AUTO_STEP_MS` = 50 ms (both
+  halved from 10 s / 100 ms at the user's request, 2026-10-07). The LED ring follows the same
+  fraction, LED brightness 10..90 (`AUTO_LED_MIN/MAX`; user 2026-10-07), via
+  `autoLedBrightness()` (-1 when off); LEDs keep following in standby, the screen keeps
+  `standbyBrightness`. Any manual brightness change turns Auto off: LCD slider, web screen
+  slider, HA "LCD Brightness", and an LED brightness change (web or HA) too. Web: LCD card
+  checkbox + Dark/Bright sliders, `POST /api/brightness/auto` (auto, min, max);
+  `/api/status` `auto_brightness`, `backlight`. HA: switch "LCD Auto Brightness", numbers
+  "LCD Auto Min" / "LCD Auto Max". The LED light's HA state shows the set brightness, not
+  Auto's (no MQTT publish on every fade step).
 - Photo eyes, Dragon 2-11 (verified on the board 2026-09-27 by the user: Dragons 3-10 all
   fine; Dragon 11 added from `23-4.png` / `24-4.png`, "works great"; `docs/PHOTO_EYES.md`):
   the artist's open/shut pairs (`assets/eye_art/`) animated by `photo_eye.cpp`: iris moves

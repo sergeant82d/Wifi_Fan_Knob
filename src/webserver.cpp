@@ -283,6 +283,8 @@ void init_webserver() {
     doc["periph_power"] = power_peripherals_on();
     doc["saver_paused"] = power_saver_paused();
     doc["mqtt_connected"] = mqtt_connected();
+    doc["auto_brightness"] = config.display.autoBrightness;
+    doc["backlight"] = displayAwakeBrightness();  // % while awake (Auto's current level when on)
     AirReadings air = air_get();  // SHT41 + SGP41; values only when valid
     JsonObject a = doc.createNestedObject("air");
     a["state"] = air.state;
@@ -452,12 +454,33 @@ void init_webserver() {
       return;
     }
     config.display.brightness = brightness;
+    config.display.autoBrightness = false;  // A manual change ends Auto
     applyDisplaySettings();
     if (!saveConfig()) {
       request->send(500, "text/plain", "Failed to write config to SPIFFS");
       return;
     }
     request->send(200, "text/plain", "Brightness saved");
+  });
+
+  // Auto brightness (LCD card): any of auto=0|1, min, max (10-100). Applied now and saved.
+  server->on(AsyncURIMatcher::exact("/api/brightness/auto"), HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (!require_login(request)) return;
+    long lo = config.display.autoMin, hi = config.display.autoMax;
+    if ((request->hasParam("min", true) && !form_int(request, "min", 10, 100, lo)) ||
+        (request->hasParam("max", true) && !form_int(request, "max", 10, 100, hi))) {
+      request->send(400, "text/plain", "Auto min and max must be 10-100");
+      return;
+    }
+    if (request->hasParam("auto", true)) config.display.autoBrightness = form_value(request, "auto") == "1";
+    config.display.autoMin = lo;
+    config.display.autoMax = hi;
+    applyDisplaySettings();
+    if (!saveConfig()) {
+      request->send(500, "text/plain", "Failed to write config to SPIFFS");
+      return;
+    }
+    request->send(200, "text/plain", "Auto brightness saved");
   });
 
   // RGB LEDs (Home tab "LEDs" card): any of on=0|1, effect=<name>, color=#RRGGBB,
@@ -498,6 +521,10 @@ void init_webserver() {
       l.speed = v;
     }
     config.leds = l;
+    if (request->hasParam("brightness", true) && config.display.autoBrightness) {
+      config.display.autoBrightness = false;  // A manual brightness change ends Auto (screen too)
+      applyDisplaySettings();
+    }
     if (!saveConfig()) {
       request->send(500, "text/plain", "Failed to write config to SPIFFS");
       return;

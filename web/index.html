@@ -595,17 +595,41 @@
                     <h3 style="font-size: 1rem;">Brightness</h3>
                     <div class="speed-input-group">
                         <input type="range" id="brightness" min="10" max="100" value="80"
-                           oninput="updateBrightnessLabel(this.value)" onchange="saveBrightness(this.value)">
+                           oninput="brightnessDragging = true; updateBrightnessLabel(this.value)"
+                           onchange="brightnessDragging = false; saveBrightness(this.value)">
                         <span class="speed-value"><span id="brightness-label">80</span>%</span>
                     </div>
-                    <small style="color: #606060; display: block; margin-top: 10px;">Saved when you let go of the slider</small>
+                    <small style="color: #606060; display: block; margin-top: 10px;">Saved when you let go of the slider. Moving it turns Auto off.</small>
+                    <div class="checkbox-group" style="margin-top: 14px;">
+                        <input type="checkbox" id="auto-brightness" onchange="saveAutoBrightness({ auto: this.checked ? 1 : 0 })">
+                        <label for="auto-brightness">Auto: follow the room light (light sensor)</label>
+                    </div>
+                    <div class="speed-input-group" style="margin-top: 10px;">
+                        <label for="auto-min" style="color: #a0a0a0; min-width: 80px;">Dark</label>
+                        <input type="range" id="auto-min" min="10" max="100" value="20"
+                               oninput="document.getElementById('auto-min-label').textContent = this.value"
+                               onchange="saveAutoBrightness({ min: this.value })">
+                        <span class="speed-value"><span id="auto-min-label">20</span>%</span>
+                    </div>
+                    <div class="speed-input-group" style="margin-top: 10px;">
+                        <label for="auto-max" style="color: #a0a0a0; min-width: 80px;">Bright</label>
+                        <input type="range" id="auto-max" min="10" max="100" value="100"
+                               oninput="document.getElementById('auto-max-label').textContent = this.value"
+                               onchange="saveAutoBrightness({ max: this.value })">
+                        <span class="speed-value"><span id="auto-max-label">100</span>%</span>
+                    </div>
+                    <small id="auto-note" style="color: #606060; display: block; margin-top: 10px;">
+                        Auto sets the screen between the Dark level (about 5 lx and darker) and the Bright level
+                        (about 500 lx and brighter), fading so a passing shadow doesn't flicker it. The LED ring
+                        follows too (LED brightness 10 to 90).
+                    </small>
                 </div>
             </div>
 
             <div class="status-card" id="leds-card" style="margin-top: 20px;">
                 <h3>LEDs</h3>
                 <p style="color: #a0a0a0; margin-bottom: 12px; font-size: 0.9rem;">
-                    The five lights on the knob. Off in standby. Also in Home Assistant as "LEDs".
+                    The five lights on the knob. They stay on in standby. Also in Home Assistant as "LEDs".
                 </p>
                 <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                     <button type="button" class="btn-secondary" id="led-Off" onclick="setLedEffect('Off')">Off</button>
@@ -635,8 +659,9 @@
                     <span class="speed-value"><span id="led-speed-label">5</span></span>
                 </div>
                 <small style="color: #606060; display: block; margin-top: 10px;">
-                    Brightness 100 is the firmware limit (100 of the LEDs' 255). Speed is for Flash, Breathe and Rainbow.
-                    Changes apply and save at once; they need the login.
+                    Brightness 100 is the firmware limit (100 of the LEDs' 255). While the LCD's Auto brightness is on,
+                    the room light sets the LED brightness (10 to 90); moving this slider turns Auto off.
+                    Speed is for Flash, Breathe and Rainbow. Changes apply and save at once; they need the login.
                 </small>
             </div>
 
@@ -1210,8 +1235,20 @@
         async function saveBrightness(value) {
             try {
                 await postForm('/api/brightness', { brightness: value });
+                document.getElementById('auto-brightness').checked = false;  // The board turned Auto off
             } catch (e) {
                 alert('Brightness not saved: ' + e.message);
+            }
+        }
+
+        // Auto brightness: any of auto (0/1), min, max
+        let brightnessDragging = false;
+        async function saveAutoBrightness(fields) {
+            try {
+                await postForm('/api/brightness/auto', fields);
+            } catch (e) {
+                alert('Auto brightness not saved: ' + e.message);
+                loadConfig();  // Back to what the board has
             }
         }
 
@@ -1409,6 +1446,12 @@
                 document.getElementById('power-level').value = c.power.activeHigh ? 'high' : 'low';
                 showLeds(c.leds);
                 updateBrightnessLabel(c.display.brightness);
+                document.getElementById('auto-brightness').checked = c.display.autoBrightness;
+                ['min', 'max'].forEach(k => {
+                    const v = k === 'min' ? c.display.autoMin : c.display.autoMax;
+                    document.getElementById('auto-' + k).value = v;
+                    document.getElementById('auto-' + k + '-label').textContent = v;
+                });
                 const w = c.network.wifi;
                 document.getElementById('hostname').value = w.hostname;
                 document.getElementById('hostname-example').textContent = w.hostname;
@@ -1456,6 +1499,12 @@
                 set('air-humidity', air.humidity === undefined ? wait : air.humidity.toFixed(1) + ' %');
                 set('air-voc', air.voc === undefined ? wait : air.voc);
                 set('air-nox', air.nox === undefined ? wait : air.nox);
+                // Brightness slider follows Auto's level (and HA changes) unless it's being dragged
+                document.getElementById('auto-brightness').checked = s.auto_brightness;
+                if (!brightnessDragging && s.backlight !== undefined) {
+                    document.getElementById('brightness').value = s.backlight;
+                    updateBrightnessLabel(s.backlight);
+                }
                 const pr = s.presence || {};
                 set('presence-prox', pr.ok ? pr.prox : 'no sensor');
                 set('presence-lux', pr.ok ? pr.lux.toFixed(1) + ' lx' : 'no sensor');

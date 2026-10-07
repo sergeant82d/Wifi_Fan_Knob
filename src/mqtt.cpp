@@ -125,6 +125,27 @@ static void publish_discovery() {
   }
   {
     StaticJsonDocument<768> doc;
+    doc["name"] = "LCD Auto Brightness";
+    doc["command_topic"] = topic("auto_brightness/set");
+    doc["state_topic"] = topic("auto_brightness");
+    doc["icon"] = "mdi:brightness-auto";
+    publish_config("switch", "auto_brightness", doc);
+  }
+  for (int i = 0; i < 2; i++) {  // Auto's range: dark (min) and bright light (max)
+    StaticJsonDocument<768> doc;
+    doc["name"] = i == 0 ? "LCD Auto Min" : "LCD Auto Max";
+    doc["command_topic"] = topic(i == 0 ? "auto_min/set" : "auto_max/set");
+    doc["state_topic"] = topic(i == 0 ? "auto_min" : "auto_max");
+    doc["min"] = 10;
+    doc["max"] = 100;
+    doc["step"] = 1;
+    doc["unit_of_measurement"] = "%";
+    doc["mode"] = "slider";
+    doc["icon"] = "mdi:brightness-6";
+    publish_config("number", i == 0 ? "auto_min" : "auto_max", doc);
+  }
+  {
+    StaticJsonDocument<768> doc;
     doc["name"] = "Screensaver";
     doc["command_topic"] = topic("screensaver/set");
     doc["state_topic"] = topic("screensaver");
@@ -254,6 +275,19 @@ static void publish_state(bool force) {
     client.publish(topic("screensaver").c_str(), saver ? "ON" : "OFF", true);
     last_saver = saver;
   }
+  static int last_auto = -1, last_auto_min = -1, last_auto_max = -1;
+  if (force || config.display.autoBrightness != last_auto) {
+    client.publish(topic("auto_brightness").c_str(), config.display.autoBrightness ? "ON" : "OFF", true);
+    last_auto = config.display.autoBrightness;
+  }
+  if (force || config.display.autoMin != last_auto_min) {
+    client.publish(topic("auto_min").c_str(), String(config.display.autoMin).c_str(), true);
+    last_auto_min = config.display.autoMin;
+  }
+  if (force || config.display.autoMax != last_auto_max) {
+    client.publish(topic("auto_max").c_str(), String(config.display.autoMax).c_str(), true);
+    last_auto_max = config.display.autoMax;
+  }
   static int last_brightness = -1;
   int brightness = config.display.brightness;  // Changed by LCD slider, web or HA
   if (force || brightness != last_brightness) {
@@ -330,7 +364,20 @@ static void on_message(char *t, byte *payload, unsigned int len) {
     long b = lroundf(msg.toFloat());
     if (b >= 10 && b <= 100) {
       config.display.brightness = b;
+      config.display.autoBrightness = false;  // A manual change ends Auto
       applyDisplaySettings();
+      saveConfig();
+    }
+  } else if (tp == topic("auto_brightness/set")) {
+    if (msg == "ON" || msg == "OFF") {
+      config.display.autoBrightness = msg == "ON";
+      applyDisplaySettings();
+      saveConfig();
+    }
+  } else if (tp == topic("auto_min/set") || tp == topic("auto_max/set")) {
+    long v = lroundf(msg.toFloat());
+    if (v >= 10 && v <= 100) {
+      (tp == topic("auto_min/set") ? config.display.autoMin : config.display.autoMax) = v;
       saveConfig();
     }
   } else if (tp == topic("leds/set")) {
@@ -349,6 +396,10 @@ static void on_message(char *t, byte *payload, unsigned int len) {
       if (e >= 0) l.effect = e;
     }
     config.leds = l;
+    if (in.containsKey("brightness") && config.display.autoBrightness) {
+      config.display.autoBrightness = false;  // A manual brightness change ends Auto (screen too)
+      applyDisplaySettings();
+    }
     saveConfig();
   } else if (tp == topic("led_speed/set")) {
     long s = lroundf(msg.toFloat());
@@ -378,6 +429,9 @@ static void try_connect() {
   client.subscribe(topic("speed/set").c_str());
   client.subscribe(topic("standby/set").c_str());
   client.subscribe(topic("brightness/set").c_str());
+  client.subscribe(topic("auto_brightness/set").c_str());
+  client.subscribe(topic("auto_min/set").c_str());
+  client.subscribe(topic("auto_max/set").c_str());
   client.subscribe(topic("screensaver/set").c_str());
   client.subscribe(topic("leds/set").c_str());
   client.subscribe(topic("led_speed/set").c_str());

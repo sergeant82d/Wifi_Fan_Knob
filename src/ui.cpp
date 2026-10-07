@@ -599,6 +599,7 @@ static lv_obj_t *page_title(lv_obj_t *tile, const char *text) {
 
 static void brightness_cb(lv_event_t *e) {
   if (lv_event_get_code(e) == LV_EVENT_VALUE_CHANGED) {
+    config.display.autoBrightness = false;  // A manual change ends Auto (saved on release)
     config.display.brightness = lv_slider_get_value(brightness_slider);
     lv_label_set_text_fmt(brightness_label, "Brightness %u%%", config.display.brightness);
     applyDisplaySettings();
@@ -974,10 +975,11 @@ void ui_update() {
   if (lv_arc_get_max_value(rpm_arc) != config.fan.maxRpm) {  // Fan max RPM changed on the web page
     lv_arc_set_range(rpm_arc, config.fan.minRpm, config.fan.maxRpm);
   }
-  // Brightness may have been changed on the web page (leave it alone while dragged)
-  if (lv_slider_get_value(brightness_slider) != config.display.brightness && !lv_slider_is_dragged(brightness_slider)) {
-    lv_slider_set_value(brightness_slider, config.display.brightness, LV_ANIM_OFF);
-    lv_label_set_text_fmt(brightness_label, "Brightness %u%%", config.display.brightness);
+  // Brightness may have been changed on the web page, or by Auto (leave it alone while dragged)
+  uint8_t shown = displayAwakeBrightness();
+  if (lv_slider_get_value(brightness_slider) != shown && !lv_slider_is_dragged(brightness_slider)) {
+    lv_slider_set_value(brightness_slider, shown, LV_ANIM_OFF);
+    lv_label_set_text_fmt(brightness_label, config.display.autoBrightness ? "Auto %u%%" : "Brightness %u%%", shown);
   }
   update_clock();
   update_status_box();

@@ -67,6 +67,9 @@ typedef struct {
     uint16_t standbyAfterMin;       // Screensaver on this long -> standby prompt (0 = never; max 1440)
     uint16_t standbyPromptSec;      // Prompt unanswered this long -> standby (5-300)
     uint16_t saverPauseMaxMin;      // LCD "Screensaver" switch off: back on after this long (0 = no limit)
+    bool autoBrightness;            // Backlight follows the APDS-9999 light level (awake only)
+    uint8_t autoMin;                // Auto: % in the dark (10-100)
+    uint8_t autoMax;                // Auto: % in bright light (10-100)
   } display;
 
   // Fan Settings
@@ -147,5 +150,7 @@ void setTimezone(const char* name, const char* posix);
 
 // Apply brightness + time zone to hardware/clock (defined in main.cpp)
 void applyDisplaySettings();
+uint8_t displayAwakeBrightness();   // Backlight % while awake: the Auto level, or the manual one
+int autoLedBrightness();            // LED brightness set by Auto (10-90), or -1 when Auto is off
 
 #endif

@@ -1,6 +1,5 @@
 #include "leds.h"
 #include "config.h"
-#include "power.h"
 #include <Adafruit_NeoPixel.h>
 
 // Pins and colour order from Elecrow's example (RotaryScreen_1_28.ino)
@@ -38,8 +37,9 @@ void leds_update() {
 
   uint32_t px[LED_COUNT] = {};
   const auto &l = config.leds;
-  if (l.on && !power_is_standby()) {
-    uint32_t b = min<uint32_t>(l.brightness, LED_BRIGHTNESS_MAX);  // Never above the cap
+  if (l.on) {  // On in standby too (user 2026-10-07)
+    int a = autoLedBrightness();  // Auto brightness (main.cpp) follows the room light
+    uint32_t b = min<uint32_t>(a >= 0 ? a : l.brightness, LED_BRIGHTNESS_MAX);  // Never above the cap
     uint32_t s = constrain(l.speed, 1, LED_SPEED_MAX);
     switch (l.effect) {
       case LED_SOLID:

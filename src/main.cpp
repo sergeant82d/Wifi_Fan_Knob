@@ -426,14 +426,87 @@ const uint32_t STIR_MS = 5000;
 const uint32_t KNOB_GLANCE_MS = 1000;
 const uint32_t TAP_LIFT_MS = 60;        // Finger must be off this long before the next tap counts
 
-static void set_backlight(uint8_t percent) {
+// Auto brightness (config.display.autoBrightness): the APDS-9999 light level, averaged over
+// AUTO_AVG_S seconds, sets the backlight between autoMin % (AUTO_DARK_LUX and darker) and
+// autoMax % (AUTO_BRIGHT_LUX and brighter) on a log scale, and the backlight fades towards it
+// so a passing shadow doesn't flicker it. Awake only: standby keeps standbyBrightness.
+// The LED ring follows the same light level, LED brightness AUTO_LED_MIN..AUTO_LED_MAX (of the
+// LEDs' 1-100 scale), fading the same way (user 2026-10-07).
+// Measured at the bench 2026-10-06: ~5 lx dark, ~40 lx room light, ~800 lx under the lamp.
+const float AUTO_DARK_LUX = 5;
+const float AUTO_BRIGHT_LUX = 500;
+const int AUTO_AVG_S = 5;           // Halved from 10 s (user 2026-10-07: respond faster)
+const uint32_t AUTO_STEP_MS = 50;   // Fade: 1 % per step; halved from 100 ms (same)
+const float AUTO_LED_MIN = 10;
+const float AUTO_LED_MAX = 90;
+static float auto_level = -1;       // Backlight % while Auto runs (-1 = not started)
+static float auto_led = -1;         // LED brightness while Auto runs (-1 = not started)
+
+static void set_backlight(uint8_t percent, bool log = true) {
   uint32_t duty = percent * 255 / 100;
   bool ok = ledcWrite(SCREEN_BACKLIGHT_PIN, duty);
-  Serial.printf("[DISPLAY] Brightness %u%% (duty %u/255) %s\n", percent, duty, ok ? "OK" : "FAILED");
+  if (log) Serial.printf("[DISPLAY] Brightness %u%% (duty %u/255) %s\n", percent, duty, ok ? "OK" : "FAILED");
+}
+
+uint8_t displayAwakeBrightness() {
+  return (config.display.autoBrightness && auto_level >= 0) ? lroundf(auto_level) : config.display.brightness;
+}
+
+int autoLedBrightness() {
+  return (config.display.autoBrightness && auto_led >= 0) ? lroundf(auto_led) : -1;
+}
+
+// One fade step of level towards target (1 per step); true if the rounded value changed
+static bool fade_step(float &level, float target) {
+  float diff = target - level;
+  if (fabsf(diff) < 0.5f) return false;
+  long before = lroundf(level);
+  level += constrain(diff, -1.0f, 1.0f);
+  return lroundf(level) != before;
+}
+
+static void auto_brightness_update() {
+  static float log_lux[AUTO_AVG_S];
+  static int count = 0, next = 0;
+  static float target = -1, led_target = -1;
+  static unsigned long sample_at = 0, step_at = 0;
+  if (!config.display.autoBrightness) {  // Off: start fresh next time
+    auto_level = target = auto_led = led_target = -1;
+    count = 0;
+    return;
+  }
+  unsigned long now = millis();
+  if (auto_level < 0) auto_level = config.display.brightness;  // Fade from the manual levels
+  if (auto_led < 0) auto_led = config.leds.brightness;
+  if (now - sample_at >= 1000) {
+    sample_at = now;
+    PresenceReadings pr = presence_get();
+    if (pr.ok) {
+      log_lux[next] = log10f(max(pr.lux, 0.1f));
+      next = (next + 1) % AUTO_AVG_S;
+      if (count < AUTO_AVG_S) count++;
+    }
+    if (count > 0) {
+      float avg = 0;
+      for (int i = 0; i < count; i++) avg += log_lux[i];
+      avg /= count;
+      float f = (avg - log10f(AUTO_DARK_LUX)) / (log10f(AUTO_BRIGHT_LUX) - log10f(AUTO_DARK_LUX));
+      uint8_t lo = min(config.display.autoMin, config.display.autoMax);
+      uint8_t hi = max(config.display.autoMin, config.display.autoMax);
+      f = constrain(f, 0.0f, 1.0f);
+      target = lo + f * (hi - lo);
+      led_target = AUTO_LED_MIN + f * (AUTO_LED_MAX - AUTO_LED_MIN);
+    }
+  }
+  if (target < 0 || now - step_at < AUTO_STEP_MS) return;
+  step_at = now;
+  // Screen: awake only (standby has its own level). LEDs: standby too, they stay on (user 2026-10-07)
+  if (fade_step(auto_level, target) && current_state != STATE_STANDBY) set_backlight(lroundf(auto_level), false);
+  fade_step(auto_led, led_target);  // leds_update() picks it up
 }
 
 void applyDisplaySettings() {
-  set_backlight(current_state == STATE_STANDBY ? config.display.standbyBrightness : config.display.brightness);
+  set_backlight(current_state == STATE_STANDBY ? config.display.standbyBrightness : displayAwakeBrightness());
   setenv("TZ", config.display.posixTz, 1);  // POSIX rule chosen on the web UI
   tzset();
 }
@@ -592,7 +665,7 @@ static void set_standby(bool standby) {
   }
   ui_set_standby(standby);
   eye_set_sleeping(standby);  // Standby: the eye sleeps; the screensaver's eye is awake
-  set_backlight(standby ? config.display.standbyBrightness : config.display.brightness);
+  set_backlight(standby ? config.display.standbyBrightness : displayAwakeBrightness());
   Serial.println(standby ? "Standby" : "Wake");
 }
 
@@ -765,6 +838,7 @@ void loop() {
   leds_update();
   air_update();
   presence_update();
+  auto_brightness_update();
   int32_t delta = encoder_read_detents();
   poll_button();
   if (delta != 0) note_activity();

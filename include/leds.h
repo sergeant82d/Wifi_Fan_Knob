@@ -4,7 +4,7 @@
 #include <Arduino.h>
 
 // RGB LEDs: 5 x WS2812 on GPIO 48 (Elecrow board). Settings in config.leds, changed from the
-// web Home tab and Home Assistant; loop() draws the effect. Off in standby.
+// web Home tab and Home Assistant; loop() draws the effect. Stays on in standby (user 2026-10-07).
 
 #define LED_BRIGHTNESS_MAX 100  // Firmware cap, of 255; also the most the user can set (user, 2026-10-06)
 #define LED_SPEED_MAX 10        // Effect speed 1-10
