@@ -390,8 +390,17 @@ See `platformio.ini`. Libraries:
   slider, HA "LCD Brightness", and an LED brightness change (web or HA) too. Web: LCD card
   checkbox + Dark/Bright sliders, `POST /api/brightness/auto` (auto, min, max);
   `/api/status` `auto_brightness`, `backlight`. HA: switch "LCD Auto Brightness", numbers
-  "LCD Auto Min" / "LCD Auto Max". The LED light's HA state shows the set brightness, not
-  Auto's (no MQTT publish on every fade step).
+  "LCD Auto Min" / "LCD Auto Max".
+  **What shows Auto's live level, and what doesn't (told to the user 2026-10-07):**
+  - Home Assistant never shows Auto's current levels. While Auto is on, the "LCD Brightness"
+    number shows the manual screen level (`config.display.brightness`) and the "LEDs" light
+    shows the set LED brightness (`config.leds.brightness`). Those are the levels used again
+    when Auto is turned off. Reason: publishing the live levels would send an MQTT message on
+    every fade step (up to 20 a second). The "LCD Auto Brightness" switch shows Auto is on.
+  - Web page: the LCD card's brightness slider does follow Auto's live level (from
+    `/api/status` `backlight`, every 2 s); the LEDs card's brightness slider shows the set
+    LED brightness, like HA.
+  - LCD Settings page: the slider follows Auto's live level, labelled "Auto NN%".
 - Photo eyes, Dragon 2-11 (verified on the board 2026-09-27 by the user: Dragons 3-10 all
   fine; Dragon 11 added from `23-4.png` / `24-4.png`, "works great"; `docs/PHOTO_EYES.md`):
   the artist's open/shut pairs (`assets/eye_art/`) animated by `photo_eye.cpp`: iris moves
