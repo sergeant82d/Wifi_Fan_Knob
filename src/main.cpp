@@ -887,7 +887,7 @@ void loop() {
   } else if (delta != 0 && !ui_on_main_page()) {
     ui_step_page(delta);  // Off Main, the knob moves one page the way it turns; speed unchanged
   } else if (delta < 0 && fan_get_target() == 0) {
-    ui_show_settings();  // Fan stopped: a left turn can't slow it, so it opens Settings
+    ui_step_page(delta);  // Fan stopped: a left turn can't slow it, so it goes one page left (QR code)
   } else if (delta != 0) {
     // Knob sets target RPM (fan_control clamps to config range)
     fan_set_target((int32_t)fan_get_target() + delta * config.fan.rpmStep);

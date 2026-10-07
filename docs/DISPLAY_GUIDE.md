@@ -266,11 +266,10 @@ of `ui.cpp`:
 static const Page PAGES[] = {
   {"System", create_system_page},
   {"QR code", create_qr_page},
-  {"Settings", create_settings_page},
   {"Main", create_main_page},
+  {"Settings", create_settings_page},
 };
-static const int SETTINGS_PAGE = 2;
-static const int MAIN_PAGE = 3;
+static const int MAIN_PAGE = 2;
 ```
 
 Each row is a **name** (shown in the knob menu) and a **function that builds the page**.
@@ -281,22 +280,24 @@ Everything else follows this table automatically:
 * the knob menu (short press on the knob)
 * tap-empty-space-to-return-to-Main, on every page except Main
 
-**Keep `MAIN_PAGE` and `SETTINGS_PAGE` pointing at the right rows** whenever you reorder:
-the board starts and wakes on `MAIN_PAGE`, and the knob uses both. The order is System, QR code,
-Settings, Main: swipe right from Main to reach Settings, again for the QR code, and again for System. With the fan stopped, a left knob turn also opens Settings.
-On any other page, each knob click moves one page the way it turns, like a swipe (left from
-Settings to the QR code and System, right back to Settings and Main), speed unchanged: `ui_step_page()`.
+**Keep `MAIN_PAGE` pointing at Main's row** whenever you reorder: the board starts and wakes
+on it, and taps and the knob use it. The order is System, QR code, Main, Settings (since
+2026-10-07): swipe left from Main for Settings; swipe right from Main for the QR code, and
+again for System. On Main with the fan stopped, a left knob turn also goes one page left (to
+the QR code). On any other page, each knob click moves one page the way it turns, like a
+swipe, speed unchanged: `ui_step_page()`. Turning left keeps cycling: left from System wraps
+to Settings, then on to Main (user, 2026-10-07); turning right stops at Settings.
 
 ### Reordering, renaming or removing a page
 
-* **Reorder:** move the rows, then fix the numbers in `MAIN_PAGE` and `SETTINGS_PAGE`.
+* **Reorder:** move the rows, then fix the number in `MAIN_PAGE`.
 * **Rename in the menu:** change the name in quotes.
 * **Remove:** delete the row. Also delete the page's `create_..._page` function and its
   declaration near the top of the file, or the build warns that it's unused.
 
 ### Adding a page: a worked example
 
-This adds an "About" page right of Main.
+This adds an "About" page right of Settings (the right-most page).
 
 **Step 1.** Add a declaration next to the others near the top of `ui.cpp`:
 
@@ -311,9 +312,9 @@ static void create_about_page(lv_obj_t *tile);      // ← add
 static const Page PAGES[] = {
   {"System", create_system_page},
   {"QR code", create_qr_page},
-  {"Settings", create_settings_page},
   {"Main", create_main_page},
-  {"About", create_about_page},                     // ← add (right of Main)
+  {"Settings", create_settings_page},
+  {"About", create_about_page},                     // ← add (right of Settings)
 };
 ```
 
@@ -390,7 +391,7 @@ The left-most page, left of the QR code. In `create_system_page()` and `update_s
 
 ### The QR code page
 
-Between System and Settings. A phone scans it to open the web page. In `create_qr_page()` and
+Between System and Main. A phone scans it to open the web page. In `create_qr_page()` and
 `update_qr_page()` (runs once a second from `ui_update()`; redraws only when something changed):
 * title at `y = -80`: "Open web page", "Join hotspot" or "Not connected"
 * the QR code at `y = 6`: `QR_SIZE` (112) pixels, black on white, with a 6-pixel white border

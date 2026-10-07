@@ -7,13 +7,14 @@
 #include <WiFi.h>
 #include <time.h>
 
-// Main screen (240x240 round) is a horizontal tileview built from PAGES (below). Settings is
-// left of Main (swipe right from Main, or a left knob turn with the fan stopped):
+// Main screen (240x240 round) is a horizontal tileview built from PAGES (below), left to right
+// System, QR code, Main, Settings (user, 2026-10-07). A left knob turn on Main with the fan
+// stopped goes one page left (the QR code); off Main the knob steps pages the way it turns:
 //   Main:     RPM arc · band of Off + preset segments inside it (top) · target RPM
 //             (gold, centre) · actual RPM (light, below) · clock (bottom gap)
 //   Settings: brightness slider (live; saved on release), Screensaver switch (pause, not
 //             saved), IP box, network/MQTT info
-//   QR code:  left of Settings. QR of the web page (http://<IP>/); on the hotspot, a QR that
+//   QR code:  left of Main. QR of the web page (http://<IP>/); on the hotspot, a QR that
 //             joins it first, and a tap on the code switches between the two
 // Auto Configure has its own gold screen (reversed theme), shown only while it runs.
 // Page dots sit in the arc's bottom gap. Wake returns to Main; off Main, the knob steps pages.
@@ -75,7 +76,7 @@ static void create_menu(lv_obj_t *parent);
 
 // Swipe pages, left to right. To add or reorder a page, write a create_*_page(tile)
 // builder and edit this table: tiles, page dots and the knob menu all follow it.
-// Keep MAIN_PAGE / SETTINGS_PAGE pointing at the right rows (start-up, wake and knob use them).
+// Keep MAIN_PAGE pointing at Main's row (start-up, wake, taps and the knob use it).
 struct Page {
   const char *name;                 // Shown in the knob menu
   void (*create)(lv_obj_t *tile);   // Builds the page's widgets on its tile
@@ -83,11 +84,10 @@ struct Page {
 static const Page PAGES[] = {
   {"System", create_system_page},
   {"QR code", create_qr_page},
-  {"Settings", create_settings_page},
   {"Main", create_main_page},
+  {"Settings", create_settings_page},
 };
-static const int SETTINGS_PAGE = 2;
-static const int MAIN_PAGE = 3;
+static const int MAIN_PAGE = 2;
 static const int PAGE_COUNT = sizeof(PAGES) / sizeof(PAGES[0]);
 static lv_obj_t *page_dots[PAGE_COUNT];
 
@@ -443,10 +443,6 @@ void ui_show_main() {
   show_page(MAIN_PAGE);
 }
 
-void ui_show_settings() {
-  show_page(SETTINGS_PAGE);
-}
-
 static int current_page() {
   lv_obj_t *tile = lv_tileview_get_tile_act(tileview);  // NULL until the first scroll
   return tile ? lv_obj_get_x(tile) / lv_obj_get_width(tileview) : MAIN_PAGE;
@@ -458,7 +454,8 @@ bool ui_on_main_page() {
 
 void ui_step_page(int delta) {
   int page = current_page() + (delta > 0 ? 1 : -1);
-  if (delta != 0 && page >= 0 && page < PAGE_COUNT) show_page(page);
+  if (page < 0) page = PAGE_COUNT - 1;  // Left from System wraps to Settings, then on to Main (user, 2026-10-07)
+  if (delta != 0 && page < PAGE_COUNT) show_page(page);
 }
 
 static void page_changed_cb(lv_event_t *) {

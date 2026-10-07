@@ -15,7 +15,7 @@ until 2026-10-07; older notes, commits and status reports use that name.)
   6.25 MB app slot (room for about 4 more photo eyes).
 - **Working and checked on the board:** fan control through the EMC2101 with fan profiles and
   Auto Configure (NF-P12 fitted; the 140 mm fan died 2026-10-06), LCD pages System / QR code /
-  Settings / Main with the knob, eyes (10 Uncanny + photo Dragons 2-11), web page (left sidebar,
+  Main / Settings with the knob, eyes (10 Uncanny + photo Dragons 2-11), web page (left sidebar,
   `D:\GitHub\WEB_STYLE.md`), Home Assistant over MQTT, RGB LEDs, SHT41 + SGP41 air readings,
   APDS-9999 light level with Auto brightness, restart (LCD / web / HA), notes, web LCD view, OTA.
 - **Waiting:** AMG8833 thermal camera (presence); Auto mode from the VOC Index (thresholds from
@@ -66,7 +66,7 @@ cd Wifi_Fan_Knob
 | `include/fan_control.h` / `src/fan_control.cpp` | ✅ Working | Target RPM → EMC2101 PWM (12 kHz, 30 steps), tach RPM, Auto Configure |
 | `include/fan_profiles.h` / `src/fan_profiles.cpp` | ✅ Working | Up to 5 fan profiles (`/fans.json`): measured table, max RPM, presets |
 | `lib/Adafruit_EMC2101/` | Vendored | Adafruit EMC2101 driver (local copy, not from registry) |
-| `include/ui.h` / `src/ui.cpp` | ✅ Working | LVGL tileview pages (System / QR code / Settings / Main), segments, knob menu |
+| `include/ui.h` / `src/ui.cpp` | ✅ Working | LVGL tileview pages (System / QR code / Main / Settings since 2026-10-07; knob left wraps from System to Settings), segments, knob menu |
 | `include/dragon_eye.h` / `src/dragon_eye.cpp` | ✅ Working | Animated eye (standby + screensaver), native 240x240 |
 | `include/eye_styles.h` / `src/eye_styles.cpp` | ✅ Working | The eye styles: 10 Uncanny Eyes (`include/eyes/*Eye.h` = Adafruit tables) + photo eyes |
 | `include/lcd_view.h` / `src/lcd_view.cpp` | ✅ Working | Web LCD view: copies of the screen for `GET /api/lcd` (LVGL snapshot; eye rows copied as drawn) |
