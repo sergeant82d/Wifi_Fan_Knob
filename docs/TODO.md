@@ -43,6 +43,10 @@ How this list works (the all-projects format, agreed 2026-10-07; from ETH_Touch_
       the "presence for X seconds wakes the screen" rule
 - [ ] `[Board]` GPIO 4 pull-down resistor: waits on the FPC breakout for GPIO 4 access
       (status report 05)
+- [ ] `[Web]` Card titles in Title Case, the all-projects rule added to `D:\GitHub\WEB_STYLE.md`
+      section 5 (user, 2026-10-08; done in ETH_Touch_PWM `d3cd279`): e.g. `Fan Settings`,
+      `Display Mode`, `Firmware Update (OTA)`. Small words lower case unless first; names keep
+      their spelling (MQTT, WiFi, LCD, OTA); field labels, hints and buttons stay in sentence case
 
 ## Done
 
