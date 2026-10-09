@@ -23,6 +23,9 @@ How this list works (the all-projects format, agreed 2026-10-07; from ETH_Touch_
 
 - `[Web]` `[HA]` Add LCD Temperature gauge minimum and maximum temperature settings to the Config web page and HA. 
 
+- `[Web]` `[HA]` Add Auto mode minimum and maximum VOC settings to web config page and HA. 
+
+
 ## Open
 
 - [ ] `[LCD]` Reference the "Automatic" mode on the LCD after the BME688 arrives - Since we moved
