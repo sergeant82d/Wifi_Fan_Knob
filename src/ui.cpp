@@ -3,12 +3,14 @@
 #include "fan_control.h"
 #include "mqtt.h"
 #include "power.h"
+#include "thermal.h"
+#include <esp_heap_caps.h>
 #include <lvgl.h>
 #include <WiFi.h>
 #include <time.h>
 
 // Main screen (240x240 round) is a horizontal tileview built from PAGES (below), left to right
-// System, QR code, Main, Settings (user, 2026-10-07). A left knob turn on Main with the fan
+// System, QR code, Main, Settings (user, 2026-10-07), Thermal (2026-10-12). A left knob turn on Main with the fan
 // stopped goes one page left (the QR code); off Main the knob steps pages the way it turns:
 //   Main:     RPM arc · band of Off + preset segments inside it (top) · target RPM
 //             (gold, centre) · actual RPM (light, below) · clock (bottom gap)
@@ -16,6 +18,7 @@
 //             saved), IP box, network/MQTT info
 //   QR code:  left of Main. QR of the web page (http://<IP>/); on the hotspot, a QR that
 //             joins it first, and a tap on the code switches between the two
+//   Thermal:  the AMG8833's 8x8 heat picture, smoothed, with the coolest and hottest pixel
 // Auto Configure has its own gold screen (reversed theme), shown only while it runs.
 // Page dots sit in the arc's bottom gap. Wake returns to Main; off Main, the knob steps pages.
 // Knob short press opens a menu of the pages: turn to choose, press or tap to go.
@@ -70,6 +73,7 @@ static void create_main_page(lv_obj_t *tile);
 static void create_settings_page(lv_obj_t *tile);
 static void create_qr_page(lv_obj_t *tile);
 static void create_system_page(lv_obj_t *tile);
+static void create_thermal_page(lv_obj_t *tile);
 static void create_page_dots(lv_obj_t *parent);
 static void tap_back_cb(lv_event_t *);
 static void create_menu(lv_obj_t *parent);
@@ -86,8 +90,10 @@ static const Page PAGES[] = {
   {"QR code", create_qr_page},
   {"Main", create_main_page},
   {"Settings", create_settings_page},
+  {"Thermal", create_thermal_page},
 };
 static const int MAIN_PAGE = 2;
+static const int THERMAL_PAGE = 4;
 static const int PAGE_COUNT = sizeof(PAGES) / sizeof(PAGES[0]);
 static lv_obj_t *page_dots[PAGE_COUNT];
 
@@ -454,8 +460,8 @@ bool ui_on_main_page() {
 
 void ui_step_page(int delta) {
   int page = current_page() + (delta > 0 ? 1 : -1);
-  // The knob wraps at both ends (user, 2026-10-07): left from System to Settings, right from
-  // Settings to System. Swipes don't wrap (tried; LVGL's edge gestures were unreliable).
+  // The knob wraps at both ends (user, 2026-10-07): left from System to the right-most page
+  // (Thermal), right from there to System. Swipes don't wrap (tried; LVGL's edge gestures were unreliable).
   if (page < 0) page = PAGE_COUNT - 1;
   if (page >= PAGE_COUNT) page = 0;
   if (delta != 0) show_page(page);
@@ -821,6 +827,105 @@ static void create_qr_page(lv_obj_t *tile) {
   lv_obj_set_style_text_color(qr_label, lv_color_hex(THEME_TEXT), 0);
   lv_label_set_text(qr_label, "");
   lv_obj_align(qr_label, LV_ALIGN_CENTER, 0, 82);
+}
+
+// ============================================================================
+// THERMAL PAGE: the AMG8833's 8x8 picture, smoothed (bilinear) to TH_SIZE px and coloured
+// from cold (black, blue) to hot (yellow, white). The colours stretch over this picture's
+// coolest to hottest pixel, at least TH_MIN_SPAN degrees, so a person stands out without
+// noise filling the scale. Redrawn whenever the sensor has a new picture (10 a second while
+// this page shows).
+// ============================================================================
+
+static const int TH_SIZE = 128;           // 8 x 16 px: fits inside the round screen with the labels
+static const float TH_MIN_SPAN = 6.0f;    // C
+static lv_obj_t *th_canvas = nullptr;
+static lv_obj_t *th_label = nullptr;
+static lv_color_t *th_buf = nullptr;      // TH_SIZE x TH_SIZE, PSRAM
+static lv_color_t th_palette[256];
+static uint8_t th_i0[TH_SIZE], th_i1[TH_SIZE];  // Sensor pixels either side of each screen pixel
+static float th_w[TH_SIZE];                     //   and the weight of the second one
+static uint32_t th_seq = 0;
+
+static void th_build_tables() {
+  // Colour stops, cold to hot (the web page's thermal card uses the same)
+  static const uint32_t STOPS[] = {0x000000, 0x20008C, 0xB4008C, 0xFF5000, 0xFFC800, 0xFFFFFF};
+  const int n = sizeof(STOPS) / sizeof(STOPS[0]) - 1;
+  for (int i = 0; i < 256; i++) {
+    float t = i * n / 255.0f;
+    int k = min((int)t, n - 1);
+    float f = t - k;
+    uint32_t a = STOPS[k], b = STOPS[k + 1];
+    auto mix = [f](uint32_t a, uint32_t b, int shift) {
+      return (uint8_t)(((a >> shift) & 0xFF) * (1 - f) + ((b >> shift) & 0xFF) * f + 0.5f);
+    };
+    th_palette[i] = lv_color_make(mix(a, b, 16), mix(a, b, 8), mix(a, b, 0));
+  }
+  for (int i = 0; i < TH_SIZE; i++) {  // Pixel centres lined up
+    float s = (i + 0.5f) * THERMAL_N / TH_SIZE - 0.5f;
+    s = constrain(s, 0.0f, (float)(THERMAL_N - 1));
+    th_i0[i] = (int)s;
+    th_i1[i] = min(th_i0[i] + 1, THERMAL_N - 1);
+    th_w[i] = s - th_i0[i];
+  }
+}
+
+static void update_thermal_page(lv_timer_t *) {
+  if (current_page() != THERMAL_PAGE) return;
+  thermal_watch();  // Full rate while this page shows
+  static ThermalFrame f;
+  thermal_get(&f);
+  if (!f.ok || !th_buf) {
+    const char *text = th_buf ? "No thermal camera" : "No memory for the picture";
+    if (strcmp(text, lv_label_get_text(th_label)) != 0) lv_label_set_text(th_label, text);
+    return;
+  }
+  if (f.seq == th_seq) return;
+  th_seq = f.seq;
+  float lo = f.px[0], hi = f.px[0];
+  for (float v : f.px) {
+    lo = min(lo, v);
+    hi = max(hi, v);
+  }
+  float top = max(hi, lo + TH_MIN_SPAN);
+  float scale = 255.0f / (top - lo);
+  for (int y = 0; y < TH_SIZE; y++) {
+    const float *r0 = f.px + th_i0[y] * THERMAL_N;
+    const float *r1 = f.px + th_i1[y] * THERMAL_N;
+    float wy = th_w[y];
+    lv_color_t *out = th_buf + y * TH_SIZE;
+    for (int x = 0; x < TH_SIZE; x++) {
+      float wx = th_w[x];
+      float a = r0[th_i0[x]] + (r0[th_i1[x]] - r0[th_i0[x]]) * wx;
+      float b = r1[th_i0[x]] + (r1[th_i1[x]] - r1[th_i0[x]]) * wx;
+      int c = (int)((a + (b - a) * wy - lo) * scale);
+      out[x] = th_palette[constrain(c, 0, 255)];
+    }
+  }
+  lv_obj_invalidate(th_canvas);
+  char text[32];  // LVGL's own printf has no %f
+  snprintf(text, sizeof(text), "%.1f - %.1f \xC2\xB0" "C", lo, hi);
+  lv_label_set_text(th_label, text);
+}
+
+static void create_thermal_page(lv_obj_t *tile) {
+  page_title(tile, "Thermal");
+  th_build_tables();
+  th_buf = (lv_color_t *)heap_caps_malloc(TH_SIZE * TH_SIZE * sizeof(lv_color_t), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  th_canvas = lv_canvas_create(tile);
+  if (th_buf) {
+    lv_canvas_set_buffer(th_canvas, th_buf, TH_SIZE, TH_SIZE, LV_IMG_CF_TRUE_COLOR);
+    lv_canvas_fill_bg(th_canvas, lv_color_black(), LV_OPA_COVER);
+  }
+  lv_obj_align(th_canvas, LV_ALIGN_CENTER, 0, 4);
+
+  th_label = lv_label_create(tile);
+  lv_obj_set_style_text_font(th_label, &lv_font_montserrat_14, 0);
+  lv_obj_set_style_text_color(th_label, lv_color_hex(THEME_TEXT), 0);
+  lv_label_set_text(th_label, "");
+  lv_obj_align(th_label, LV_ALIGN_CENTER, 0, 84);
+
+  lv_timer_create(update_thermal_page, 100, nullptr);
 }
 
 static void create_standby_screen() {

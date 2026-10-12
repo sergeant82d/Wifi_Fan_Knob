@@ -268,8 +268,10 @@ static const Page PAGES[] = {
   {"QR code", create_qr_page},
   {"Main", create_main_page},
   {"Settings", create_settings_page},
+  {"Thermal", create_thermal_page},
 };
 static const int MAIN_PAGE = 2;
+static const int THERMAL_PAGE = 4;
 ```
 
 Each row is a **name** (shown in the knob menu) and a **function that builds the page**.
@@ -281,24 +283,24 @@ Everything else follows this table automatically:
 * tap-empty-space-to-return-to-Main, on every page except Main
 
 **Keep `MAIN_PAGE` pointing at Main's row** whenever you reorder: the board starts and wakes
-on it, and taps and the knob use it. The order is System, QR code, Main, Settings (since
-2026-10-07): swipe left from Main for Settings; swipe right from Main for the QR code, and
+on it, and taps and the knob use it. The order is System, QR code, Main, Settings, Thermal
+(Thermal added 2026-10-12): swipe left from Main for Settings, and again for Thermal; swipe right from Main for the QR code, and
 again for System. On Main with the fan stopped, a left knob turn also goes one page left (to
 the QR code). On any other page, each knob click moves one page the way it turns, like a
 swipe, speed unchanged: `ui_step_page()`. The knob wraps at both ends (user, 2026-10-07):
-left from System to Settings, right from Settings to System. Swipes stop at the ends (a
+left from System to Thermal, right from Thermal to System. Swipes stop at the ends (a
 swipe wrap was tried and didn't work reliably).
 
 ### Reordering, renaming or removing a page
 
-* **Reorder:** move the rows, then fix the number in `MAIN_PAGE`.
+* **Reorder:** move the rows, then fix the numbers in `MAIN_PAGE` and `THERMAL_PAGE`.
 * **Rename in the menu:** change the name in quotes.
 * **Remove:** delete the row. Also delete the page's `create_..._page` function and its
   declaration near the top of the file, or the build warns that it's unused.
 
 ### Adding a page: a worked example
 
-This adds an "About" page right of Settings (the right-most page).
+This adds an "About" page right of Thermal (the right-most page).
 
 **Step 1.** Add a declaration next to the others near the top of `ui.cpp`:
 
@@ -315,7 +317,8 @@ static const Page PAGES[] = {
   {"QR code", create_qr_page},
   {"Main", create_main_page},
   {"Settings", create_settings_page},
-  {"About", create_about_page},                     // ← add (right of Settings)
+  {"Thermal", create_thermal_page},
+  {"About", create_about_page},                     // ← add (right of Thermal)
 };
 ```
 
@@ -389,6 +392,23 @@ The left-most page, left of the QR code. In `create_system_page()` and `update_s
   (nothing saved or lost; the fan starts stopped). The same restart is on the web page (System
   tab) and in Home Assistant (button "Restart").
 * "Hold 2 s to restart (the fan stops)" at `y = 72`
+
+### The Thermal page
+
+The right-most page: the thermal camera's picture. In `create_thermal_page()` and
+`update_thermal_page()` (an LVGL timer every 100 ms; it only draws while this page shows and
+the camera has a new picture, which is 10 times a second):
+* title at `y = -80`: "Thermal"
+* the picture at `y = 4`: `TH_SIZE` (128) pixels square. The camera has only 8 x 8 pixels; they
+  are blended smoothly to fill the square. Much bigger and its corners leave the round screen.
+* text at `y = 84`: the coolest and hottest pixel, e.g. "25.8 - 31.2 °C", or "No thermal camera"
+* **Colours:** black and blue are cool, magenta and orange warmer, yellow and white hottest.
+  They stretch over this picture's coolest to hottest pixel, but over at least `TH_MIN_SPAN`
+  (6 °C), so an empty bench stays dark instead of showing coloured noise. The colour list is
+  `STOPS` in `th_build_tables()`; the web page's Thermal Camera card has the same list
+  (`THERMAL_STOPS` in `web/index.html`), so change both together.
+* **Mirrored or upside down?** `FLIP_X` / `FLIP_Y` at the top of `src/thermal.cpp` (they turn
+  the LCD and the web picture together).
 
 ### The QR code page
 

@@ -9,6 +9,7 @@
 #include "leds.h"
 #include "air.h"
 #include "presence.h"
+#include "thermal.h"
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
 #include <SPIFFS.h>
@@ -321,6 +322,27 @@ void init_webserver() {
     String body;
     serializeJson(doc, body);
     request->send(200, "application/json", body);
+  });
+
+  // Thermal camera (Dashboard): the latest 8x8 picture in C, row by row from the top left.
+  // Asking keeps the board reading at the full rate for a few seconds. No login (read only).
+  server->on(AsyncURIMatcher::exact("/api/thermal"), HTTP_GET, [](AsyncWebServerRequest *request) {
+    thermal_watch();
+    static ThermalFrame f;  // AsyncTCP runs one request at a time
+    thermal_get(&f);
+    String body = String("{\"ok\":") + (f.ok ? "true" : "false") + ",\"seq\":" + f.seq;
+    if (f.ok) {
+      body += ",\"thermistor\":" + String(f.thermistor, 1) + ",\"px\":[";
+      for (int i = 0; i < THERMAL_N * THERMAL_N; i++) {
+        if (i) body += ',';
+        body += String(f.px[i], 2);
+      }
+      body += ']';
+    }
+    body += '}';
+    AsyncWebServerResponse *response = request->beginResponse(200, "application/json", body);
+    response->addHeader("Cache-Control", "no-store");
+    request->send(response);
   });
 
   // LCD view for the Home tab: the latest copy of the screen, raw 240x240 RGB565 little-endian.

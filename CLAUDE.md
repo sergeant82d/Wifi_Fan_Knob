@@ -3,7 +3,7 @@
 ESP32-S3 fan controller for a solder fume extractor, on the Elecrow CrowPanel 1.28" round
 rotary display: knob and touch LCD with an animated eye screensaver, fan speed through an
 EMC2101 (fan profiles, Auto Configure), air sensors (SHT41 + SGP41), light sensor
-(APDS-9999), RGB LED ring, a web page (login, OTA) and Home Assistant over MQTT (discovery).
+(APDS-9999), thermal camera (AMG8833), RGB LED ring, a web page (login, OTA) and Home Assistant over MQTT (discovery).
 
 **Read `docs/PROJECT_HISTORY.md` first:** current status, what each part does and why, pins,
 gotchas, decisions and plans. Open items and the user's notes: `docs/TODO.md`. Changing the
@@ -17,8 +17,8 @@ status reports, web standard, Windows/PlatformIO build) are in the user's global
 - Elecrow CrowPanel 1.28" rotary display (ESP32-S3, 16 MB flash, 8 MB PSRAM, GC9A01 240x240,
   CST816D touch, knob, 5 WS2812 LEDs) on COM13, native USB. Pins: `docs/PROJECT_HISTORY.md`
   (Pins) and the top of `src/main.cpp`.
-- Main I2C (GPIO 38/39): SHT41 0x44, EMC2101 0x4C, APDS-9999 0x52, SGP41 0x59 (and the
-  AMG8833 at 0x69 when it arrives), all on always-on 3.3 V. GPIO 4 switches only the 12 V
+- Main I2C (GPIO 38/39): SHT41 0x44, EMC2101 0x4C, APDS-9999 0x52, SGP41 0x59, AMG8833 0x69,
+  all on always-on 3.3 V. GPIO 4 switches only the 12 V
   rail (the fan): on while awake, off in standby. The boot log lists the bus (`[I2C] Found:`).
 - Fan: Noctua NF-P12 via the EMC2101 (12 kHz PWM, 30 steps); its TACH needs the 10 kOhm
   pull-up to 3.3 V (replaced 2026-10-06).
@@ -43,8 +43,8 @@ status reports, web standard, Windows/PlatformIO build) are in the user's global
   folder is shared with ETH_Touch_PWM (3.3.11), so switching projects re-downloads it.
 - Settings are JSON in SPIFFS (`/config.json`, `/fans.json`, `/notes.json`); new fields load
   with defaults, so older files keep working. Never run `uploadfs` (it wipes them).
-- **Flash space:** after a major change, tell the user the build's `Flash:` figure (86.6 % on
-  2026-10-07; warn past ~90 %). Ways to free space: `docs/PROJECT_HISTORY.md`, "Possible future mods".
+- **Flash space:** after a major change, tell the user the build's `Flash:` figure (86.8 % on
+  2026-10-12; warn past ~90 %). Ways to free space: `docs/PROJECT_HISTORY.md`, "Possible future mods".
 
 ## Rules
 

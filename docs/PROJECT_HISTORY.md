@@ -8,17 +8,18 @@ until 2026-10-07; older notes, commits and status reports use that name.)
 **Repository**: https://github.com/sergeant82d/Wifi_Fan_Knob.git
 **Repo root / PlatformIO project**: `D:\GitHub\VSCodeProjects\Wifi_Bench_Fan\Wifi_Fan_Knob`
 
-## Current status (2026-10-07)
+## Current status (2026-10-12)
 
 - **Board:** Elecrow CrowPanel 1.28" rotary display (ESP32-S3), COM13, `http://192.168.10.102:8080`
-  (static IP). Platform pinned to pioarduino 51.03.04 = Arduino core 3.0.4. Flash 86.6 % of the
+  (static IP). Platform pinned to pioarduino 51.03.04 = Arduino core 3.0.4. Flash 86.8 % of the
   6.25 MB app slot (room for about 4 more photo eyes).
 - **Working and checked on the board:** fan control through the EMC2101 with fan profiles and
   Auto Configure (NF-P12 fitted; the 140 mm fan died 2026-10-06), LCD pages System / QR code /
-  Main / Settings with the knob, eyes (10 Uncanny + photo Dragons 2-11), web page (left sidebar,
+  Main / Settings / Thermal with the knob, eyes (10 Uncanny + photo Dragons 2-11), web page (left sidebar,
   `D:\GitHub\WEB_STYLE.md`), Home Assistant over MQTT, RGB LEDs, SHT41 + SGP41 air readings,
-  APDS-9999 light level with Auto brightness, restart (LCD / web / HA), notes, web LCD view, OTA.
-- **Waiting:** AMG8833 thermal camera (presence); Auto mode from the VOC Index (thresholds from
+  APDS-9999 light level with Auto brightness, AMG8833 thermal picture (LCD and web), restart (LCD / web / HA), notes, web LCD view, OTA.
+- **Waiting:** presence from the AMG8833 (tests, then the wake rule); soft-latch Off button
+  (design); Auto mode from the VOC Index (thresholds from
   a few days of HA history); relook at LCD swiping; FPC breakout (fan PWM to the UART0
   connector, GPIO 4 pull-down). Details and the rest: `docs/TODO.md`.
 
@@ -66,11 +67,12 @@ cd Wifi_Fan_Knob
 | `include/fan_control.h` / `src/fan_control.cpp` | ✅ Working | Target RPM → EMC2101 PWM (12 kHz, 30 steps), tach RPM, Auto Configure |
 | `include/fan_profiles.h` / `src/fan_profiles.cpp` | ✅ Working | Up to 5 fan profiles (`/fans.json`): measured table, max RPM, presets |
 | `lib/Adafruit_EMC2101/` | Vendored | Adafruit EMC2101 driver (local copy, not from registry) |
-| `include/ui.h` / `src/ui.cpp` | ✅ Working | LVGL tileview pages (System / QR code / Main / Settings since 2026-10-07; the knob wraps at both ends; swipes don't, a swipe wrap was tried and was unreliable), segments, knob menu |
+| `include/ui.h` / `src/ui.cpp` | ✅ Working | LVGL tileview pages (System / QR code / Main / Settings since 2026-10-07, Thermal right of Settings since 2026-10-12; the knob wraps at both ends; swipes don't, a swipe wrap was tried and was unreliable), segments, knob menu |
 | `include/dragon_eye.h` / `src/dragon_eye.cpp` | ✅ Working | Animated eye (standby + screensaver), native 240x240 |
 | `include/eye_styles.h` / `src/eye_styles.cpp` | ✅ Working | The eye styles: 10 Uncanny Eyes (`include/eyes/*Eye.h` = Adafruit tables) + photo eyes |
 | `include/lcd_view.h` / `src/lcd_view.cpp` | ✅ Working | Web LCD view: copies of the screen for `GET /api/lcd` (LVGL snapshot; eye rows copied as drawn) |
 | `include/air.h` / `src/air.cpp` | ✅ Working | SHT41 + SGP41 read once a second from `loop()` (raw commands, no driver library); VOC/NOx Index via Sensirion's Gas Index Algorithm |
+| `include/thermal.h` / `src/thermal.cpp` | ✅ Working | AMG8833 8x8 thermal camera, raw I2C from `loop()` (no library); `GET /api/thermal`; LCD Thermal page |
 | `include/presence.h` / `src/presence.cpp` | ✅ Working | APDS-9999 proximity + light (lux) read from `loop()` (Adafruit APDS9999 library) |
 | `include/leds.h` / `src/leds.cpp` | ✅ Working | RGB LEDs (5x WS2812, GPIO 48): Solid / Flash / Breathe / Rainbow, brightness capped at 100 of 255 |
 | `include/photo_eye.h` / `src/photo_eye.cpp` | ✅ Working | Photo eye renderer (artist open/shut pictures: moving iris, reactive slit pupil, lids); data `include/eyes/*Photo.h` from `tools/photo_eye.py` |
@@ -138,7 +140,7 @@ https://github.com/Elecrow-RD/CrowPanel-1.28inch-HMI-ESP32-Rotary-Display-240-24
 | **Peripheral power switch** | **4** | Transistor switching the 12 V rail (fan) only; level in config |
 | Touch SDA / SCL | 6 / 7 | |
 | Touch INT / RST | 5 / 13 | |
-| Main I2C SDA / SCL | 38 / 39 | SHT41 (0x44), EMC2101 (0x4C), APDS-9999 (0x52), SGP41 (0x59); all on always-on 3.3 V. Boot/wake log lists them (`[I2C] Found:`) |
+| Main I2C SDA / SCL | 38 / 39 | SHT41 (0x44), EMC2101 (0x4C), APDS-9999 (0x52), SGP41 (0x59), AMG8833 (0x69); all on always-on 3.3 V. Boot/wake log lists them (`[I2C] Found:`) |
 | EMC2101 TACH (on the Adafruit 4808 board) | — | **Needs a 10 kΩ pull-up to 3.3 V** (added by user 2026-09-25; found open and discoloured on the TACH end 2026-10-06 and replaced: symptom was 0 RPM measured at every speed; tach line then tested open to GND, 3.3 V and 5 V; the board's own TACH pull-up is off unless its solder jumper is bridged). Without it the tach floats and counts PWM noise |
 | Encoder A / B / SW | 45 / 42 / 41 | A/B decoded by PCNT hardware (no interrupts); SW polled, active-low |
 | Power Light | 40 | Elecrow drives it LOW |
@@ -368,6 +370,21 @@ See `platformio.ini`. Libraries:
   sensor") + temp_c, humidity, voc, nox when valid. Web: Home tab "Air" card (°F and °C). HA:
   sensors Temperature (°C, HA converts), Humidity, VOC Index, NOx Index, every 10 s, valid
   values only. First readings: 26.5 °C, 42 %RH, NOx 1.
+- AMG8833 thermal camera (verified 2026-10-12 by the user: LCD page, web card, orientation):
+  Adafruit 3538 board on always-on 3.3 V, I2C 0x69 (0x68 tried too). `thermal.cpp` sets normal
+  mode, reset and 10 pictures/s, then reads the 128 pixel bytes in four 32-byte pieces, one
+  per `loop()` pass (100 kHz bus: a whole picture at once would hold `loop()` ~13 ms), plus the
+  thermistor. Read 10 times a second while someone looks (`thermal_watch()`: LCD Thermal page
+  or a web request in the last 3 s), else once a second. Pixels: 12-bit two's complement,
+  0.25 C; thermistor 12-bit sign and magnitude, 0.0625 C. `FLIP_X` / `FLIP_Y` (both false) are
+  correct as mounted. LCD **Thermal** page (right of Settings): 8x8 smoothed (bilinear) to a
+  128 px canvas in PSRAM, colours black-blue-magenta-orange-yellow-white stretched over the
+  picture's coolest to hottest pixel, at least 6 C (so an empty bench isn't coloured noise),
+  "lo - hi °C" below; an `lv_timer` redraws it on each new picture while the page shows.
+  `GET /api/thermal` (no login) = ok, seq, thermistor, px[64] in C; web Dashboard **Thermal
+  Camera** card polls it 4 times a second while the tab shows, same colours and range rule,
+  scaled up by the browser. First pictures: room ~26 C, user ~30-31 C, sensor 29.6 C.
+  Not in HA (a picture; a presence sensor will be).
 - APDS-9999 readings (verified 2026-10-06 on the board; step 1 of the presence plan):
   Adafruit APDS9999 library (no delays inside; the chip measures by itself, `loop()` reads
   the result registers): proximity 11-bit (0-2047, higher = closer) every 200 ms, lux from
@@ -763,7 +780,8 @@ STANDBY (1)
     work it reads the air the user breathes.
   - With the Auto segment the RPM arc can reach lower again (towards a 270 deg sweep): the IP
     box moved to Settings (TODO.md item, do it together with the Auto button).
-- **Presence: AMG8833 thermal camera ordered (user decision 2026-10-06).** Chosen over ST's
+- **Presence: AMG8833 thermal camera (user decision 2026-10-06; fitted and showing its picture
+  2026-10-12, see Verified).** Chosen over ST's
   STHS34PF80 (single IR pixel with on-chip presence flags: less code, but it can't tell a hot
   iron or hot-air gun from a person, and the iron can't be kept out of its view). The AMG8833's
   8x8 picture lets the firmware ignore a small very hot spot and look for a person-sized warm

@@ -292,6 +292,20 @@ dialog .field { margin-bottom: 12px; }
             </small>
         </div>
 
+        <div class="panel" style="text-align: center;">
+            <h2>Thermal Camera</h2>
+            <!-- AMG8833 8x8 picture, smoothed; 4 times a second while this tab shows -->
+            <canvas id="thermal-view" width="240" height="240"
+                    style="width: 240px; max-width: 100%; background: #000; border: 2px solid var(--accent-line); border-radius: 8px;"></canvas>
+            <div class="status-item" style="justify-content: center; gap: 8px;">
+                <span class="status-label">Coolest / hottest:</span>
+                <span class="status-value" id="thermal-range">--</span>
+            </div>
+            <small id="thermal-note" style="color: var(--muted); display: block; margin-top: 6px;">
+                Black and blue are cool, yellow and white hot. The colours stretch over this picture's range.
+            </small>
+        </div>
+
         <div class="panel" id="lcd-card">
             <div class="lcd-part" id="lcd-viewer" style="text-align: center;">
             <h2>LCD</h2>
@@ -1290,6 +1304,48 @@ dialog .field { margin-bottom: 12px; }
         }
         document.addEventListener('DOMContentLoaded', loadStatus);
         setInterval(loadStatus, 2000);  // Knob changes show within ~2 s
+
+        // Thermal camera (Dashboard): /api/thermal = {ok, seq, thermistor, px: 64 temperatures in C}.
+        // Same colours and range rule as the LCD's Thermal page (ui.cpp): coolest pixel to hottest,
+        // at least 6 C. The 8x8 picture is drawn small, then scaled up smoothed by the browser.
+        const THERMAL_STOPS = [0x000000, 0x20008C, 0xB4008C, 0xFF5000, 0xFFC800, 0xFFFFFF];
+        function thermalColour(t) {  // t 0..1
+            const n = THERMAL_STOPS.length - 1, s = Math.min(Math.max(t, 0), 1) * n;
+            const k = Math.min(Math.floor(s), n - 1), f = s - k, a = THERMAL_STOPS[k], b = THERMAL_STOPS[k + 1];
+            return [16, 8, 0].map(sh => Math.round(((a >> sh) & 255) * (1 - f) + ((b >> sh) & 255) * f));
+        }
+        const thermalSmall = document.createElement('canvas');
+        thermalSmall.width = thermalSmall.height = 8;
+        let thermalBusy = false, thermalSeq = -1;
+        async function loadThermal() {
+            if (thermalBusy || document.hidden || !document.getElementById('page-dashboard').classList.contains('active')) return;
+            thermalBusy = true;
+            try {
+                const d = await (await fetch('/api/thermal', { cache: 'no-store' })).json();
+                if (!d.ok) {
+                    document.getElementById('thermal-range').textContent = 'No thermal camera';
+                } else if (d.seq !== thermalSeq) {
+                    thermalSeq = d.seq;
+                    const lo = Math.min(...d.px), hi = Math.max(...d.px), span = Math.max(hi - lo, 6);
+                    const sctx = thermalSmall.getContext('2d'), img = sctx.createImageData(8, 8);
+                    d.px.forEach((v, i) => {
+                        const [r, g, b] = thermalColour((v - lo) / span);
+                        img.data.set([r, g, b, 255], i * 4);
+                    });
+                    sctx.putImageData(img, 0, 0);
+                    const ctx = document.getElementById('thermal-view').getContext('2d');
+                    ctx.imageSmoothingEnabled = true;
+                    ctx.imageSmoothingQuality = 'high';
+                    ctx.drawImage(thermalSmall, 0, 0, 240, 240);
+                    document.getElementById('thermal-range').textContent =
+                        lo.toFixed(1) + ' / ' + hi.toFixed(1) + ' \u00B0C (sensor ' + d.thermistor.toFixed(1) + ' \u00B0C)';
+                }
+            } catch (e) {
+                // Offline: the status line already says so
+            }
+            thermalBusy = false;
+        }
+        setInterval(loadThermal, 250);
 
         // LCD view (Dashboard): /api/lcd is the knob's screen as raw 240x240 RGB565 (little-endian).
         // Fetched only while the Home tab shows and the page is visible; the board captures only

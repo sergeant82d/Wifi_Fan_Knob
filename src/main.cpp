@@ -16,6 +16,7 @@
 #include "leds.h"
 #include "air.h"
 #include "presence.h"
+#include "thermal.h"
 
 // ============================================================================
 // PIN DEFINITIONS (Elecrow 1.28" Rotary Display)
@@ -529,7 +530,7 @@ static void set_peripheral_power(bool on) {
 }
 
 // List every device answering on the main I2C bus (serial log). Expected: 0x44 SHT41,
-// 0x4C EMC2101, 0x52 APDS-9999, 0x59 SGP41.
+// 0x4C EMC2101, 0x52 APDS-9999, 0x59 SGP41, 0x69 AMG8833.
 static void i2c_scan() {
   Serial.print("[I2C] Found:");
   int found = 0;
@@ -786,6 +787,7 @@ void setup() {
   Serial.println("Initializing I2C...");
   Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
   presence_begin();  // APDS-9999 is on always-on 3.3 V
+  thermal_begin();   // AMG8833, likewise
 
   // Encoder Input
   Serial.println("Initializing encoder...");
@@ -861,6 +863,7 @@ void loop() {
   leds_update();
   air_update();
   presence_update();
+  thermal_update();
   auto_brightness_update();
   int32_t delta = encoder_read_detents();
   poll_button();

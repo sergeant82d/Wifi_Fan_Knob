@@ -44,6 +44,8 @@ How this list works (the all-projects format, agreed 2026-10-07; from ETH_Touch_
       arrives: wire it to the always-on 3.3 V and SDA/SCL (GPIO 38/39), check the boot log lists
       0x69, test (away, sitting, leaning in, hot iron with nobody there, a long still sit), then
       the "presence for X seconds wakes the screen" rule
+      Claude: fitted and its picture shows on the LCD and web (2026-10-12, Done below); next the
+      tests, then the wake rule
 - [ ] `[Board]` GPIO 4 pull-down resistor: waits on the FPC breakout for GPIO 4 access
       (status report 05)
 - [ ] `[Web]` Card titles in Title Case, the all-projects rule added to `D:\GitHub\WEB_STYLE.md`
@@ -51,7 +53,21 @@ How this list works (the all-projects format, agreed 2026-10-07; from ETH_Touch_
       `Display Mode`, `Firmware Update (OTA)`. Small words lower case unless first; names keep
       their spelling (MQTT, WiFi, LCD, OTA); field labels, hints and buttons stay in sentence case
 
+- [ ] `[Board]` `[Decide]` Soft-latch Off button (Si4599 module; your notes in
+      `docs/soft-latch_circuit_notes.md`). You want it for all the reasons discussed: a real Off
+      when leaving the bench, saving power, and maybe Off after no presence (2026-10-12).
+      Claude: before wiring, the design needs: the first section's N-FET drain wiring corrected
+      (to the P gate), the 0.1 uF cap gate-to-V_IN not gate-to-GND, a safe way to read the button
+      (it sits at 12 V while off), the latch held through restarts / OTA / crashes, the ~1 s hold
+      to turn on, and free pins (GPIO 4/5/6 in the notes are taken here)
+
 ## Done
+
+- [x] `[Sensor]` `[LCD]` `[Web]` Thermal camera picture (your request): new LCD page **Thermal**
+      right of Settings (swipe, knob, menu) and a **Thermal Camera** card on the web Dashboard,
+      both the 8x8 picture smoothed, cool black/blue to hot yellow/white, with the coolest and
+      hottest temperature; `GET /api/thermal`. Checked by the user: LCD, web page, orientation
+      (2026-10-12, this commit). Flash 86.8 %
 
 - [x] `[LCD]` Swiping between LCD pages is barely usable and very unfriendly: relook at the swipe
       functions (user, 2026-10-07; after the docs split). Measured first: during a swipe LVGL's
