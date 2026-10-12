@@ -17,10 +17,10 @@ static const uint32_t IDLE_MS = 1000;
 static const uint32_t WATCH_HOLD_MS = 3000;
 static const uint32_t START_MS = 100;   // After the reset, before the first picture
 static const int CHUNK = 32;            // Bytes per read
-// Picture orientation, applied here so the LCD and the web page agree. Both false is the right
-// way round as mounted (checked by the user with a hand wave, 2026-10-12).
+// Picture orientation, applied here so the LCD and the web page agree. As mounted, left and
+// right are correct and up and down were reversed (user, hand wave, 2026-10-12).
 static const bool FLIP_X = false;
-static const bool FLIP_Y = false;
+static const bool FLIP_Y = true;
 
 static uint8_t addr = 0;                // 0 = not found
 static volatile uint32_t watch_at = 0;  // millis() of the last thermal_watch()

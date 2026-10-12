@@ -376,8 +376,8 @@ See `platformio.ini`. Libraries:
   per `loop()` pass (100 kHz bus: a whole picture at once would hold `loop()` ~13 ms), plus the
   thermistor. Read 10 times a second while someone looks (`thermal_watch()`: LCD Thermal page
   or a web request in the last 3 s), else once a second. Pixels: 12-bit two's complement,
-  0.25 C; thermistor 12-bit sign and magnitude, 0.0625 C. `FLIP_X` / `FLIP_Y` (both false) are
-  correct as mounted. LCD **Thermal** page (right of Settings): 8x8 smoothed (bilinear) to a
+  0.25 C; thermistor 12-bit sign and magnitude, 0.0625 C. `FLIP_X` false, `FLIP_Y` true as mounted
+  (up and down came out reversed; fixed 2026-10-12). LCD **Thermal** page (right of Settings): 8x8 smoothed (bilinear) to a
   128 px canvas in PSRAM, colours black-blue-magenta-orange-yellow-white stretched over the
   picture's coolest to hottest pixel, at least 6 C (so an empty bench isn't coloured noise),
   "lo - hi °C" below; an `lv_timer` redraws it on each new picture while the page shows.
