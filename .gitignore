@@ -26,3 +26,5 @@ assets/eye_photos/*/preview.gif
 
 # Local reference copies, not part of the project
 docs/markdown-cheat-sheet.md
+# Graphify code graph (local, rebuilt with: graphify update .)
+graphify-out/

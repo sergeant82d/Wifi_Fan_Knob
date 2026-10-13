@@ -1,0 +1,8 @@
+# Graphify: leave out generated image data and large art files
+assets/
+include/eyes/*Eye.h
+include/eyes/*Photo.h
+docs/images/*.mp4
+# Third-party boilerplate
+lib/Adafruit_EMC2101/code-of-conduct.md
+lib/Adafruit_EMC2101/license.txt
