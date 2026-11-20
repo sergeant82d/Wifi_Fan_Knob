@@ -21,3 +21,9 @@ ESP32-S3 fan controller for a solder fume extractor, built on the Elecrow CrowPa
 3. Connect the board by USB.
 4. Run `pio run --target upload`.
 
+## License
+
+The code is MIT - see [LICENSE](LICENSE). Not covered by it:
+
+- `lib/Adafruit_EMC2101` keeps Adafruit's license (`lib/Adafruit_EMC2101/license.txt`); libraries pulled in by PlatformIO keep theirs.
+- The eye artwork: the Uncanny Eyes styles in `include/eyes` come from Adafruit's Uncanny Eyes project, and the photo eyes (Dragon 2 to 11, `assets/`) are made from purchased dragon-eye sheets by an artist. Neither is licensed for reuse here.
